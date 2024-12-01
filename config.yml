@@ -1,5 +1,5 @@
-baseURL: "https://examplesite.com/"
-title: ExampleSite
+baseURL: "https://localhost:1313"
+title: Christopher Li
 paginate: 5
 theme: PaperMod
 
@@ -19,7 +19,7 @@ params:
   title: ExampleSite
   description: "ExampleSite description"
   keywords: [Blog, Portfolio, PaperMod]
-  author: Me
+  author: Chris
   # author: ["Me", "You"] # multiple authors
   images: ["<link or path of image for opengraph, twitter-cards>"]
   DateFormat: "January 2, 2006"
@@ -27,12 +27,12 @@ params:
   disableThemeToggle: false
 
   ShowReadingTime: true
-  ShowShareButtons: true
-  ShowPostNavLinks: true
+  ShowShareButtons: false
+  ShowPostNavLinks: false
   ShowBreadCrumbs: true
   ShowCodeCopyButtons: false
-  ShowWordCount: true
-  ShowRssButtonInSectionTermList: true
+  ShowWordCount: false
+  ShowRssButtonInSectionTermList: false
   UseHugoToc: true
   disableSpecial1stPost: false
   disableScrollToTop: false
@@ -73,16 +73,41 @@ params:
 
   # home-info mode
   homeInfoParams:
-    Title: "Hi there \U0001F44B"
-    Content: Welcome to my blog
+    Title: "Christopher Li"
+    Content: |
+      \
+      Hey! I'm Chris :) \
+      \
+      I call Cupertino, California home, but I am currently studying **CS** at **New York University** (CAS '26). \
+      \
+      In my free time, I like **reading** (working through *Upshift* by Ben Ramalingam right now), **sports** (especially soccer, basketball, and F1)
+      and **cafes** (always on the lookout for hidden NYC gems!)
+      \
+      \
+      Here are some side quests I'm working on or have pursued in the past: 
+      - **Incoming Software Engineer Intern** (Summer 2025)
+      - **Head Teaching Assistant** -- NYU CSCI-UA 101 (Fall 2023, 2024, 2025)
+      - **VimCat** -- Game aimed at faciliating Vim learning; 1st place at HackNYU
+      - **Software Engineer Intern at Pulsar** -- Scraped data from over 250,000 companies; built a ReactJS/NodeJS/MySQL dashboard (Fall 2023)
+      - **TL;DR** -- Chrome extension that generates paragraph-length summaries and translates news articles, using the OpenAI API (Spring 2023)
+
+      \
+      Feel free to get in touch! christopherli@nyu.edu
+
+
+      
+
+      
+      
+
 
   socialIcons:
-    - name: x
-      url: "https://x.com/"
-    - name: stackoverflow
-      url: "https://stackoverflow.com"
+    - name: email
+      url: "mailto:christopherli@nyu.edu"
+    - name: linkedin
+      url: "https://www.linkedin.com/in/christopherrli/"
     - name: github
-      url: "https://github.com/"
+      url: "https://github.com/christopherlii"
 
   analytics:
     google:
@@ -97,10 +122,11 @@ params:
     hiddenInList: true # hide on list pages and home
     hiddenInSingle: true # hide on single page
 
-  editPost:
-    URL: "https://github.com/<path_to_repo>/content"
-    Text: "Suggest Changes" # edit text
-    appendFilePath: true # to append file path to Edit link
+  #originally in, but dont want people to edit my posts right now 
+  #editPost:
+    #URL: "https://github.com/<path_to_repo>/content"
+    #Text: "Suggest Changes" # edit text
+    #appendFilePath: true # to append file path to Edit link
 
   # for search
   # https://fusejs.io/api/options.html
@@ -115,18 +141,10 @@ params:
     keys: ["title", "permalink", "summary", "content"]
 menu:
   main:
-    - identifier: categories
-      name: categories
-      url: /categories/
-      weight: 10
-    - identifier: tags
-      name: tags
-      url: /tags/
+    - identifier: archives
+      name: archives
+      url: /archives/
       weight: 20
-    - identifier: example
-      name: example.org
-      url: https://example.org
-      weight: 30
 # Read: https://github.com/adityatelange/hugo-PaperMod/wiki/FAQs#using-hugos-syntax-highlighter-chroma
 pygmentsUseClasses: true
 markup:
