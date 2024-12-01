@@ -1,4 +1,4 @@
-baseURL: "https://christopherlii.github.io/personalwebsit/"
+baseURL: "https://christopherlii.github.io/personalwebsite/"
 title: Christopher Li
 paginate: 5
 theme: PaperMod
@@ -79,7 +79,7 @@ params:
       \
       Hey! I'm Chris :) \
       \
-      I call Cupertino, California home, but I am currently studying **CS** at **New York University** (CAS '26). \
+      I call Cupertino, California home, but I am currently studying **CS** at [**New York University**](https://www.nyu.edu/) (CAS '26). \
       \
       In my free time, I like **reading** (working through *Upshift* by Ben Ramalingam right now), **sports** (especially soccer, basketball, and F1)
       and **cafes** (always on the lookout for hidden NYC gems!)
@@ -88,9 +88,9 @@ params:
       Here are some side quests I'm working on or have pursued in the past: 
       - **Incoming Software Engineer Intern** (Summer 2025)
       - **Head Teaching Assistant** -- NYU CSCI-UA 101 (Fall 2023, 2024, 2025)
-      - **VimCat** -- Game aimed at faciliating Vim learning; 1st place at HackNYU
-      - **Software Engineer Intern at Pulsar** -- Scraped data from over 250,000 companies; built a ReactJS/NodeJS/MySQL dashboard (Fall 2023)
-      - **TL;DR** -- Chrome extension that generates paragraph-length summaries and translates news articles, using the OpenAI API (Spring 2023)
+      - [**VimCat**](https://devpost.com/software/vimcat) -- Game aimed at faciliating Vim learning; 1st place at HackNYU
+      - **Software Engineer Intern at [Pulsar](https://www.linkedin.com/company/pulsar-is/)** -- Scraped data from over 250,000 companies; built a ReactJS/NodeJS/MySQL dashboard (Fall 2023)
+      - [**TL;DR**](https://chromewebstore.google.com/detail/tldr-gpt3-news-summarizer/ddikohmknplkcapomompgabjabbicaij) (Discontinued) -- Chrome extension that generates paragraph-length summaries and translates news articles, using the OpenAI API (Spring 2023)
 
       \
       Feel free to get in touch! christopherli@nyu.edu
