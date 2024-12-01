@@ -2,6 +2,7 @@ baseURL: "https://christopherlii.github.io/personalwebsit/"
 title: Christopher Li
 paginate: 5
 theme: PaperMod
+languageCode: "en-us"
 
 enableRobotsTXT: true
 buildDrafts: false
