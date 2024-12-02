@@ -1,4 +1,4 @@
-baseURL: "https://christopherlii.github.io/personalwebsite/"
+baseURL: "/"
 title: Christopher Li
 paginate: 5
 theme: PaperMod
