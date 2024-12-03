@@ -9,7 +9,7 @@ buildDrafts: false
 buildFuture: false
 buildExpired: false
 
-googleAnalytics: UA-123-45
+googleAnalytics: G-946ZRJPW0Q
 
 minify:
   disableXML: true
@@ -24,7 +24,7 @@ params:
   # author: ["Me", "You"] # multiple authors
   images: ["<link or path of image for opengraph, twitter-cards>"]
   DateFormat: "January 2, 2006"
-  defaultTheme: auto # dark, light
+  defaultTheme: dark # dark, light
   disableThemeToggle: false
   ShowReadingTime: true
   ShowShareButtons: false
