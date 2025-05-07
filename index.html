@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Christopher Li - Personal Website</title>
+  <link rel="icon" type="image/png" href="/logos/CL.png">
   <style>
     body {
       font-family: Georgia, serif;
@@ -114,6 +115,30 @@
       color: #555;
       font-weight: bold;
       flex-shrink: 0;
+      position: relative; /* Added for positioning hover images */
+    }
+    
+    .side-quest-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: opacity 0.3s ease; /* Smooth transition for hover effect */
+    }
+    
+    .side-quest-logo .hover-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0; /* Hide hover image initially */
+      transition: opacity 0.5s ease;
+    }
+    
+    .side-quest-entry:hover .side-quest-logo .default-img {
+      opacity: 0; /* Hide default image on hover */
+    }
+    
+    .side-quest-entry:hover .side-quest-logo .hover-img {
+      opacity: 1; /* Show hover image */
     }
     
     .side-quest-info {
@@ -191,18 +216,19 @@
     <div class="content">
       <div id="home-page">
         <h2>About Me</h2>
-        <p> Currently: studying CS at New York University (CAS '26) </p>
-        <p>In my free time, I like building, sports (especially soccer, basketball, and F1) and hopping cafes.</p>
-        <p>This site is a work in progress!</p>
+        <p> I am studying CS at New York University (CAS '26) </p>
+        <p>In my free time, I like building, sports (especially soccer, basketball, and F1) and hopping cafes. Currently reading: Good Arguments by Bo Seo!</p>
+        <p>This site is a work in progress :)</p>
         
         <div class="spacer"></div>
 
         <h2>Resume</h2>
         <div id="side-quests-list">
-          <!-- Side quests styled like blog entries -->
+          <!-- Side quests styled like blog entries with hover images -->
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
-              <img src="logos/aws-logo.png" alt="AWS Logo" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="logos/aws-logo.png" alt="AWS Logo" class="default-img">
+              <img src="logos/aws-logo-hover.png" alt="AWS Logo Hover" class="hover-img">
             </div>
             <div class="side-quest-info">
               <span class="side-quest-title">Software Development Engineer Intern @ AWS</span>
@@ -212,28 +238,36 @@
           
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
-              <img src="logos/coinbase-logo.png" alt="Coinbase Logo" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="logos/coinbase-logo.png" alt="Coinbase Logo" class="default-img">
+              <img src="logos/coinbase-logo-hover.png" alt="Coinbase Logo Hover" class="hover-img">
             </div>
             <div class="side-quest-info">
               <span class="side-quest-title">Product Consultant @ Coinbase</span>
               <span class="side-quest-date">Contract</span>
             </div>
           </a>
+
+          <a href="#" class="side-quest-entry">
+            <div class="side-quest-logo">
+              <img src="logos/nyu-logo.png" alt="NYU Logo" class="default-img">
+              <img src="logos/nyu-logo-hover.png" alt="NYU Logo Hover" class="hover-img">
+            </div>
+            <div class="side-quest-info">
+              <span class="side-quest-title">Head Teaching Assistant @ NYU</span>
+              <span class="side-quest-date">Fall 2023, Fall 2024</span>
+            </div>
+          </a>
           
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
-              <img src="logos/pulsar-logo.png" alt="Pulsar Logo" style="width: 100%; height: 100%; object-fit: contain;">
+              <img src="logos/pulsar-logo.png" alt="Pulsar Logo" class="default-img">
+              <img src="logos/pulsar-logo-hover.png" alt="Pulsar Logo Hover" class="hover-img">
             </div>
             <div class="side-quest-info">
               <span class="side-quest-title">Software Engineer Intern @ Pulsar</span>
               <span class="side-quest-date">Fall 2023</span>
             </div>
           </a>
-        </div>
-
-        <div class="currently-reading">
-          <h2>Currently Reading:</h2>
-          <p>Good Arguments by Bo Seo</p>
         </div>
       </div>
       
