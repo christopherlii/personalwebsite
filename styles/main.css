@@ -38,10 +38,9 @@ margin-top: 5;
 
 /* nav bar */
 .nav {
-flex: 0 0 auto;
+flex: 1;
 text-align: right;
 padding-top: 8px;
-margin-left: 40px;
 }
 
 .nav a {
@@ -51,8 +50,6 @@ color: #555;
 text-decoration: none;
 font-size: 16px;
 transition: color 0.3s;
-width: 80px;
-text-align: right;
 }
 
 .nav a:hover, .nav a.active {
