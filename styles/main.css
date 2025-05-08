@@ -18,10 +18,11 @@ display: flex;
 justify-content: space-between;
 align-items: flex-start;
 margin-bottom: 50px;
+max-width: 600px;
 }
 
 .welcome {
-flex: 3;
+flex: 1;
 }
 
 .welcome h1 {
@@ -37,9 +38,10 @@ margin-top: 5;
 
 /* nav bar */
 .nav {
-flex: 1;
+flex: 0 0 auto;
 text-align: right;
 padding-top: 8px;
+margin-left: 40px;
 }
 
 .nav a {
