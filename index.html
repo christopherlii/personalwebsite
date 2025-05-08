@@ -3,202 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Christopher Li - Personal Website</title>
+  <title>Christopher Li</title>
   <link rel="icon" type="image/png" href="/logos/CL.png">
-  <style>
-    body {
-      font-family: Georgia, serif;
-      line-height: 1.6;
-      margin: 0;
-      padding: 0;
-      color: #1b1b1d;
-      background-color: #f8f8f8;
-    }
-    
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 40px 20px 20px;
-    }
-    
-    .intro-section {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 50px;
-    }
-    
-    .welcome {
-      flex: 3;
-    }
-    
-    .welcome h1 {
-      margin-top: 20px;
-      line-height: 1;
-      font-weight: normal;
-      font-size: 35px;
-    }
-    
-    .welcome p {
-      margin-top: 5;
-    }
-    
-    .nav {
-      flex: 1;
-      text-align: right;
-      padding-top: 8px;
-    }
-    
-    .nav a {
-      display: block;
-      margin-bottom: 10px;
-      color: #555;
-      text-decoration: none;
-      font-size: 16px;
-      transition: color 0.3s;
-    }
-    
-    .nav a:hover, .nav a.active {
-      color: #000;
-      font-weight: bold;
-    }
-    
-    .content {
-      max-width: 600px;
-    }
-    
-    h2 {
-      font-size: 22px;
-      font-weight: normal;
-      margin-top: 25px;
-      margin-bottom: 15px;
-    }
-    
-    /* Archives and Side Quest common styles */
-    .archives-entry, .side-quest-entry {
-      margin-bottom: 20px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      transition: all 0.2s ease;
-      cursor: pointer;
-      text-decoration: none;
-      color: inherit;
-      display: block;
-    }
-    
-    .archives-entry {
-      padding: 12px;
-    }
-    
-    .archives-entry:hover, .side-quest-entry:hover {
-      border-color: #999;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      background-color: #fafafa;
-    }
-    
-    /* Side Quest specific styles */
-    .side-quest-entry {
-      display: flex;
-      align-items: center;
-      padding: 15px; /* Slightly more padding to ensure equal spacing */
-    }
-    
-    .side-quest-logo {
-      width: 60px;
-      height: 60px;
-      margin-right: 15px;
-      border-radius: 3px;
-      background-color: #eee;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #555;
-      font-weight: bold;
-      flex-shrink: 0;
-      position: relative; /* Added for positioning hover images */
-    }
-    
-    .side-quest-logo img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      transition: opacity 0.3s ease; /* Smooth transition for hover effect */
-    }
-    
-    .side-quest-logo .hover-img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      opacity: 0; /* Hide hover image initially */
-      transition: opacity 0.5s ease;
-    }
-    
-    .side-quest-entry:hover .side-quest-logo .default-img {
-      opacity: 0; /* Hide default image on hover */
-    }
-    
-    .side-quest-entry:hover .side-quest-logo .hover-img {
-      opacity: 1; /* Show hover image */
-    }
-    
-    .side-quest-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center; /* Center content vertically */
-    }
-    
-    .side-quest-title {
-      font-weight: normal;
-      font-size: 18px;
-      margin: 0 0 0 0;
-      display: block;
-    }
-    
-    .side-quest-date {
-      font-style: italic;
-      color: #777;
-      font-size: 14px;
-    }
-    
-    /* Archives specific styles */
-    .archives-intro {
-      margin-bottom: 15px;
-      font-size: 15px;
-    }
-    
-    .archives-entry h3 {
-      margin-top: 0;
-      margin-bottom: 5px;
-      font-size: 18px;
-      font-weight: normal;
-    }
-    
-    .archives-entry .date {
-      font-style: italic;
-      color: #777;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-    
-    .archives-entry p {
-      margin-top: 2px;
-      margin-bottom: 2px;
-      line-height: 1.4;
-    }
-    
-    .article-page {
-      display: none;
-    }
-    
-    .article-content {
-      margin-top: 30px;
-    }
-    
-    .hidden {
-      display: none;
-    }
-  </style>
+  <link rel="stylesheet" href="/styles/main.css">
+  
 </head>
 <body>
   <div class="container">
@@ -208,15 +16,15 @@
       </div>
       <nav class="nav">
         <a href="#" class="active" data-page="home">Home</a>
-        <a href="#" data-page="archives">Archives</a>
-        <a href="#" data-page="contact">Contact</a>
+        <a href="/#archives" data-page="archives">Archives</a>
+        <a href="/#contact" data-page="contact">Contact</a>
       </nav>
     </div>
     
     <div class="content">
       <div id="home-page">
         <h2>About Me</h2>
-        <p> I am studying CS at New York University (CAS '26) </p>
+        <p> Originally from Cupertino, CA; now studying Computer Science at NYU (CAS '26). </p>
         <p>In my free time, I like building, sports (especially soccer, basketball, and F1) and hopping cafes. Currently reading: Good Arguments by Bo Seo!</p>
         <p>This site is a work in progress :)</p>
         
@@ -224,7 +32,6 @@
 
         <h2>Resume</h2>
         <div id="side-quests-list">
-          <!-- Side quests styled like blog entries with hover images -->
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
               <img src="logos/aws-logo.png" alt="AWS Logo" class="default-img">
@@ -243,7 +50,7 @@
             </div>
             <div class="side-quest-info">
               <span class="side-quest-title">Product Consultant @ Coinbase</span>
-              <span class="side-quest-date">Contract</span>
+              <span class="side-quest-date">Contract (via NYU Blockchain & Fintech)</span>
             </div>
           </a>
 
@@ -273,94 +80,65 @@
       
       <div id="archives-page" class="hidden">
         <h2>Archives</h2>
-        <p class="archives-intro">A collection of my writings, organized by date.</p>
+       <!-- <p class="archives-intro">A collection of my writings, organized by date.</p> -->
         
-        <!-- Example of Archives entries -->
-         <!--
-        
-        <a href="article1.html" class="archives-entry">
-          <h3>The Art of Simplicity</h3>
+        <a href="/posts/to-be-alive.html" class="archives-entry">
+          <h3>To Be Alive</h3>
           <p class="date">April 28, 2025</p>
-          <p>Exploring how minimalism enhances both creative work and daily living. In this piece, I consider how reduction often leads to greater clarity and impact.</p>
+          <p>
+            Excerpt from a final paper I wrote for Professor Shum's Expository Writing course.
+            Mostly a placeholder for testing purposes.
+          </p>
         </a>
-        
-        <a href="article2.html" class="archives-entry">
-          <h3>Digital Gardens vs Traditional Blogs</h3>
-          <p class="date">April 15, 2025</p>
-          <p>A comparison of different approaches to publishing personal thoughts online, with reflections on how format influences both writing and reading experiences.</p>
-        </a>
-
-        -->
       </div>
       
       <div id="contact-page" class="hidden">
         <h2>Contact</h2>
         <p>Email: christopherli@nyu.edu</p>
       </div>
-      
-
     </div>
   </div>
+
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const navLinks = document.querySelectorAll('.nav a');
       const pages = document.querySelectorAll('[id$="-page"]');
       
-      // Navigation between main pages
+      function showPage(pageId) {
+        pages.forEach(page => {
+          page.classList.add('hidden');
+        });
+        
+        navLinks.forEach(navLink => {
+          navLink.classList.remove('active');
+        });
+        
+        document.getElementById(pageId).classList.remove('hidden');
+        document.querySelector(`[data-page="${pageId.replace('-page', '')}"]`).classList.add('active');
+      }
+      
       navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
           e.preventDefault();
-          
-          // Hide all pages
-          pages.forEach(page => {
-            page.classList.add('hidden');
-          });
-          
-          // Remove active class from all links
-          navLinks.forEach(navLink => {
-            navLink.classList.remove('active');
-          });
-          
-          // Show selected page and mark link as active
           const pageId = this.getAttribute('data-page') + '-page';
-          document.getElementById(pageId).classList.remove('hidden');
-          this.classList.add('active');
+          showPage(pageId);
+          history.pushState(null, '', this.getAttribute('href'));
         });
       });
-      
-      // Handle article links
-      const archivesEntries = document.querySelectorAll('.archives-entry');
-      archivesEntries.forEach((entry, index) => {
-        entry.addEventListener('click', function(e) {
-          e.preventDefault();
-          
-          // Hide all pages
-          pages.forEach(page => {
-            page.classList.add('hidden');
-          });
-          
-          // Show the article page
-          const articleId = 'article' + (index + 1) + '-page';
-          document.getElementById(articleId).classList.remove('hidden');
-          
-          // Update navigation
-          navLinks.forEach(navLink => {
-            navLink.classList.remove('active');
-          });
-        });
-      });
-      
-      // Back to main pages from articles
-      document.querySelector('.nav').addEventListener('click', function(e) {
-        if (e.target.tagName === 'A') {
-          // Hide all article pages
-          document.querySelectorAll('.article-page').forEach(page => {
-            page.classList.add('hidden');
-          });
+
+      function handleHashNavigation() {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+          showPage(hash + '-page');
         }
-      });
+      }
+
+      handleHashNavigation();
+
+      window.addEventListener('popstate', handleHashNavigation);
     });
   </script>
 </body>
+
 </html>

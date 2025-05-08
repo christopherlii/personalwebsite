@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Art of Simplicity - Christopher Li</title>
+  <link rel="icon" type="image/png" href="/logos/CL.png">
+  <link rel="stylesheet" href="/styles/archives.css">
+</head>
+<body>
+  <div class="container">
+    <div class="intro-section">
+      <div class="welcome">
+        <h1><a href="/" style="text-decoration: none; color: inherit;">Christopher Li</a></h1>
+      </div>
+      <nav class="nav">
+        <a href="/" data-page="home">Home</a>
+        <a href="/#archives" data-page="archives">Archives</a>
+        <a href="/#contact" data-page="contact">Contact</a>
+      </nav>
+    </div>
+    
+    <div class="post-content">
+      <h1>To Be Alive</h1>
+      <div class="date">April 28, 2025</div>
+      <div class="content">
+        <p>
+          <i>
+            This is an excerpt from a final paper I wrote in freshman year, discussing works by Joan Didion, Rebecca
+            Solnit, and Karl Ove Knausgaard (with references to Marcel Proust). It's here as a placeholder to test
+            changes that I make to the site, but every once in a while I'll read it back and realize I should 
+            listen to my own advice.
+          </i>
+        </p>
+        
+        <p style="text-indent: 2em;">
+               One semester in, I haven't yet fully appreciated all that NYU has to offer. I found the way 
+          individuals assessed their peers to be similar to that of the reporter which berated Solnit. 
+          People are confused when others think and act differently, and offended when someone questions 
+          their motives. But we cannot have it both ways. By doing so, we stray from "peace, a private 
+          reconciliation" (Didion) that prompts not a realization, but a subtle change of mindset. Because 
+          the standard for happiness is unique to the individual, constantly trying to be better than 
+          (or more similar to) others is pointless, and thinking of life as a competition becomes an obstacle 
+          towards your utopia. Our lives will never be identical to the success we dream of or as horrible as 
+          our worst fears, but instead something unique that cannot be unveiled through trying to be someone or 
+          something else—to believe otherwise is to trap oneself in their own "prisons and punishments" (Solnit). 
+          Perhaps we divert our energy and love elsewhere, and cease picturing an erroneous image of both 
+          ourselves and others. Then, finally, we are alive. Our "only true voyage of discovery, the only 
+          fountain of Eternal youth, would be not to visit strange lands but to possess other eyes," through
+           which we can see, understand, and live (Proust).
+          </p>
+        
+      </div>
+      <a href="/#archives" class="return-button">← Return to Archives</a>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const navLinks = document.querySelectorAll('.nav a');
+      
+      navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const page = this.getAttribute('data-page');
+          window.location.href = `/#${page}`;
+        });
+      });
+    });
+  </script>
+</body>
+</html> 
