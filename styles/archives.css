@@ -77,6 +77,15 @@ body {
   margin-bottom: 20px;
 }
 
+.footer {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+}
+
 .return-button {
   display: inline-block;
   margin-top: 30px;

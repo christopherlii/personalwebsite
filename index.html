@@ -80,14 +80,14 @@
       
       <div id="archives-page" class="hidden">
         <h2>Archives</h2>
-       <!-- <p class="archives-intro">A collection of my writings, organized by date.</p> -->
+        <p class="archives-intro">A collection of my writings, organized by date.</p>
         
         <a href="/posts/to-be-alive.html" class="archives-entry">
           <h3>To Be Alive</h3>
           <p class="date">April 28, 2025</p>
           <p>
             Excerpt from a final paper I wrote for Professor Shum's Expository Writing course.
-            Mostly a placeholder for testing purposes.
+            Place 
           </p>
         </a>
       </div>
@@ -106,27 +106,33 @@
       const pages = document.querySelectorAll('[id$="-page"]');
       
       function showPage(pageId) {
+        // Hide all pages
         pages.forEach(page => {
           page.classList.add('hidden');
         });
         
+        // Remove active class from all links
         navLinks.forEach(navLink => {
           navLink.classList.remove('active');
         });
         
+        // Show selected page and mark link as active
         document.getElementById(pageId).classList.remove('hidden');
         document.querySelector(`[data-page="${pageId.replace('-page', '')}"]`).classList.add('active');
       }
       
+      // Navigation between main pages
       navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
           e.preventDefault();
           const pageId = this.getAttribute('data-page') + '-page';
           showPage(pageId);
+          // Update URL without triggering a page reload
           history.pushState(null, '', this.getAttribute('href'));
         });
       });
 
+      // Handle hash-based navigation
       function handleHashNavigation() {
         const hash = window.location.hash.replace('#', '');
         if (hash) {
@@ -134,8 +140,10 @@
         }
       }
 
+      // Handle initial page load
       handleHashNavigation();
 
+      // Handle browser back/forward buttons
       window.addEventListener('popstate', handleHashNavigation);
     });
   </script>
