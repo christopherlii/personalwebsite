@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Christopher Li</title>
+  <link rel="icon" type="image/png" href="/logos/CL.png">
+  <link rel="stylesheet" href="/styles/archives.css">
+</head>
+<body>
+  <div class="container">
+    <div class="intro-section">
+      <div class="welcome">
+        <h1><a href="/" style="text-decoration: none; color: inherit;">Christopher Li</a></h1>
+      </div>
+      <nav class="nav">
+        <a href="/" data-page="home">Home</a>
+        <a href="/#archives" data-page="archives">Archives</a>
+        <a href="/#contact" data-page="contact">Contact</a>
+      </nav>
+    </div>
+    
+    <div class="post-content">
+      <h1>If I Had To Do NYU CS Over Again</h1>
+      <div class="date">May 31, 2025</div>
+      <div class="content">
+        
+        <p style="text-indent: 2em;">
+            First things first, if you're reading this as an incoming CS student at NYU, congratulations!
+             You'll probably have the best 4 years of your life here... if you make the most of it. Obviously,
+             listen to the blanket advice, but there's a couple things I think people miss. I'm a 
+             rising senior at time of writing, and if I had another shot at NYU CS, this is what I'd do differently.
+
+        </p>
+
+        <h3>1. Credit</h3>
+        <p>
+            If you are a pre-matriculated student, get the AP credit (especially for Calc, CS, and foreign language)!!! 
+            Take community college courses (these might not count towards your CAS core requirements, but you can still get 
+            credit). Despite what you might read online, NYU is pretty lax on this. Each credit you save is, over the course 
+            of the semester, worth over $1000 in tuition fees, or XX hours taking a class you actually enjoy.
+        </p>
+
+        <h3>2. Grades don't matter</h3>
+
+        <p>
+            Good grades don't matter. It's good to study hard, but they don't actually matter for jobs and are not a 
+            reflection of how well you learned the material. It's more valuable instead to be 
+             <a href="https://blog.torchnyu.com/2020/12/10/intellectual-ambition.html">intellectually curious</a>. 
+            It's a common mistake to spend too much of your freshman year cramming for your GPA when it's arguably 
+            the one year that you can spend trying <i>anything</i>.
+        </p>
+
+        <h3>3. Freshman Year</h3>
+
+        <p>
+            Try everything in freshman year. Join clubs: Tech@NYU dev team, Blockchain & Fintech dev team, BUGS, SVS, QFS, 
+            BAC, and others. It doesn't have to be tech either—cultural clubs, frats, and anything you find cool! Go to 
+            events, meet new people. Join a VIP. Find a community and surround yourself with people you want to be like. 
+            This is the best time to find a friend, mentor, cofounder. Build projects, go to hackathons. Do research if 
+            you're doing nothing in the summer (reach out to professors around winter). Apply to fellowships. Look up people 
+            who have the jobs you want on LinkedIn, and follow what they were doing in their fresh/soph years. Use rocketreach 
+            and find recruiter emails. Work hard play harder. You'll always regret not doing something more than you'll regret 
+            doing it. 
+        </p>
+
+        <h3>4. Found a club</h3>
+
+        <p>
+            This is probably one of my biggest regrets. The CS community at NYU is missing sooo many amazing clubs that other 
+            schools offer. An app dev club. A club that creates NYU-focused tooling to better student lives. An AI/ML club that 
+            builds products. A Software Dev club that sources work from companies. Refound ACM. Make project teams. So many options....
+            A lack of a excellence and talent hubs, in my opinion, is what most separates NYU from top CS programs. 
+        </p>
+
+        <h3>5. Meet People</h3>
+
+        <p>
+            Most important for last: go out of your way to meet people. I'd honestly treat extroversion as a skill. One of my close friends used to 
+            taxi back to her dorm with the sole purpose of striking up and maintaining a conversation with the driver. Now, 
+            socializing comes naturally to her. NYU is a school where it's incredibly easy to feel alone in a big city. 
+            Having a support system underneath you and a wide reaching network not only advances your career, life is simply 
+            much more fun—you do more, risk more, live more. There's nothing more special than experiencing a moment (at 
+            the perfect place, with the perfect people) that you know you'll reminisce on later.
+        </p>
+
+        <p>
+        I think that's enough rambling at 4 am, goodnight :)
+        </p>
+        
+      </div>
+      <a href="/#archives" class="return-button">← Return to Archives</a>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const navLinks = document.querySelectorAll('.nav a');
+      
+      navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const page = this.getAttribute('data-page');
+          window.location.href = `/#${page}`;
+        });
+      });
+    });
+  </script>
+</body>
+</html> 
