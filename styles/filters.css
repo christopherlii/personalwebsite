@@ -70,4 +70,9 @@
     background: rgba(39, 174, 96, 0.3);
     box-shadow: 0 0 6px rgba(39, 174, 96, 0.4);
   }
+
+  .filter-pill[data-filter="random"].active .filter-indicator {
+    background: rgba(217, 202, 35, 0.3);
+    box-shadow: 0 0 6px rgba(212, 196, 47, 0.4);
+  }
   
