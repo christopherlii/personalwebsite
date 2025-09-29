@@ -60,14 +60,26 @@ class MarkdownRenderer {
   // Load all markdown posts
   async loadPosts() {
     try {
-      // Fetch the list of markdown files
-      const response = await fetch('/posts/');
-      const text = await response.text();
-      
-      // Extract .md files from the directory listing
-      const mdFiles = text.match(/href="([^"]*\.md)"/g)?.map(match => 
-        match.replace('href="', '').replace('"', '')
-      ) || [];
+      // Prefer a static index for production (GitHub Pages blocks dir listing)
+      let mdFiles = [];
+      try {
+        const indexResp = await fetch('/posts/index.json', { cache: 'no-store' });
+        if (indexResp.ok) {
+          const index = await indexResp.json();
+          if (Array.isArray(index)) {
+            mdFiles = index.filter(name => typeof name === 'string' && name.endsWith('.md'));
+          }
+        }
+      } catch (_) {}
+
+      // Fallback to directory listing if index.json not available (local dev)
+      if (mdFiles.length === 0) {
+        const response = await fetch('/posts/');
+        const text = await response.text();
+        mdFiles = text.match(/href="([^"]*\.md)"/g)?.map(match => 
+          match.replace('href="', '').replace('"', '')
+        ) || [];
+      }
       
       this.posts = [];
       
