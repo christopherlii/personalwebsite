@@ -36,6 +36,17 @@
         <div id="side-quests-list">
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
+              <img src="logos/tabs-logo.png" alt="Tabs Logo" class="default-img">
+              <img src="logos/tabs-logo-hover.png" alt="Tabs Logo Hover" class="hover-img">
+            </div>
+            <div class="side-quest-info">
+              <span class="side-quest-title">Software Engineer @ Tabs</span>
+              <span class="side-quest-date">Backed by Lightspeed, General Catalyst, Primary Ventures</span>
+            </div>
+          </a>
+
+          <a href="#" class="side-quest-entry">
+            <div class="side-quest-logo">
               <img src="logos/aws-logo.png" alt="AWS Logo" class="default-img">
               <img src="logos/aws-logo-hover.png" alt="AWS Logo Hover" class="hover-img">
             </div>
@@ -55,17 +66,6 @@
               <span class="side-quest-date">Contract (via NYU Blockchain & Fintech)</span>
             </div>
           </a>
-
-          <a href="#" class="side-quest-entry">
-            <div class="side-quest-logo">
-              <img src="logos/nyu-logo.png" alt="NYU Logo" class="default-img">
-              <img src="logos/nyu-logo-hover.png" alt="NYU Logo Hover" class="hover-img">
-            </div>
-            <div class="side-quest-info">
-              <span class="side-quest-title">Head Teaching Assistant @ NYU</span>
-              <span class="side-quest-date">Fall 2023, Fall 2024</span>
-            </div>
-          </a>
           
           <a href="#" class="side-quest-entry">
             <div class="side-quest-logo">
@@ -80,167 +80,18 @@
         </div>
       </div>
       
-      <div id="archives-page" class="hidden">
-        <div>
-          <h2>Archives</h2>
-        </div>
-        
-        <div class="filter-container">
-          <div class="filter-pills">
-            <div class="filter-pill" data-filter="nyu">
-              <div class="filter-indicator"></div>
-              <span>NYU</span>
-            </div>
-            <div class="filter-pill" data-filter="thoughts">
-              <div class="filter-indicator"></div>
-              <span>Thoughts</span>
-            </div>
-            <div class="filter-pill" data-filter="cases">
-              <div class="filter-indicator"></div>
-              <span>Case Studies</span>
-            </div>
-            <!-- 
-            <div class="filter-pill" data-filter="sports">
-              <div class="filter-indicator"></div>
-              <span>Sports</span>
-            </div>
-
-            -->
-            <div class="filter-pill" data-filter="random">
-              <div class="filter-indicator"></div>
-              <span>Random</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="archives-list">
-          <a href="/posts/if-i-had-to-do-nyu-over-again.html" class="archives-entry" data-tags="nyu">
-            <h3>If I Had To Do NYU CS Over Again</h3>
-            <p>Some things i learned over 3 years</p>
-          </a>
-          
-          <a href="/posts/to-be-alive.html" class="archives-entry" data-tags="thoughts">
-            <h3>To Be Alive</h3>
-            <p>Excerpt from a final paper i wrote for expos. Placeholder for testing purposes.</p>
-          </a>
-        </div>
-
-        <div class="no-results hidden">
-          <p>No posts match the selected filters.</p>
-        </div>
-      </div>
+      <div id="archives-page" class="hidden"></div>
       
       <div id="contact-page" class="hidden">
-        <h2>contact</h2>
+        <h2>Contact</h2>
         <p>Email: christopherli@nyu.edu</p>
       </div>
     </div>
   </div>
 
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const navLinks = document.querySelectorAll('.nav a');
-      const pages = document.querySelectorAll('[id$="-page"]');
-      
-      function showPage(pageId) {
-        // Hide all pages
-        pages.forEach(page => {
-          page.classList.add('hidden');
-        });
-        
-        // Remove active class from all links
-        navLinks.forEach(navLink => {
-          navLink.classList.remove('active');
-        });
-        
-        // Show selected page and mark link as active
-        document.getElementById(pageId).classList.remove('hidden');
-        document.querySelector(`[data-page="${pageId.replace('-page', '')}"]`).classList.add('active');
-      }
-      
-      // Navigation between main pages
-      navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          const pageId = this.getAttribute('data-page') + '-page';
-          showPage(pageId);
-          // Update URL without triggering a page reload
-          history.pushState(null, '', this.getAttribute('href'));
-        });
-      });
-
-      // Handle hash-based navigation
-      function handleHashNavigation() {
-        const hash = window.location.hash.replace('#', '');
-        if (hash) {
-          showPage(hash + '-page');
-        }
-      }
-
-      // Handle initial page load
-      handleHashNavigation();
-
-      // Handle browser back/forward buttons
-      window.addEventListener('popstate', handleHashNavigation);
-
-      // Archives filtering functionality
-      const filterPills = document.querySelectorAll('.filter-pill');
-      const archiveEntries = document.querySelectorAll('.archives-entry');
-      const noResults = document.querySelector('.no-results');
-      
-      let activeFilters = new Set();
-
-      filterPills.forEach(pill => {
-        pill.addEventListener('click', () => {
-          const filter = pill.dataset.filter;
-          
-          if (activeFilters.has(filter)) {
-            activeFilters.delete(filter);
-            pill.classList.remove('active');
-          } else {
-            activeFilters.add(filter);
-            pill.classList.add('active');
-          }
-          
-          applyFilters();
-        });
-      });
-
-      function applyFilters() {
-        let visibleCount = 0;
-        
-        archiveEntries.forEach(entry => {
-          const tags = entry.dataset.tags.split(',');
-          
-          if (activeFilters.size === 0) {
-            // No filters active, show all
-            entry.classList.remove('hidden');
-            visibleCount++;
-          } else {
-            // Check if entry has any of the active filters
-            const hasActiveFilter = Array.from(activeFilters).some(filter => 
-              tags.includes(filter)
-            );
-            
-            if (hasActiveFilter) {
-              entry.classList.remove('hidden');
-              visibleCount++;
-            } else {
-              entry.classList.add('hidden');
-            }
-          }
-        });
-        
-        // Show/hide no results message
-        if (visibleCount === 0 && activeFilters.size > 0) {
-          noResults.classList.remove('hidden');
-        } else {
-          noResults.classList.add('hidden');
-        }
-      }
-    });
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/static/markdown-renderer.js"></script>
 </body>
 
 </html>

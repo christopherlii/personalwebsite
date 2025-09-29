@@ -192,3 +192,14 @@ margin-top: 30px;
 display: none;
 }
 
+/* Ensure markdown-rendered links are black by default */
+.post-content a {
+  color: #000;
+  text-decoration: underline;
+}
+
+.post-content a:hover {
+  color: #000;
+  text-decoration-color: #777;
+}
+
