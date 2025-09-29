@@ -1,6 +1,6 @@
 ---
 title: "Example Markdown Post"
-date: "12.15.2024"
+date: "12-15-2024"
 tags: ["thoughts", "random"]
 description: "This is an example post to demonstrate the markdown converter functionality."
 ---
