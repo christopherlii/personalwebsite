@@ -203,3 +203,19 @@ display: none;
   text-decoration-color: #777;
 }
 
+/* Limit image width to match content width */
+.post-content img {
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 20px 0;
+  object-fit: contain;
+}
+
+/* Additional constraint for very large images */
+.post-content img {
+  max-width: 500px;
+  width: auto;
+}
+

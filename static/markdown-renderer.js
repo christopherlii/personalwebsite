@@ -182,10 +182,15 @@ class MarkdownRenderer {
     document.getElementById('return-to-archives').addEventListener('click', (e) => {
       e.preventDefault();
       this.showArchives();
+      // Update URL to show archives in the URL bar
+      history.pushState(null, '', '/#archives');
     });
 
     // Update navigation
     this.updateNavigation('archives');
+    
+    // Update URL to show the specific post
+    history.pushState(null, '', `/#post/${postId}`);
   }
 
   // Show archives list
@@ -374,10 +379,15 @@ document.addEventListener('DOMContentLoaded', function() {
   // Load posts when the page loads
   renderer.loadPosts().then(() => {
     console.log('Posts loaded successfully');
-    // After posts are loaded, handle initial hash navigation (e.g., #archives)
+    // After posts are loaded, handle initial hash navigation (e.g., #archives, #post/volume1)
     const initialHash = window.location.hash.replace('#', '');
     if (initialHash) {
-      renderer.handleNavigation(initialHash);
+      if (initialHash.startsWith('post/')) {
+        const postId = initialHash.replace('post/', '');
+        renderer.showPost(postId);
+      } else {
+        renderer.handleNavigation(initialHash);
+      }
     }
   });
 
@@ -398,7 +408,12 @@ document.addEventListener('DOMContentLoaded', function() {
   window.addEventListener('popstate', () => {
     const hash = window.location.hash.replace('#', '');
     if (hash) {
-      renderer.handleNavigation(hash);
+      if (hash.startsWith('post/')) {
+        const postId = hash.replace('post/', '');
+        renderer.showPost(postId);
+      } else {
+        renderer.handleNavigation(hash);
+      }
     }
   });
 }); 
