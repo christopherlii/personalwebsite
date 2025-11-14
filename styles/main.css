@@ -1,24 +1,24 @@
 body {
 font-family: Georgia, serif;
-line-height: 1.5;
+line-height: 1.55;
 margin: 0;
 padding: 0;
 color: #1b1b1d;
 background-color: #f8f8f8;
-font-size: 14px;
+font-size: 15px;
 }
 
 .container {
 max-width: 600px;
 margin: 0 auto;
-padding: 30px 20px 20px;
+padding: 35px 20px 20px;
 }
 
 .intro-section {
 display: flex;
 justify-content: space-between;
 align-items: flex-start;
-margin-bottom: 35px;
+margin-bottom: 40px;
 max-width: 600px;
 }
 
@@ -27,30 +27,30 @@ flex: 1;
 }
 
 .welcome h1 {
-margin-top: 15px;
+margin-top: 18px;
 line-height: 1;
 font-weight: normal;
-font-size: 24px;
+font-size: 28px;
 }
 
 .welcome p {
 margin-top: 5;
-font-size: 14px;
+font-size: 15px;
 }
 
 /* nav bar */
 .nav {
 flex: 1;
 text-align: right;
-padding-top: 5px;
+padding-top: 6px;
 }
 
 .nav a {
 display: block;
-margin-bottom: 6px;
+margin-bottom: 8px;
 color: #555;
 text-decoration: none;
-font-size: 13px;
+font-size: 14px;
 transition: color 0.3s;
 }
 
@@ -64,25 +64,25 @@ max-width: 600px;
 }
 
 .content p {
-font-size: 14px;
-line-height: 1.5;
-margin-bottom: 10px;
+font-size: 15px;
+line-height: 1.55;
+margin-bottom: 12px;
 }
 
 .spacer {
-height: 20px;
+height: 25px;
 }
 
 h2 {
-font-size: 16px;
+font-size: 18px;
 font-weight: normal;
-margin-top: 20px;
-margin-bottom: 12px;
+margin-top: 25px;
+margin-bottom: 14px;
 }
 
 /* archives */
 .archives-entry, .side-quest-entry {
-margin-bottom: 12px;
+margin-bottom: 14px;
 border: 1px solid #ddd;
 border-radius: 4px;
 transition: all 0.3s ease;
@@ -93,7 +93,7 @@ display: block;
 }
 
 .archives-entry {
-padding: 10px;
+padding: 12px;
 }
 
 .archives-entry:hover, .side-quest-entry:hover {
@@ -106,13 +106,13 @@ background-color: #fafafa;
 .side-quest-entry {
 display: flex;
 align-items: center;
-padding: 12px;
+padding: 14px;
 }
 
 .side-quest-logo {
-width: 50px;
-height: 50px;
-margin-right: 12px;
+width: 55px;
+height: 55px;
+margin-right: 14px;
 border-radius: 3px;
 background-color: #eee;
 display: flex;
@@ -156,7 +156,7 @@ justify-content: center;
 
 .side-quest-title {
 font-weight: normal;
-font-size: 14px;
+font-size: 16px;
 margin: 0 0 0 0;
 display: block;
 }
@@ -164,33 +164,33 @@ display: block;
 .side-quest-date {
 font-style: italic;
 color: #777;
-font-size: 12px;
+font-size: 13px;
 }
 
 .archives-intro {
-margin-bottom: 12px;
-font-size: 14px;
+margin-bottom: 14px;
+font-size: 15px;
 }
 
 .archives-entry h3 {
 margin-top: 0;
-margin-bottom: 4px;
-font-size: 14px;
+margin-bottom: 5px;
+font-size: 16px;
 font-weight: normal;
 }
 
 .archives-entry .date {
 font-style: italic;
 color: #777;
-margin-bottom: 6px;
-font-size: 12px;
+margin-bottom: 7px;
+font-size: 13px;
 }
 
 .archives-entry p {
 margin-top: 2px;
 margin-bottom: 2px;
-line-height: 1.4;
-font-size: 13px;
+line-height: 1.45;
+font-size: 14px;
 }
 
 .article-page {
@@ -207,31 +207,31 @@ display: none;
 
 /* Post content styling */
 .post-content {
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 .post-content h1 {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: normal;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .post-content .date {
-  font-size: 12px;
+  font-size: 13px;
   color: #777;
   font-style: italic;
-  margin-bottom: 15px;
+  margin-bottom: 18px;
 }
 
 .post-content p {
-  font-size: 14px;
-  margin-bottom: 12px;
+  font-size: 15px;
+  margin-bottom: 14px;
 }
 
 .post-content .return-button {
-  font-size: 13px;
-  margin-top: 20px;
+  font-size: 14px;
+  margin-top: 25px;
   display: inline-block;
 }
 

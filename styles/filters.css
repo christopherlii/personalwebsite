@@ -1,21 +1,21 @@
 /* Filter container and pills styling */
 .filter-container {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .filter-pills {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
   }
 
   .filter-pill {
     display: flex;
     align-items: center;
-    padding: 5px 12px;
+    padding: 6px 14px;
     background: transparent;
     border: 1px solid #ddd;
-    border-radius: 20px;
+    border-radius: 22px;
     cursor: pointer;
     transition: all 0.3s ease;
     user-select: none;
@@ -32,7 +32,7 @@
   }
 
   .filter-pill span {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     color: #555;
   }
@@ -42,36 +42,24 @@
   }
 
   .filter-indicator {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: #ddd;
-    margin-right: 8px;
+    margin-right: 9px;
     transition: all 0.3s ease;
     position: relative;
-  }
-  
-  .filter-pill[data-filter="nyu"].active .filter-indicator {
-    background: rgba(171, 48, 248, 0.29);
-    box-shadow: 0 0 6px rgba(204, 121, 255, 0.39);
   }
   
   .filter-pill[data-filter="thoughts"].active .filter-indicator {
     background: rgba(226, 125, 96, 0.3);
     box-shadow: 0 0 6px rgba(226, 125, 96, 0.4);
   }
-  
-  .filter-pill[data-filter="updates"].active .filter-indicator {
+
+  .filter-pill[data-filter="volumes"].active .filter-indicator {
     background: rgba(39, 118, 174, 0.35);
     box-shadow: 0 0 6px rgba(39, 88, 174, 0.4);
   }
-  
-  .filter-pill[data-filter="sports"].active .filter-indicator {
-    background: rgba(39, 174, 96, 0.3);
-    box-shadow: 0 0 6px rgba(39, 174, 96, 0.4);
-  }
-
-  
 
   .filter-pill[data-filter="random"].active .filter-indicator {
     background: rgba(217, 202, 35, 0.3);

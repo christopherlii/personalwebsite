@@ -214,19 +214,14 @@ class MarkdownRenderer {
       
       <div class="filter-container">
         <div class="filter-pills">
-          <div class="filter-pill" data-filter="nyu">
-            <div class="filter-indicator"></div>
-            <span>NYU</span>
-          </div>
           <div class="filter-pill" data-filter="thoughts">
             <div class="filter-indicator"></div>
             <span>Thoughts</span>
           </div>
-              <div class="filter-pill" data-filter="updates">
-                <div class="filter-indicator"></div>
-                <span>Updates</span>
-              </div>
-              
+          <div class="filter-pill" data-filter="volumes">
+            <div class="filter-indicator"></div>
+            <span>Volumes</span>
+          </div>
           <div class="filter-pill" data-filter="random">
             <div class="filter-indicator"></div>
             <span>Random</span>

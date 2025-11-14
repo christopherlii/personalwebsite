@@ -1,7 +1,7 @@
 ---
 title: "Volume 1: Oct 13-26"
 date: "2025-10-19"
-tags: ["updates"]
+tags: ["volumes"]
 description: "Some insights of my first week full time :)"
 ---
 
