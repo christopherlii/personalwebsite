@@ -107,8 +107,7 @@ class MarkdownRenderer {
           console.error(`Error loading ${filename}:`, error);
         }
       }
-      
-      this.updateArchivesList();
+
       return this.posts;
     } catch (error) {
       console.error('Error loading posts:', error);
@@ -116,29 +115,11 @@ class MarkdownRenderer {
     }
   }
 
-  // Update the archives list on the homepage
-  updateArchivesList() {
-    const archivesList = document.querySelector('.archives-list');
-    if (!archivesList) return;
-
-    const archivesEntries = this.posts.map(post => {
-      const tagsString = post.tags.join(',');
-      return `<a href="#" class="archives-entry" data-tags="${tagsString}" data-post="${post.filename}">
-        <h3>${post.title}</h3>
-        <p>${post.description}</p>
-      </a>`;
-    }).join('');
-
-    archivesList.innerHTML = archivesEntries;
-    
-    // Add click handlers for the new entries
-    this.addPostClickHandlers();
-  }
 
   // Add click handlers for post links
   addPostClickHandlers(container) {
     const scope = container || document;
-    const postLinks = scope.querySelectorAll('.archives-entry[data-post]');
+    const postLinks = scope.querySelectorAll('.writing-entry[data-post]');
     postLinks.forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -155,10 +136,10 @@ class MarkdownRenderer {
 
     this.currentPost = post;
     this.currentPage = 'post';
-    
+
     // Hide all existing pages
     this.hideAllPages();
-    
+
     // Create post HTML with proper container structure
     const postHTML = `
       <div class="post-content">
@@ -167,51 +148,47 @@ class MarkdownRenderer {
         <div class="content">
           ${post.content}
         </div>
-        <a href="#" class="return-button" id="return-to-archives">← Return to Archives</a>
+        <a href="#" class="return-button" id="return-to-writing">← Back to writing</a>
       </div>
     `;
 
-    // Create a new page div for the post with fixed width
+    // Create a new page div for the post
     const postPage = document.createElement('div');
     postPage.id = 'post-page';
-    postPage.style.cssText = 'width: 600px; max-width: 600px; margin: 0 auto;';
+    postPage.className = 'page-section';
     postPage.innerHTML = postHTML;
-    document.querySelector('.content').appendChild(postPage);
+    document.querySelector('.main-content').appendChild(postPage);
 
     // Add return button handler
-    document.getElementById('return-to-archives').addEventListener('click', (e) => {
+    document.getElementById('return-to-writing').addEventListener('click', (e) => {
       e.preventDefault();
-      this.showArchives();
-      // Update URL to show archives in the URL bar
-      history.pushState(null, '', '/#archives');
+      this.showWriting();
+      // Update URL to show writing in the URL bar
+      history.pushState(null, '', '/#writing');
     });
 
     // Update navigation
-    this.updateNavigation('archives');
-    
+    this.updateNavigation('writing');
+
     // Update URL to show the specific post
     history.pushState(null, '', `/#post/${postId}`);
   }
 
-  // Show archives list
-  showArchives() {
-    this.currentPage = 'archives';
-    
+  // Show writing list
+  showWriting() {
+    this.currentPage = 'writing';
+
     // Hide all existing pages
     this.hideAllPages();
-    
-    // Remove any existing dynamic archives page to avoid duplicate handlers
-    const existing = document.getElementById('archives-page-dynamic');
+
+    // Remove any existing dynamic writing page to avoid duplicate handlers
+    const existing = document.getElementById('writing-page-dynamic');
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);
     }
 
-    // Create archives page with proper container structure
-    const archivesHTML = `
-      <div>
-        <h2>Archives</h2>
-      </div>
-      
+    // Create writing page with proper container structure
+    const writingHTML = `
       <div class="filter-container">
         <div class="filter-pills">
           <div class="filter-pill" data-filter="thoughts">
@@ -229,11 +206,12 @@ class MarkdownRenderer {
         </div>
       </div>
 
-      <div class="archives-list">
+      <div class="writing-list">
         ${this.posts.map(post => {
           const tagsString = post.tags.join(',');
-          return `<a href="#" class="archives-entry" data-tags="${tagsString}" data-post="${post.filename}">
+          return `<a href="#" class="writing-entry" data-tags="${tagsString}" data-post="${post.filename}">
             <h3>${post.title}</h3>
+            <div class="date">${post.date}</div>
             <p>${post.description}</p>
           </a>`;
         }).join('')}
@@ -244,19 +222,19 @@ class MarkdownRenderer {
       </div>
     `;
 
-    // Create a new archives page div with fixed width
-    const archivesPage = document.createElement('div');
-    archivesPage.id = 'archives-page-dynamic';
-    archivesPage.style.cssText = 'width: 600px; max-width: 600px; margin: 0 auto;';
-    archivesPage.innerHTML = archivesHTML;
-    document.querySelector('.content').appendChild(archivesPage);
+    // Create a new writing page div
+    const writingPage = document.createElement('div');
+    writingPage.id = 'writing-page-dynamic';
+    writingPage.className = 'page-section';
+    writingPage.innerHTML = writingHTML;
+    document.querySelector('.main-content').appendChild(writingPage);
 
-    // Reinitialize archives functionality
-    this.initializeArchives(archivesPage);
-    this.addPostClickHandlers(archivesPage);
-    
+    // Reinitialize writing functionality
+    this.initializeWriting(writingPage);
+    this.addPostClickHandlers(writingPage);
+
     // Update navigation
-    this.updateNavigation('archives');
+    this.updateNavigation('writing');
   }
 
   // Hide all pages
@@ -267,27 +245,27 @@ class MarkdownRenderer {
     });
   }
 
-  // Show home page
-  showHome() {
-    this.currentPage = 'home';
+  // Show about page
+  showAbout() {
+    this.currentPage = 'about';
     this.hideAllPages();
-    document.getElementById('home-page').classList.remove('hidden');
-    this.updateNavigation('home');
+    document.getElementById('about-page').classList.remove('hidden');
+    this.updateNavigation('about');
   }
 
-  // Show contact page
-  showContact() {
-    this.currentPage = 'contact';
+  // Show projects page
+  showProjects() {
+    this.currentPage = 'projects';
     this.hideAllPages();
-    document.getElementById('contact-page').classList.remove('hidden');
-    this.updateNavigation('contact');
+    document.getElementById('projects-page').classList.remove('hidden');
+    this.updateNavigation('projects');
   }
 
-  // Initialize archives filtering scoped to a container
-  initializeArchives(container) {
+  // Initialize writing filtering scoped to a container
+  initializeWriting(container) {
     const scope = container || document;
     const filterPills = scope.querySelectorAll('.filter-pill');
-    const archiveEntries = scope.querySelectorAll('.archives-entry');
+    const writingEntries = scope.querySelectorAll('.writing-entry');
     const noResults = scope.querySelector('.no-results');
 
     let activeFilter = 'thoughts'; // Default to 'thoughts'
@@ -300,7 +278,7 @@ class MarkdownRenderer {
     });
 
     // Apply initial filter
-    this.applyFilters(archiveEntries, noResults, activeFilter);
+    this.applyFilters(writingEntries, noResults, activeFilter);
 
     filterPills.forEach(pill => {
       pill.addEventListener('click', () => {
@@ -318,16 +296,16 @@ class MarkdownRenderer {
         activeFilter = filter;
         pill.classList.add('active');
 
-        this.applyFilters(archiveEntries, noResults, activeFilter);
+        this.applyFilters(writingEntries, noResults, activeFilter);
       });
     });
   }
 
-  // Apply filters to archives
-  applyFilters(archiveEntries, noResults, activeFilter) {
+  // Apply filters to writing
+  applyFilters(writingEntries, noResults, activeFilter) {
     let visibleCount = 0;
 
-    archiveEntries.forEach(entry => {
+    writingEntries.forEach(entry => {
       const tags = entry.dataset.tags.split(',');
 
       // Since we always have an active filter, check if entry has that tag
@@ -348,7 +326,7 @@ class MarkdownRenderer {
 
   // Update navigation state
   updateNavigation(page) {
-    const navLinks = document.querySelectorAll('.nav a');
+    const navLinks = document.querySelectorAll('.sidebar-nav a');
     navLinks.forEach(link => {
       link.classList.remove('active');
       if (link.getAttribute('data-page') === page) {
@@ -360,14 +338,14 @@ class MarkdownRenderer {
   // Handle navigation clicks
   handleNavigation(page) {
     switch(page) {
-      case 'home':
-        this.showHome();
+      case 'about':
+        this.showAbout();
         break;
-      case 'archives':
-        this.showArchives();
+      case 'writing':
+        this.showWriting();
         break;
-      case 'contact':
-        this.showContact();
+      case 'projects':
+        this.showProjects();
         break;
     }
   }
@@ -376,11 +354,11 @@ class MarkdownRenderer {
 // Initialize the markdown renderer
 document.addEventListener('DOMContentLoaded', function() {
   const renderer = new MarkdownRenderer();
-  
+
   // Load posts when the page loads
   renderer.loadPosts().then(() => {
     console.log('Posts loaded successfully');
-    // After posts are loaded, handle initial hash navigation (e.g., #archives, #post/volume1)
+    // After posts are loaded, handle initial hash navigation (e.g., #writing, #post/volume1)
     const initialHash = window.location.hash.replace('#', '');
     if (initialHash) {
       if (initialHash.startsWith('post/')) {
@@ -393,13 +371,13 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Override all navigation to use the renderer
-  const navLinks = document.querySelectorAll('.nav a');
+  const navLinks = document.querySelectorAll('.sidebar-nav a');
   navLinks.forEach(link => {
     link.addEventListener('click', function(e) {
       e.preventDefault();
       const page = this.getAttribute('data-page');
       renderer.handleNavigation(page);
-      
+
       // Update URL without triggering a page reload
       history.pushState(null, '', this.getAttribute('href'));
     });
@@ -415,6 +393,9 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         renderer.handleNavigation(hash);
       }
+    } else {
+      // If no hash, show about page
+      renderer.showAbout();
     }
   });
 }); 
