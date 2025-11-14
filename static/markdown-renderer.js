@@ -294,51 +294,57 @@ class MarkdownRenderer {
     const filterPills = scope.querySelectorAll('.filter-pill');
     const archiveEntries = scope.querySelectorAll('.archives-entry');
     const noResults = scope.querySelector('.no-results');
-    
-    let activeFilters = new Set();
+
+    let activeFilter = 'thoughts'; // Default to 'thoughts'
+
+    // Set the default active filter on initialization
+    filterPills.forEach(pill => {
+      if (pill.dataset.filter === 'thoughts') {
+        pill.classList.add('active');
+      }
+    });
+
+    // Apply initial filter
+    this.applyFilters(archiveEntries, noResults, activeFilter);
 
     filterPills.forEach(pill => {
       pill.addEventListener('click', () => {
         const filter = pill.dataset.filter;
-        
-        if (activeFilters.has(filter)) {
-          activeFilters.delete(filter);
-          pill.classList.remove('active');
-        } else {
-          activeFilters.add(filter);
-          pill.classList.add('active');
+
+        // If clicking the already active filter, do nothing (mutually exclusive - must have one active)
+        if (activeFilter === filter) {
+          return;
         }
-        
-        this.applyFilters(archiveEntries, noResults, activeFilters);
+
+        // Remove active class from all pills
+        filterPills.forEach(p => p.classList.remove('active'));
+
+        // Set new active filter
+        activeFilter = filter;
+        pill.classList.add('active');
+
+        this.applyFilters(archiveEntries, noResults, activeFilter);
       });
     });
   }
 
   // Apply filters to archives
-  applyFilters(archiveEntries, noResults, activeFilters) {
+  applyFilters(archiveEntries, noResults, activeFilter) {
     let visibleCount = 0;
-    
+
     archiveEntries.forEach(entry => {
       const tags = entry.dataset.tags.split(',');
-      
-      if (activeFilters.size === 0) {
+
+      // Since we always have an active filter, check if entry has that tag
+      if (tags.includes(activeFilter)) {
         entry.classList.remove('hidden');
         visibleCount++;
       } else {
-        const hasActiveFilter = Array.from(activeFilters).some(filter => 
-          tags.includes(filter)
-        );
-        
-        if (hasActiveFilter) {
-          entry.classList.remove('hidden');
-          visibleCount++;
-        } else {
-          entry.classList.add('hidden');
-        }
+        entry.classList.add('hidden');
       }
     });
-    
-    if (visibleCount === 0 && activeFilters.size > 0) {
+
+    if (visibleCount === 0) {
       noResults.classList.remove('hidden');
     } else {
       noResults.classList.add('hidden');
