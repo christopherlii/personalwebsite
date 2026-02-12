@@ -8,7 +8,6 @@ class Site {
     this.projects = [];
     this.reading = [];
     this.solaces = [];
-    this.heroPictures = [];
     this.init();
   }
 
@@ -64,76 +63,6 @@ class Site {
     panel?.classList.remove('open');
     document.getElementById('panel-overlay')?.classList.remove('open');
     document.body.style.overflow = '';
-  }
-
-  async loadHeroPictures() {
-    try {
-      const resp = await fetch('quests/index.json', { cache: 'no-store' });
-      if (resp.ok) {
-        const data = await resp.json();
-        this.heroPictures = data.pictures || [];
-      }
-    } catch (e) { console.error(e); }
-  }
-
-  setupHeroPicture() {
-    const wrap = document.getElementById('hero-picture-wrap');
-    const imgA = document.getElementById('hero-picture-a');
-    const imgB = document.getElementById('hero-picture-b');
-    const caption = document.getElementById('hero-picture-caption');
-    if (!wrap || !imgA || !imgB) return;
-
-    const base = window.location.origin + (window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname.replace(/\/[^/]*$/, '/'));
-    const resolve = (path) => path.startsWith('/') ? path : new URL(path, base).href;
-
-    let currentSrc = imgA.src || '';
-    let active = 'a';
-    let transitioning = false;
-
-    const pickRandom = () => {
-      if (!this.heroPictures.length || transitioning) return;
-      wrap.style.display = 'block';
-
-      const pool = this.heroPictures.filter(p => resolve(p.src) !== currentSrc);
-      const options = pool.length ? pool : this.heroPictures;
-      const p = options[Math.floor(Math.random() * options.length)];
-      const nextSrc = resolve(p.src);
-      const nextImg = active === 'a' ? imgB : imgA;
-
-      nextImg.onload = null;
-      nextImg.onerror = null;
-      nextImg.src = nextSrc;
-      nextImg.alt = p.alt || '';
-      if (caption) caption.textContent = p.caption || '';
-
-      const doCrossfade = () => {
-        transitioning = true;
-        imgA.style.opacity = active === 'a' ? '0' : '1';
-        imgB.style.opacity = active === 'a' ? '1' : '0';
-        currentSrc = nextSrc;
-        active = active === 'a' ? 'b' : 'a';
-        const t = (parseFloat(getComputedStyle(imgA).transitionDuration) || 0.4) * 1000;
-        setTimeout(() => { transitioning = false; }, t);
-      };
-
-      const runCrossfade = () => {
-        if (nextImg.decode) {
-          nextImg.decode().then(doCrossfade).catch(() => doCrossfade());
-        } else if (nextImg.complete) {
-          doCrossfade();
-        } else {
-          nextImg.onload = () => doCrossfade();
-          nextImg.onerror = () => { transitioning = false; };
-        }
-      };
-      runCrossfade();
-    };
-
-    imgB.style.opacity = '0';
-    wrap.addEventListener('click', () => pickRandom());
-    if (this.heroPictures.length) {
-      pickRandom();
-    }
   }
 
   // Navigation setup
@@ -543,12 +472,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     site.loadPosts(),
     site.loadProjects(),
     site.loadReading(),
-    site.loadSolaces(),
-    site.loadHeroPictures()
+    site.loadSolaces()
   ]);
-
-  // Show random hero picture with loaded data
-  site.setupHeroPicture();
 
   await site.handleRoute();
 
