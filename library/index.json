@@ -1,0 +1,50 @@
+[
+  {
+    "title": "Good Arguments",
+    "author": "Bo Seo",
+    "type": "book",
+    "notes": "A beautiful exploration of debate and disagreement. Changed how I think about arguments — not as battles to win, but as collaborative searches for truth."
+  },
+  {
+    "title": "Devoción",
+    "author": "Williamsburg, NYC",
+    "type": "cafe",
+    "notes": "My favorite spot to work. Colombian coffee, incredible space with a living wall, and just the right amount of bustle. I've written so much here."
+  },
+  {
+    "title": "Sunday mornings",
+    "author": null,
+    "type": "moment",
+    "notes": "Slow coffee, no plans, nowhere to be. The city is quiet. These mornings keep me sane."
+  },
+  {
+    "title": "The Almanack of Naval Ravikant",
+    "author": "Eric Jorgenson",
+    "type": "book",
+    "notes": "Wealth, happiness, and the importance of leverage. Naval's ideas on specific knowledge and accountability have shaped how I think about career decisions."
+  },
+  {
+    "title": "How to Do Great Work",
+    "author": "Paul Graham",
+    "type": "essay",
+    "notes": "The importance of curiosity and working on things that excite you. Keep returning to this when I feel stuck."
+  },
+  {
+    "title": "Russ & Daughters",
+    "author": "Lower East Side, NYC",
+    "type": "restaurant",
+    "notes": "The best bagels in the city. Been coming here since I moved to New York. It feels like history."
+  },
+  {
+    "title": "Designing Data-Intensive Applications",
+    "author": "Martin Kleppmann",
+    "type": "book",
+    "notes": "The bible for distributed systems. Dense but incredibly valuable for understanding how modern data systems work."
+  },
+  {
+    "title": "Late night walks",
+    "author": "NYC",
+    "type": "moment",
+    "notes": null
+  }
+]

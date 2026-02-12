@@ -1,0 +1,20 @@
+[
+  {
+    "name": "this website",
+    "description": "my corner of the internet",
+    "tech": "html, css, js",
+    "year": "2026",
+    "status": "active",
+    "image": null,
+    "link": null
+  },
+  {
+    "name": "nyu swipeshare",
+    "description": "campus food sharing app for nyu students.",
+    "tech": "ts, supabase",
+    "year": "2026",
+    "status": "active",
+    "image": null,
+    "link": null
+  }
+]
