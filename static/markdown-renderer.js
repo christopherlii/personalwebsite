@@ -61,9 +61,17 @@ class Site {
   setupPanel() {
     const overlay = document.getElementById('panel-overlay');
     const closeBtn = document.getElementById('panel-close');
+    const expandBtn = document.getElementById('panel-expand');
 
     overlay?.addEventListener('click', () => this.closePanel());
     closeBtn?.addEventListener('click', () => this.closePanel());
+    expandBtn?.addEventListener('click', () => {
+      const idx = expandBtn.dataset.projectExpand;
+      if (idx != null) {
+        this.closePanel();
+        this.showProjectDetail(parseInt(idx, 10));
+      }
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.closePanel();
     });
@@ -81,6 +89,8 @@ class Site {
     panel?.classList.remove('open');
     document.getElementById('panel-overlay')?.classList.remove('open');
     document.body.style.overflow = '';
+    const expandBtn = document.getElementById('panel-expand');
+    if (expandBtn) expandBtn.style.display = 'none';
   }
 
   // Navigation setup
@@ -211,6 +221,10 @@ class Site {
   async fadeToView(viewId) {
     const currentView = document.querySelector('.view:not(.hidden)');
     const targetView = document.getElementById(viewId);
+    
+    if (currentView && currentView.id === 'youre-already-here-view') {
+      this.stopEasterEggAge();
+    }
     
     if (currentView && currentView !== targetView) {
       currentView.classList.add('fade-out');
@@ -419,9 +433,6 @@ class Site {
                 <div class="panel-label">description</div>
                 <div class="panel-notes">${project.description || '<span class="panel-empty">no description.</span>'}</div>
               </div>
-              <div class="panel-section">
-                <a href="#projects/${projectIdx}" class="panel-expand-link" data-project-expand="${projectIdx}">view full page →</a>
-              </div>
             </div>
             ${imageHtml}
           </div>
@@ -436,18 +447,84 @@ class Site {
             </div>
             <div class="panel-meta-item">
               <div class="panel-meta-label">link</div>
-              <div class="panel-meta-value">${project.link ? `<a href="${project.link}" target="_blank" class="panel-link">view →</a>` : '—'}</div>
+              <div class="panel-meta-value">${project.name.toLowerCase() === 'this website' ? `<a href="#youre-already-here" class="panel-link panel-link-easter">view →</a>` : project.link ? `<a href="${project.link}" target="_blank" class="panel-link">view →</a>` : '—'}</div>
             </div>
           </div>
         </div>
       </div>
     `);
-    // Delegate click for expand link (content is dynamically added)
-    document.getElementById('panel-content').querySelector('[data-project-expand]')?.addEventListener('click', (e) => {
+    // Setup expand button in header
+    const expandBtn = document.getElementById('panel-expand');
+    if (expandBtn) {
+      expandBtn.style.display = '';
+      expandBtn.dataset.projectExpand = String(projectIdx);
+    }
+    // Delegate click for easter egg link (this website) - close panel and navigate
+    document.getElementById('panel-content').querySelector('.panel-link-easter')?.addEventListener('click', (e) => {
       e.preventDefault();
       this.closePanel();
-      this.showProjectDetail(parseInt(e.currentTarget.dataset.projectExpand));
+      this.showYoureAlreadyHere();
     });
+  }
+
+  async showYoureAlreadyHere() {
+    await this.fadeToView('youre-already-here-view');
+    history.pushState(null, '', '#youre-already-here');
+    this.startEasterEggAge();
+    this.updateEasterEggJsLines();
+    this.updateQueensStreak();
+  }
+
+  updateQueensStreak() {
+    const el = document.getElementById('easter-queens-streak');
+    if (!el) return;
+    const baseDate = new Date('2026-02-15');
+    const baseValue = 211;
+    const now = new Date();
+    const diffMs = now - baseDate;
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    el.textContent = String(baseValue + diffDays);
+  }
+
+  async updateEasterEggJsLines() {
+    const el = document.getElementById('easter-js-lines');
+    if (!el) return;
+    try {
+      const [mainRes] = await Promise.all([
+        fetch('/static/markdown-renderer.js', { cache: 'no-store' })
+      ]);
+      const mainJs = await mainRes.text();
+      const mainLines = mainJs.split('\n').length;
+      const inlineLines = 4; // route-pending script in index.html
+      el.textContent = String(mainLines + inlineLines);
+    } catch {
+      el.textContent = '?';
+    }
+  }
+
+  startEasterEggAge() {
+    const el = document.getElementById('easter-age');
+    if (!el) return;
+    const birth = new Date('2004-06-10T08:00:00');
+    const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
+    let lastUpdate = 0;
+    const update = (ts = 0) => {
+      const now = new Date();
+      const ageMs = now - birth;
+      const ageYears = ageMs / msPerYear;
+      // Use 14 decimals so the last digits visibly tick every ~20ms
+      el.textContent = ageYears.toFixed(14);
+      lastUpdate = requestAnimationFrame(update);
+    };
+    lastUpdate = requestAnimationFrame(update);
+    this._easterAgeFrame = lastUpdate;
+  }
+
+  stopEasterEggAge() {
+    if (this._easterAgeFrame) {
+      cancelAnimationFrame(this._easterAgeFrame);
+      this._easterAgeFrame = null;
+    }
   }
 
   async showProjectDetail(index) {
@@ -533,6 +610,8 @@ class Site {
       else await this.showProjectsList();
     } else if (hash === 'solaces') {
       await this.showSolacesList();
+    } else if (hash === 'youre-already-here') {
+      await this.showYoureAlreadyHere();
     } else if (hash.startsWith('thought/')) {
       await this.showThought(hash.replace('thought/', ''));
     } else {

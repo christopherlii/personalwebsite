@@ -1,7 +1,7 @@
 {
   "pictures": [
-    { "src": "static/images/bar.png", "alt": "bar", "caption": "a bar somewhere in nyc" },
-    { "src": "static/images/tabsoffice.png", "alt": "tabs office", "caption": "the tabs office" },
-    { "src": "static/images/strava.PNG", "alt": "strava", "caption": "strava activity" }
+    { "src": "static/images/quests/bar.png", "alt": "bar", "caption": "a bar somewhere in nyc" },
+    { "src": "static/images/quests/tabsoffice.png", "alt": "tabs office", "caption": "the tabs office" },
+    { "src": "static/images/quests/strava.PNG", "alt": "strava", "caption": "strava activity" }
   ]
 }

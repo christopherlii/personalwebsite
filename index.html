@@ -131,6 +131,66 @@
       </div>
     </div>
 
+    <!-- Easter Egg: You're Already Here -->
+    <div id="youre-already-here-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <a href="#projects">projects</a>
+          <span class="breadcrumb-separator">/</span>
+          <a href="#projects/0">this website</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">you're already here</span>
+        </div>
+      </header>
+      <div class="page-container easter-egg-container">
+        <div class="easter-egg-content">
+          <h1 class="easter-egg-title">you're already here...</h1>
+          <p class="easter-egg-subtitle">but here's a reward for being curious :)</p>
+
+          <h2 class="easter-egg-section">about me</h2>
+          <table class="easter-egg-table">
+            <tr><td>Current age</td><td><span id="easter-age">—</span></td></tr>
+            <tr><td>Countries visited</td><td>11</td></tr>
+            <tr><td>Current city</td><td>New York, NY</td></tr>
+            <tr><td>Currently reading</td><td>The Three-Body Problem</td></tr>
+            <tr><td>Last updated</td><td>February 14, 2026</td></tr>
+            <tr><td>Lines of JavaScript powering this website</td><td><span id="easter-js-lines">—</span></td></tr>
+          </table>
+
+          <h2 class="easter-egg-section">Whimsical stats</h2>
+          <table class="easter-egg-table">
+            <tr><td>Record soccer juggles</td><td>2412</td></tr>
+            <tr><td>Half marathon time</td><td>i run my first in April!</td></tr>
+            <tr><td>Queen's Daily Streak</td><td><span id="easter-queens-streak">—</span></td></tr>
+            <tr><td>Energy drinks today</td><td>hopefully 0</td></tr>
+            <tr><td>Calories today</td><td>probably too many</td></tr>
+            <tr><td>Favorite clothing brand</td><td>GU</td></tr>
+            <tr><td>Favorite song</td><td>it changes too often</td></tr>
+            <tr><td>Favorite artist</td><td>Tame Impala</td></tr>
+            <tr><td>Favorite restaurant</td><td>Dubu Haus</td></tr>
+            <tr><td>Favorite city</td><td>New York City</td></tr>
+            <tr><td>Favorite F1 track</td><td>Suzuka</td></tr>
+            <tr><td>Favorite soccer player</td><td>Pedri / Foden</td></tr>
+          </table>
+
+          <h2 class="easter-egg-section">I Dream Of</h2>
+          <ul class="easter-egg-list">
+            <li>Inspiring and feeling inspired.</li>
+            <li>Enabling a brighter future for everyone, regardless of political or socioeconomic status.</li>
+            <li>Treating every individual with genuine kindness and respect.</li>
+            <li>Forever staying curious.</li>
+            <li>Making Mom and Dad proud.</li>
+            <li>Conquering the world and then moving to Switzerland.</li>
+            <li>You reaching out. Let's connect :D</li>
+          </ul>
+
+          <a href="#projects/0" class="easter-egg-back">← back to reality</a>
+        </div>
+      </div>
+    </div>
+
     <!-- Solaces View -->
     <div id="solaces-view" class="view hidden">
       <header class="header">
@@ -150,6 +210,7 @@
     <div id="panel-overlay" class="overlay"></div>
     <div id="detail-panel" class="panel">
       <div class="panel-header">
+        <button id="panel-expand" class="panel-expand-btn" aria-label="expand to full page" style="display: none;">↗ full page</button>
         <button id="panel-close" class="panel-close-btn" aria-label="close">×</button>
       </div>
       <div id="panel-content" class="panel-content"></div>

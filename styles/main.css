@@ -308,6 +308,122 @@ a.timeline-row {
 }
 
 /* ========================================
+   EASTER EGG: YOU'RE ALREADY HERE
+   ======================================== */
+
+.easter-egg-container {
+  padding-top: 24px;
+}
+
+.easter-egg-content {
+  max-width: 520px;
+}
+
+.easter-egg-content .easter-egg-title,
+.easter-egg-content .easter-egg-subtitle,
+.easter-egg-content .easter-egg-note {
+  text-align: center;
+}
+
+.easter-egg-content .easter-egg-note {
+  margin-bottom: 40px;
+}
+
+.easter-egg-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 16px;
+  animation: easter-egg-fade 1.5s ease-out;
+}
+
+.easter-egg-subtitle {
+  font-size: var(--text-base);
+  color: var(--fg-secondary);
+  margin-bottom: 24px;
+  animation: easter-egg-fade 1.5s ease-out 0.2s both;
+}
+
+.easter-egg-note {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  line-height: 1.7;
+  margin-bottom: 32px;
+  animation: easter-egg-fade 1.5s ease-out 0.4s both;
+}
+
+.easter-egg-back {
+  display: inline-block;
+  font-size: var(--text-sm);
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(11, 36, 62, 0.55);
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.easter-egg-back:hover {
+  color: var(--accent-ocean);
+  border-bottom-color: var(--accent-ocean);
+}
+
+.easter-egg-section {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 32px 0 16px;
+}
+
+.easter-egg-section:first-of-type {
+  margin-top: 0;
+}
+
+.easter-egg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin-bottom: 8px;
+}
+
+.easter-egg-table td {
+  padding: 8px 12px 8px 0;
+  vertical-align: top;
+}
+
+.easter-egg-table td:first-child {
+  color: var(--fg-muted);
+  width: 55%;
+}
+
+.easter-egg-table td:last-child {
+  color: var(--fg-secondary);
+}
+
+.easter-egg-list {
+  margin: 0 0 32px;
+  padding-left: 20px;
+  font-size: var(--text-sm);
+  color: var(--fg-secondary);
+  line-height: 1.8;
+}
+
+.easter-egg-list li {
+  margin-bottom: 8px;
+}
+
+@keyframes easter-egg-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
    FILTERS
    ======================================== */
 
@@ -779,8 +895,25 @@ a.timeline-row {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 12px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
+}
+
+.panel-expand-btn {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.panel-expand-btn:hover {
+  color: var(--accent-ocean);
+  border-color: var(--accent-soft);
 }
 
 .panel-close-btn {

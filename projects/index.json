@@ -5,7 +5,7 @@
     "tech": "html, css, js",
     "year": "2026",
     "status": "active",
-    "image": "/static/images/CL_drawn.png",
+    "image": "/static/images/projects/CL_drawn.png",
     "link": null
   },
   {
@@ -14,7 +14,7 @@
     "tech": "ts, supabase",
     "year": "2026",
     "status": "active",
-    "image": "/static/images/wsp.png",
+    "image": "/static/images/projects/wsp.png",
     "gradient": "linear-gradient(180deg, #e8eee5 0%, #f5f4f0 100%)",
     "link": null
   }
