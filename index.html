@@ -3,95 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Christopher Li - Software Engineer">
   <title>Christopher Li</title>
   <link rel="icon" type="image/png" href="/logos/CL.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/main.css">
-  <link rel="stylesheet" href="/styles/filters.css">
-
-  
+  <script>
+    if (window.location.hash && window.location.hash !== '#') {
+      document.documentElement.classList.add('route-pending');
+    }
+  </script>
 </head>
 <body>
-  <div class="container">
-    <div class="intro-section">
-      <div class="welcome">
-        <h1><a href="/" style="text-decoration: none; color: inherit;">Christopher Li</a></h1>
-      </div>
-      <nav class="nav">
-        <a href="#" class="active" data-page="home">Home</a>
-        <a href="/#archives" data-page="archives">Archives</a>
-        <a href="/#contact" data-page="contact">Contact</a>
-      </nav>
+  <div class="site">
+    <!-- Home View -->
+    <div id="home-view" class="view">
+      <header class="header">
+        <a href="/" class="logo">Christopher Li</a>
+      </header>
+      <main class="main">
+        <section class="hero">
+          <p class="hero-text">hi, i'm chris :)</p>
+          <p class="hero-text">i'm currently engineering at <a href="https://tabs.inc" target="_blank" class="inline-link">Tabs</a> and finishing up my degree part-time at NYU. previously, i interned at Amazon and have done some consulting work for Coinbase.</p>
+          <p class="hero-text">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a>, <a href="#projects" class="inline-link">projects</a>, and <a href="#solaces" class="inline-link">solaces</a>.</p>
+          <p class="hero-text">here are some of my main/side quests in 2026:</p>
+        </section>
+
+        <section class="timeline">
+          <a href="#projects" class="timeline-row">
+            <span class="timeline-date">feb 8</span>
+            <span class="timeline-text">built nyu swipeshare, launching soon :)</span>
+          </a>
+          <div class="timeline-row">
+            <span class="timeline-date">feb 1</span>
+            <span class="timeline-text">received offers from stripe, google, and more</span>
+          </div>
+          <a href="#projects" class="timeline-row">
+            <span class="timeline-date">jan 27</span>
+            <span class="timeline-text">built this site</span>
+          </a>
+        </section>
+
+        <section class="contact">
+          <p class="contact-email">christopherli [at] nyu [dot] edu</p>
+        </section>
+      </main>
     </div>
-    
-    <div class="content">
-      <div id="home-page">
-        <h2>About Me</h2>
-        <p> Originally from Cupertino, CA; now engineering at Tabs and part time at NYU. </p>
-        <p>In my free time, I like building, sports (especially soccer, basketball, and F1) and hopping cafes. Currently reading: Good Arguments by Bo Seo!</p>
-        <p>This site is a work in progress :)</p>
-        
-        <div class="spacer"></div>
 
-        <h2>Resume</h2>
-        <div id="side-quests-list">
-          <a href="#" class="side-quest-entry">
-            <div class="side-quest-logo">
-              <img src="logos/tabs-logo.png" alt="Tabs Logo" class="default-img">
-              <img src="logos/tabs-logo-hover.png" alt="Tabs Logo Hover" class="hover-img">
-            </div>
-            <div class="side-quest-info">
-              <span class="side-quest-title">Software Engineer @ Tabs</span>
-              <span class="side-quest-date">Backed by Lightspeed, General Catalyst, Primary Ventures</span>
-            </div>
-          </a>
-
-          <a href="#" class="side-quest-entry">
-            <div class="side-quest-logo">
-              <img src="logos/aws-logo.png" alt="AWS Logo" class="default-img">
-              <img src="logos/aws-logo-hover.png" alt="AWS Logo Hover" class="hover-img">
-            </div>
-            <div class="side-quest-info">
-              <span class="side-quest-title">Software Engineer Intern @ Amazon</span>
-              <span class="side-quest-date">Summer 2025</span>
-            </div>
-          </a>
-          
-          <a href="#" class="side-quest-entry">
-            <div class="side-quest-logo">
-              <img src="logos/coinbase-logo.png" alt="Coinbase Logo" class="default-img">
-              <img src="logos/coinbase-logo-hover.png" alt="Coinbase Logo Hover" class="hover-img">
-            </div>
-            <div class="side-quest-info">
-              <span class="side-quest-title">Product Consultant @ Coinbase</span>
-              <span class="side-quest-date">Contract (via NYU Blockchain & Fintech)</span>
-            </div>
-          </a>
-          
-          <a href="#" class="side-quest-entry">
-            <div class="side-quest-logo">
-              <img src="logos/pulsar-logo.png" alt="Pulsar Logo" class="default-img">
-              <img src="logos/pulsar-logo-hover.png" alt="Pulsar Logo Hover" class="hover-img">
-            </div>
-            <div class="side-quest-info">
-              <span class="side-quest-title">Software Engineer Intern @ Pulsar</span>
-              <span class="side-quest-date">Fall 2023</span>
-            </div>
-          </a>
+    <!-- Thoughts List View -->
+    <div id="thoughts-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">writing</span>
         </div>
+      </header>
+      <div class="page-container">
+        <div id="thoughts-filters" class="filters-inline"></div>
+        <div id="thoughts-full-list" class="thoughts-list"></div>
       </div>
-      
-      <div id="archives-page" class="hidden"></div>
-      
-      <div id="contact-page" class="hidden">
-        <h2>Contact</h2>
-        <p>Email: christopherli@nyu.edu</p>
+    </div>
+
+    <!-- Thought Detail View -->
+    <div id="thought-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <a href="#thoughts">writing</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current" id="thought-breadcrumb">post</span>
+        </div>
+      </header>
+      <div class="page-container">
+        <article id="thought-content" class="article"></article>
       </div>
+    </div>
+
+    <!-- Reading List View -->
+    <div id="reading-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <a href="#thoughts">writing</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">reading</span>
+        </div>
+      </header>
+      <div class="page-container">
+        <p class="page-blurb">writings by others that moved me — words i wish i'd found myself.</p>
+        <div id="reading-list" class="reading-list"></div>
+      </div>
+    </div>
+
+    <!-- Project Detail View (full page) -->
+    <div id="project-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <a href="#projects">projects</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current" id="project-breadcrumb">project</span>
+        </div>
+      </header>
+      <div class="page-container">
+        <article id="project-content" class="project-article"></article>
+      </div>
+    </div>
+
+    <!-- Projects List View -->
+    <div id="projects-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">projects</span>
+        </div>
+      </header>
+      <div class="page-container">
+        <p class="page-blurb">random stuff that i can't stop thinking about until i build it</p>
+        <div id="projects-full-list" class="projects-grid"></div>
+      </div>
+    </div>
+
+    <!-- Solaces View -->
+    <div id="solaces-view" class="view hidden">
+      <header class="header">
+        <div class="breadcrumb">
+          <a href="/" class="breadcrumb-home">Christopher Li</a>
+          <span class="breadcrumb-separator">/</span>
+          <span class="breadcrumb-current">solaces</span>
+        </div>
+      </header>
+      <div class="page-container">
+        <p class="page-blurb">things i like.</p>
+        <div id="solaces-list" class="solaces-masonry"></div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div id="panel-overlay" class="overlay"></div>
+    <div id="detail-panel" class="panel">
+      <div class="panel-header">
+        <button id="panel-close" class="panel-close-btn" aria-label="close">×</button>
+      </div>
+      <div id="panel-content" class="panel-content"></div>
     </div>
   </div>
-
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="/static/markdown-renderer.js"></script>
 </body>
-
 </html>
