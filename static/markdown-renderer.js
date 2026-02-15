@@ -18,6 +18,24 @@ class Site {
     this.setupTimelineReveal();
   }
 
+  setupPhotoShuffle() {
+    document.querySelectorAll('.article-body .photo-shuffle').forEach(container => {
+      const imgs = Array.from(container.querySelectorAll('img'));
+      if (imgs.length === 0) return;
+
+      let idx = 0;
+
+      const showNext = () => {
+        imgs.forEach(img => img.classList.remove('visible'));
+        imgs[idx].classList.add('visible');
+        idx = (idx + 1) % imgs.length;
+      };
+
+      showNext();
+      container.addEventListener('click', showNext);
+    });
+  }
+
   setupTimelineReveal() {
     const els = document.querySelectorAll('.timeline-label, .timeline-row, .contact-email');
     if (!els.length) return;
@@ -297,6 +315,8 @@ class Site {
       <div class="article-body">${post.content}</div>
     `;
 
+    this.setupPhotoShuffle();
+
     history.pushState(null, '', `#thought/${postId}`);
   }
 
@@ -305,7 +325,7 @@ class Site {
 
     const grid = document.getElementById('projects-full-list');
     grid.innerHTML = this.projects.map((p, i) => `
-      <div class="project-card" data-project="${i}">
+      <div class="project-card" data-project="${i}"${p.gradient ? ` style="background: ${p.gradient}"` : ''}>
         <div class="project-image">
           ${p.image
             ? `<img src="${p.image}" alt="${p.name}">`
@@ -328,37 +348,97 @@ class Site {
     grid.querySelectorAll('.project-card').forEach(card => {
       card.addEventListener('click', () => {
         const idx = parseInt(card.dataset.project);
-        this.showProjectItem(this.projects[idx], idx);
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (isMobile) {
+          this.showProjectDetail(idx);
+        } else {
+          this.showProjectItem(this.projects[idx], idx);
+        }
       });
     });
+
+    this.applyProjectCardGradients();
 
     history.pushState(null, '', '#projects');
   }
 
+  applyProjectCardGradients() {
+    document.querySelectorAll('.project-card .project-image img').forEach(img => {
+      const card = img.closest('.project-card');
+      if (card.style.background) return;
+      const applyGradient = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const w = Math.min(img.naturalWidth, 60);
+          const h = Math.min(img.naturalHeight, 60);
+          if (!w || !h) return;
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          const data = ctx.getImageData(0, 0, w, h).data;
+
+          const sample = (x, y) => {
+            const i = (Math.floor(y) * w + Math.floor(x)) * 4;
+            return [data[i], data[i + 1], data[i + 2]];
+          };
+          const topLeft = sample(0, 0);
+          const topRight = sample(w - 1, 0);
+          const bottom = sample(w / 2, h - 1);
+
+          const soften = (rgb) => rgb.map((c) => Math.round(c * 0.35 + 255 * 0.65));
+          const c1 = soften(topLeft);
+          const c2 = soften(topRight);
+          const c3 = soften(bottom);
+
+          card.style.background = `linear-gradient(180deg, rgb(${c1.join(',')}) 0%, rgb(${c2.join(',')}) 45%, rgb(${c3.join(',')}) 100%)`;
+        } catch (_) {}
+      };
+
+      if (img.complete && img.naturalWidth) {
+        applyGradient();
+      } else {
+        img.addEventListener('load', applyGradient);
+      }
+    });
+  }
+
   showProjectItem(project, index) {
     const projectIdx = index ?? this.projects.findIndex(p => p.name === project.name);
+    const imageHtml = project.image
+      ? `<div class="panel-image"><img src="${project.image}" alt="${project.name}"></div>`
+      : '';
     this.openPanel(`
-      <div class="panel-title">${project.name}</div>
-      <div class="panel-author">${project.tech || ''}</div>
-      <div class="panel-section">
-        <div class="panel-label">description</div>
-        <div class="panel-notes">${project.description || '<span class="panel-empty">no description.</span>'}</div>
-      </div>
-      <div class="panel-section">
-        <a href="#projects/${projectIdx}" class="panel-expand-link" data-project-expand="${projectIdx}">view full page →</a>
-      </div>
-      <div class="panel-meta">
-        <div class="panel-meta-item">
-          <div class="panel-meta-label">year</div>
-          <div class="panel-meta-value">${project.year || '—'}</div>
-        </div>
-        <div class="panel-meta-item">
-          <div class="panel-meta-label">status</div>
-          <div class="panel-meta-value">${project.status || '—'}</div>
-        </div>
-        <div class="panel-meta-item">
-          <div class="panel-meta-label">link</div>
-          <div class="panel-meta-value">${project.link ? `<a href="${project.link}" target="_blank" class="panel-link">view →</a>` : '—'}</div>
+      <div class="panel-layout">
+        <div class="panel-main">
+          <div class="panel-top-row">
+            <div class="panel-top-content">
+              <div class="panel-title">${project.name}</div>
+              <div class="panel-author">${project.tech || ''}</div>
+              <div class="panel-section">
+                <div class="panel-label">description</div>
+                <div class="panel-notes">${project.description || '<span class="panel-empty">no description.</span>'}</div>
+              </div>
+              <div class="panel-section">
+                <a href="#projects/${projectIdx}" class="panel-expand-link" data-project-expand="${projectIdx}">view full page →</a>
+              </div>
+            </div>
+            ${imageHtml}
+          </div>
+          <div class="panel-meta">
+            <div class="panel-meta-item">
+              <div class="panel-meta-label">year</div>
+              <div class="panel-meta-value">${project.year || '—'}</div>
+            </div>
+            <div class="panel-meta-item">
+              <div class="panel-meta-label">status</div>
+              <div class="panel-meta-value">${project.status || '—'}</div>
+            </div>
+            <div class="panel-meta-item">
+              <div class="panel-meta-label">link</div>
+              <div class="panel-meta-value">${project.link ? `<a href="${project.link}" target="_blank" class="panel-link">view →</a>` : '—'}</div>
+            </div>
+          </div>
         </div>
       </div>
     `);
