@@ -567,25 +567,129 @@ class Site {
     history.pushState(null, '', '#reading');
   }
 
+  setupSolacePreviews() {
+    if ('ontouchstart' in window) return;
+    const wrappers = document.querySelectorAll('.solaces-item-wrapper');
+    let previewEl = document.getElementById('solace-preview');
+    if (!previewEl) {
+      previewEl = document.createElement('div');
+      previewEl.id = 'solace-preview';
+      previewEl.className = 'solace-preview';
+      previewEl.innerHTML = '<img src="" alt="" />';
+      previewEl.style.pointerEvents = 'none';
+      document.body.appendChild(previewEl);
+    }
+    const img = previewEl.querySelector('img');
+
+    const gapBelow = 8;
+    const previewWidth = 240;
+    const previewHeight = 160;
+    const lerpFactor = 0.12;
+    let targetLeft = 0;
+    let targetTop = 0;
+    let currentLeft = 0;
+    let currentTop = 0;
+    let rafId = null;
+
+    const horizontalDampen = 0.25;
+
+    const updatePosition = (wrapper, clientX) => {
+      const rect = wrapper.getBoundingClientRect();
+      const linkCenterX = rect.left + rect.width / 2;
+      const targetCenterX = linkCenterX + (clientX - linkCenterX) * horizontalDampen;
+      let left = targetCenterX - previewWidth / 2;
+      if (left + previewWidth > window.innerWidth) left = window.innerWidth - previewWidth;
+      if (left < 0) left = 0;
+      const top = rect.bottom + gapBelow;
+      if (top + previewHeight > window.innerHeight) {
+        targetTop = Math.max(0, rect.top - previewHeight - gapBelow);
+      } else {
+        targetTop = top;
+      }
+      targetLeft = left;
+    };
+
+    const animate = () => {
+      currentLeft += (targetLeft - currentLeft) * lerpFactor;
+      currentTop += (targetTop - currentTop) * lerpFactor;
+      previewEl.style.left = `${currentLeft}px`;
+      previewEl.style.top = `${currentTop}px`;
+      if (previewEl.classList.contains('visible')) {
+        rafId = requestAnimationFrame(animate);
+      }
+    };
+
+    wrappers.forEach(wrapper => {
+      wrapper.addEventListener('mouseenter', (e) => {
+        const src = wrapper.dataset.previewImg;
+        if (src) {
+          img.src = src;
+          img.alt = '';
+          const rect = wrapper.getBoundingClientRect();
+          const linkCenterX = rect.left + rect.width / 2;
+          const targetCenterX = linkCenterX + (e.clientX - linkCenterX) * horizontalDampen;
+          const top = rect.bottom + gapBelow;
+          let left = targetCenterX - previewWidth / 2;
+          if (left + previewWidth > window.innerWidth) left = window.innerWidth - previewWidth;
+          if (left < 0) left = 0;
+          targetLeft = left;
+          targetTop = top + previewHeight > window.innerHeight
+            ? Math.max(0, rect.top - previewHeight - gapBelow)
+            : top;
+          currentLeft = targetLeft;
+          currentTop = targetTop;
+          previewEl.style.left = `${currentLeft}px`;
+          previewEl.style.top = `${currentTop}px`;
+          previewEl.classList.add('visible');
+          if (!rafId) rafId = requestAnimationFrame(animate);
+        }
+      });
+      wrapper.addEventListener('mousemove', (e) => {
+        if (previewEl.classList.contains('visible')) {
+          updatePosition(wrapper, e.clientX);
+        }
+      });
+      wrapper.addEventListener('mouseleave', () => {
+        previewEl.classList.remove('visible');
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      });
+    });
+  }
+
   async showSolacesList() {
     await this.fadeToView('solaces-view');
     
     const container = document.getElementById('solaces-list');
     if (!container) return;
 
+    const placeholderImg = '/static/images/blogs/2025_q4/apt_view.png';
     container.innerHTML = this.solaces.map(category => `
       <div class="solaces-category">
         <div class="solaces-category-title">${category.title}</div>
         <div class="solaces-category-items">
-          ${category.items.map(item => `
+          ${category.items.map(item => {
+            const hasPreview = (category.title === 'films' || category.title === 'sports') && item.previewImage;
+            const previewImg = item.previewImage || placeholderImg;
+            if (hasPreview) {
+              return `
+            <div class="solaces-item">
+              <span class="solaces-item-wrapper" data-preview-img="${previewImg}">${item.name}</span>
+            </div>`;
+            }
+            return `
             <div class="solaces-item">
               ${item.url ? `<a href="${item.url}" target="_blank">${item.name}</a>` : item.name}
-            </div>
-          `).join('')}
+            </div>`;
+          }).join('')}
           ${category.more ? `<div class="solaces-item solaces-more"><a href="${category.more.url}">${category.more.text}</a></div>` : ''}
         </div>
       </div>
     `).join('') || '<p style="color:var(--fg-muted);">nothing here yet.</p>';
+
+    this.setupSolacePreviews();
 
     history.pushState(null, '', '#solaces');
   }
