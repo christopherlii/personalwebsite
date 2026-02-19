@@ -217,6 +217,7 @@ class Site {
   }
 
 
+
   // View management with fade transitions
   async fadeToView(viewId) {
     const currentView = document.querySelector('.view:not(.hidden)');
@@ -527,6 +528,43 @@ class Site {
     }
   }
 
+  renderWorkDetail(work, options = {}) {
+    const { isVibecode = false, linkLabel = 'view project' } = options;
+    const meta = isVibecode
+      ? `${work.tech || ''} · ${work.date || ''}`.replace(/^ · | · $/g, '').trim()
+      : `${work.tech || ''} · ${work.year || ''}`.replace(/^ · | · $/g, '').trim();
+    const statusHtml = work.status
+      ? `<span class="work-status work-status-${(work.status || '').toLowerCase()}">${work.status}</span>`
+      : '';
+    let html = `
+      <header class="article-header work-header">
+        <h1 class="article-title">${work.name}</h1>
+        <div class="work-meta">
+          ${meta ? `<span class="article-date">${meta}</span>` : ''}
+          ${statusHtml}
+        </div>
+      </header>
+      <div class="article-body">
+        <p class="work-description">${work.description || 'No description.'}</p>
+        ${work.link ? `<p><a href="${work.link}" target="_blank">${linkLabel} →</a></p>` : ''}
+    `;
+    if (work.thoughtProcess) {
+      html += `<section class="work-section"><h2 class="work-section-title">thought process</h2><div class="work-section-body">${work.thoughtProcess}</div></section>`;
+    }
+    if (work.prd) {
+      const prdContent = work.prd.startsWith('http') ? `<a href="${work.prd}" target="_blank">view PRD →</a>` : `<div class="work-section-body">${work.prd}</div>`;
+      html += `<section class="work-section"><h2 class="work-section-title">PRD</h2>${prdContent}</section>`;
+    }
+    if (work.howBuilt) {
+      html += `<section class="work-section"><h2 class="work-section-title">how i built it</h2><div class="work-section-body">${work.howBuilt}</div></section>`;
+    }
+    if (work.stills && work.stills.length > 0) {
+      html += `<section class="work-section"><h2 class="work-section-title">stills</h2><div class="work-stills">${work.stills.map(src => `<figure><img src="${src}" alt=""></figure>`).join('')}</div></section>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
   async showProjectDetail(index) {
     const project = this.projects[index];
     if (!project) return this.showProjectsList();
@@ -537,16 +575,7 @@ class Site {
     if (breadcrumb) breadcrumb.textContent = project.name;
 
     const content = document.getElementById('project-content');
-    content.innerHTML = `
-      <header class="article-header">
-        <h1 class="article-title">${project.name}</h1>
-        <div class="article-date">${project.tech || ''} · ${project.year || ''}</div>
-      </header>
-      <div class="article-body">
-        <p>${project.description || 'No description.'}</p>
-        ${project.link ? `<p><a href="${project.link}" target="_blank">view project →</a></p>` : ''}
-      </div>
-    `;
+    content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
 
     history.pushState(null, '', `#projects/${index}`);
   }
