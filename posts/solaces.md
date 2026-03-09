@@ -86,7 +86,9 @@ At the end of the day, I'm now comfortable in New York, and that's quite scary t
 
 ## 6.
 
-It's March and I'm at pier 26. It's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific. 
+It's March and I'm at pier 26. It's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific.
+
+![Hawkhill](/static/images/blogs/solaces/hawkhill.png) 
 
 I'm burning with excitement.
 
