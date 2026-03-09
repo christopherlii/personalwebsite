@@ -2,7 +2,7 @@
 title: "How to Recruit for Startups"
 date: "2026-01-05"
 tags: ["random"]
-description: "Advice on breaking into the startup scene—less luck, more strategy."
+description: "Random Advice"
 ---
 
 A few of my friends have asked me recently for advice on breaking into the startup scene. I've discovered that, through trial and error, the process is much less luck based compared to traditional big tech companies.

@@ -137,6 +137,14 @@ class Site {
     window.addEventListener('hashchange', () => this.handleRoute());
   }
 
+  formatArticleDate(dateStr) {
+    if (!dateStr) return '';
+    const m = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) return dateStr;
+    const [, year, month, day] = m;
+    return `${parseInt(month, 10)}.${parseInt(day, 10)}.${year}`;
+  }
+
   // Data loading
   parseFrontMatter(content) {
     const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -322,12 +330,16 @@ class Site {
       breadcrumb.textContent = post.title.toLowerCase();
     }
 
+    const descriptionHtml = post.description && typeof marked !== 'undefined'
+      ? marked.parse(post.description) : (post.description || '');
+    const formattedDate = this.formatArticleDate(post.date);
     document.getElementById('thought-content').innerHTML = `
       <header class="article-header">
         <h1 class="article-title">${post.title}</h1>
-        <div class="article-date">${post.date}</div>
+        ${descriptionHtml ? `<div class="article-description">${descriptionHtml}</div>` : ''}
       </header>
       <div class="article-body">${post.content}</div>
+      ${formattedDate ? `<footer class="article-footer"><time class="article-date">${formattedDate}</time></footer>` : ''}
     `;
 
     this.setupPhotoShuffle();
