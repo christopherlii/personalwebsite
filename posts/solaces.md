@@ -24,7 +24,7 @@ I think about this line a lot when I meet new faces. At first you only see shado
 
 However, I've always envisioned a second half to this quote, something along the lines of: he who is not afraid of my darkness will find banks full of roses under my cypresses, *and proceed to plant his own tulips or daffodils or peonies.*
 
-There's something awfully idyllic in the way people shape each other. I feel it when my dad tries (and fails) to use Gen Z slang. I feel it when I lock eyes with my best friend as we laugh until we're out of breath.
+There's something awfully idyllic in the way people shape each other. I feel it just as much when my dad tries (and fails) to use Gen Z slang as I do when I lock eyes with my best friend as we laugh until we're out of breath.
 
 This kind of feeling lingers—small but undeniable proof that something in our universe makes sense.
 
