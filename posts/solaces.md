@@ -7,7 +7,7 @@ description: "My feelings on leaving college, SF, and my many solaces."
 
 ## 1.
 
-Lately, I've been nostalgizing the smaller things more than usual. The realization that I'm approaching a series of lasts isn't settling well. I'll miss strolling through Bobst with absolutely no intention of getting any work done. I'll miss the chatter of k-town and the long lines outside random stores. I'll miss the side quests that end the night at the Brooklyn promenade.
+Lately, I've been nostalgizing the smaller things more than usual. The realization that I'm approaching a series of lasts isn't settling well. I'll miss strolling through Bobst with absolutely no intention of getting any work done. I'll miss the chatter of k-town and waiting long lines outside random stores. I'll miss the side quests that end the night at the Brooklyn promenade.
 
 I can't help but wonder if one day, I'll step into the city the same way I do my childhood room. I'm a little bigger, a little older. Everything is exactly where it's supposed to be, except me.
 
@@ -86,7 +86,7 @@ At the end of the day, I'm now comfortable in New York, and that's quite scary t
 
 ## 6.
 
-It's March and the city is alive again. It's a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. I'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific.
+It's March and the city is alive again. The temperature is a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. I'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific.
 
 ![Hawkhill](/static/images/blogs/solaces/hawkhill.png) 
 
