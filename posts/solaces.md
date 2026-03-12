@@ -88,7 +88,10 @@ At the end of the day, I'm now comfortable in New York, and that's quite scary t
 
 It's March and the city is alive again. The temperature is a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. I'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific.
 
-![Hawkhill](/static/images/blogs/solaces/hawkhill.png) 
+<figure>
+  <img src="/static/images/blogs/solaces/hawkhill.png" alt="Hawk Hill" />
+  <figcaption>Hawk Hill!</figcaption>
+</figure> 
 
 I'm burning with excitement.
 
