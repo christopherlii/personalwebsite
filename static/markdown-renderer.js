@@ -133,8 +133,14 @@ class Site {
     });
 
     // Handle browser back/forward and hash changes
-    window.addEventListener('popstate', () => this.handleRoute());
-    window.addEventListener('hashchange', () => this.handleRoute());
+    window.addEventListener('popstate', () => {
+      this._fromPopstate = true;
+      this.handleRoute();
+    });
+    window.addEventListener('hashchange', () => {
+      this._fromPopstate = false;
+      this.handleRoute();
+    });
   }
 
   formatArticleDate(dateStr) {
@@ -318,7 +324,7 @@ class Site {
     });
   }
 
-  async showThought(postId) {
+  async showThought(postId, skipHistoryPush) {
     const post = this.posts.find(p => p.filename === postId);
     if (!post) return;
 
@@ -344,7 +350,9 @@ class Site {
 
     this.setupPhotoShuffle();
 
-    history.pushState(null, '', `#thought/${postId}`);
+    if (!skipHistoryPush) {
+      history.pushState(null, '', `#thought/${postId}`);
+    }
   }
 
   async showProjectsList() {
@@ -494,24 +502,25 @@ class Site {
     const baseDate = new Date('2026-02-15');
     const baseValue = 211;
     const now = new Date();
-    const diffMs = now - baseDate;
-    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-    el.textContent = String(baseValue + diffDays);
+    const diffDays = Math.floor((now - baseDate) / (24 * 60 * 60 * 1000));
+    el.textContent = String(Math.max(0, baseValue + diffDays));
   }
 
   async updateEasterEggJsLines() {
     const el = document.getElementById('easter-js-lines');
     if (!el) return;
     try {
-      const [mainRes] = await Promise.all([
-        fetch('/static/markdown-renderer.js', { cache: 'no-store' })
-      ]);
-      const mainJs = await mainRes.text();
-      const mainLines = mainJs.split('\n').length;
-      const inlineLines = 4; // route-pending script in index.html
-      el.textContent = String(mainLines + inlineLines);
+      const mainRes = await fetch('/static/markdown-renderer.js', { cache: 'no-store' });
+      if (mainRes.ok) {
+        const mainJs = await mainRes.text();
+        const mainLines = mainJs.split('\n').length;
+        const inlineLines = 4; // route-pending script in index.html
+        el.textContent = String(mainLines + inlineLines);
+      } else {
+        el.textContent = '—';
+      }
     } catch {
-      el.textContent = '?';
+      el.textContent = '—';
     }
   }
 
@@ -520,17 +529,17 @@ class Site {
     if (!el) return;
     const birth = new Date('2004-06-10T08:00:00');
     const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
-    let lastUpdate = 0;
-    const update = (ts = 0) => {
+    const setAge = () => {
       const now = new Date();
-      const ageMs = now - birth;
-      const ageYears = ageMs / msPerYear;
-      // Use 14 decimals so the last digits visibly tick every ~20ms
+      const ageYears = (now - birth) / msPerYear;
       el.textContent = ageYears.toFixed(14);
-      lastUpdate = requestAnimationFrame(update);
     };
-    lastUpdate = requestAnimationFrame(update);
-    this._easterAgeFrame = lastUpdate;
+    setAge(); // Set immediately
+    const update = () => {
+      setAge();
+      this._easterAgeFrame = requestAnimationFrame(update);
+    };
+    this._easterAgeFrame = requestAnimationFrame(update);
   }
 
   stopEasterEggAge() {
@@ -758,7 +767,13 @@ class Site {
     } else if (hash === 'youre-already-here') {
       await this.showYoureAlreadyHere();
     } else if (hash.startsWith('thought/')) {
-      await this.showThought(hash.replace('thought/', ''));
+      const postId = hash.replace('thought/', '');
+      // When not from back/forward, inject thoughts list so browser back goes to writing list
+      if (!this._fromPopstate) {
+        history.replaceState(null, '', '#thoughts');
+        history.pushState(null, '', `#thought/${postId}`);
+      }
+      await this.showThought(postId, true); // skip push - we injected or history already correct
     } else {
       await this.fadeToView('home-view');
     }

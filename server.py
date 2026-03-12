@@ -62,7 +62,7 @@ class MarkdownHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
 if __name__ == "__main__":
-    PORT = 8000
+    PORT = 8001
     
     with socketserver.TCPServer(("", PORT), MarkdownHandler) as httpd:
         print(f"Server running at http://localhost:{PORT}")

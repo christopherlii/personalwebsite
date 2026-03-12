@@ -1261,6 +1261,17 @@ a.timeline-row {
   cursor: default;
 }
 
+.solaces-section-title {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.solaces-about {
+  margin-top: 6rem;
+  padding-top: 3rem;
+  border-top: 1px solid var(--border);
+}
+
 .solace-preview {
   position: fixed;
   width: 240px;
