@@ -488,6 +488,12 @@ class Site {
     });
   }
 
+  async showPrivacyLinkedInSearchBypass() {
+    this.closePanel();
+    await this.fadeToView('privacy-view');
+    history.pushState(null, '', '#privacy/linkedin-search-bypass');
+  }
+
   async showYoureAlreadyHere() {
     await this.fadeToView('youre-already-here-view');
     history.pushState(null, '', '#youre-already-here');
@@ -568,6 +574,7 @@ class Site {
       <div class="article-body">
         <p class="work-description">${work.description || 'No description.'}</p>
         ${work.link ? `<p><a href="${work.link}" target="_blank">${linkLabel} →</a></p>` : ''}
+        ${work.privacy ? `<p><a href="${work.privacy}">privacy policy</a></p>` : ''}
     `;
     if (work.thoughtProcess) {
       html += `<section class="work-section"><h2 class="work-section-title">thought process</h2><div class="work-section-body">${work.thoughtProcess}</div></section>`;
@@ -766,6 +773,8 @@ class Site {
       await this.showSolacesList();
     } else if (hash === 'youre-already-here') {
       await this.showYoureAlreadyHere();
+    } else if (hash === 'privacy/linkedin-search-bypass') {
+      await this.showPrivacyLinkedInSearchBypass();
     } else if (hash.startsWith('thought/')) {
       const postId = hash.replace('thought/', '');
       // When not from back/forward, inject thoughts list so browser back goes to writing list
