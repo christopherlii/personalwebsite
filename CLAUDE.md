@@ -16,7 +16,7 @@ Personal website for Christopher Li (www.christopherli.dev). A static site with 
 All content is data-driven via JSON index files and markdown:
 
 - **`posts/`** — blog posts as `.md` files with YAML front matter (`title`, `date`, `tags`, `description`). Index: `posts/index.json` (array of filenames)
-- **`projects/index.json`** — array of project objects (`name`, `description`, `tech`, `year`, `status`, `image`, `link`)
+- **`projects/index.json`** — array of project objects (`name`, `slug`, `description`, `tech`, `year`, `status`, `image`, `link`, `privacy`). Project images go in `static/images/projects/` (e.g. `image: "/static/images/projects/my-project.png"`). Use `slug` for readable URLs like `#projects/linkedin-search-bypass`.
 - **`reading/index.json`** — reading list entries
 - **`solaces/index.json`** — solaces (things Chris likes)
 - **`quests/index.json`** — quest photos/captions displayed on the home page

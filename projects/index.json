@@ -1,6 +1,7 @@
 [
   {
     "name": "this website",
+    "slug": "this-website",
     "description": "my corner of the internet",
     "tech": "html, css, js",
     "year": "2026",
@@ -10,6 +11,7 @@
   },
   {
     "name": "nyu swipeshare",
+    "slug": "nyu-swipeshare",
     "description": "campus food sharing app for nyu students.",
     "tech": "ts, supabase",
     "year": "2026",
@@ -20,11 +22,12 @@
   },
   {
     "name": "LinkedIn Search Bypass",
+    "slug": "linkedin-search-bypass",
     "description": "Chrome extension that bypasses LinkedIn's profile search limits by replacing paywalled sidebar links with direct profile URLs via Google lookup. Includes visit history tracking.",
     "tech": "JavaScript, Chrome Extension (Manifest V3)",
     "year": "2026",
     "status": "active",
-    "image": null,
+    "image": "/static/images/projects/linkedin-search-bypass.png",
     "link": "https://chrome.google.com/webstore/detail/linkedin-search-bypass/EXTENSION_ID",
     "privacy": "#privacy/linkedin-search-bypass"
   }

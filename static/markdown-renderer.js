@@ -360,7 +360,7 @@ class Site {
 
     const grid = document.getElementById('projects-full-list');
     grid.innerHTML = this.projects.map((p, i) => `
-      <div class="project-card" data-project="${i}"${p.gradient ? ` style="background: ${p.gradient}"` : ''}>
+      <div class="project-card" data-project="${i}" data-slug="${p.slug || p.name.toLowerCase().replace(/\s+/g, '-')}"${p.gradient ? ` style="background: ${p.gradient}"` : ''}>
         <div class="project-image">
           ${p.image
             ? `<img src="${p.image}" alt="${p.name}">`
@@ -395,6 +395,18 @@ class Site {
     this.applyProjectCardGradients();
 
     history.pushState(null, '', '#projects');
+  }
+
+  getProjectSlug(project) {
+    return project?.slug || project?.name?.toLowerCase().replace(/\s+/g, '-') || '';
+  }
+
+  getProjectIndex(slugOrIndex) {
+    const parsed = parseInt(slugOrIndex, 10);
+    if (!isNaN(parsed) && parsed >= 0 && parsed < this.projects.length) return parsed;
+    const slug = String(slugOrIndex);
+    const idx = this.projects.findIndex(p => (p.slug || p.name.toLowerCase().replace(/\s+/g, '-')) === slug);
+    return idx >= 0 ? idx : -1;
   }
 
   applyProjectCardGradients() {
@@ -593,8 +605,9 @@ class Site {
     return html;
   }
 
-  async showProjectDetail(index) {
-    const project = this.projects[index];
+  async showProjectDetail(slugOrIndex) {
+    const index = this.getProjectIndex(slugOrIndex);
+    const project = index >= 0 ? this.projects[index] : null;
     if (!project) return this.showProjectsList();
 
     await this.fadeToView('project-view');
@@ -605,7 +618,8 @@ class Site {
     const content = document.getElementById('project-content');
     content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
 
-    history.pushState(null, '', `#projects/${index}`);
+    const slug = this.getProjectSlug(project);
+    history.pushState(null, '', `#projects/${slug}`);
   }
 
   async showReadingList() {
@@ -766,9 +780,8 @@ class Site {
     } else if (hash === 'projects') {
       await this.showProjectsList();
     } else if (hash.startsWith('projects/')) {
-      const idx = parseInt(hash.replace('projects/', ''), 10);
-      if (!isNaN(idx)) await this.showProjectDetail(idx);
-      else await this.showProjectsList();
+      const slugOrIndex = hash.replace('projects/', '');
+      await this.showProjectDetail(slugOrIndex);
     } else if (hash === 'solaces') {
       await this.showSolacesList();
     } else if (hash === 'youre-already-here') {
