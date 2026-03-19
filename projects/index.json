@@ -21,13 +21,14 @@
     "link": null
   },
   {
-    "name": "LinkedIn Search Bypass",
+    "name": "linkedin search bypass",
     "slug": "linkedin-search-bypass",
-    "description": "Chrome extension that bypasses LinkedIn's profile search limits by replacing paywalled sidebar links with direct profile URLs via Google lookup. Includes visit history tracking.",
-    "tech": "JavaScript, Chrome Extension (Manifest V3)",
+    "description": "chrome extension that bypasses linkedin's profile search limits",
+    "tech": "javascript",
     "year": "2026",
     "status": "active",
     "image": "/static/images/projects/linkedin-search-bypass.png",
+    "gradient": "linear-gradient(180deg, #e8eef5 0%, #f0f4f8 100%)",
     "link": "https://chrome.google.com/webstore/detail/linkedin-search-bypass/EXTENSION_ID",
     "privacy": "#privacy/linkedin-search-bypass"
   }
