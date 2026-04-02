@@ -29,7 +29,7 @@
     "status": "active",
     "image": "/static/images/projects/linkedin-search-bypass.png",
     "gradient": "linear-gradient(180deg, #e8eef5 0%, #f0f4f8 100%)",
-    "link": "https://chrome.google.com/webstore/detail/linkedin-search-bypass/EXTENSION_ID",
-    "privacy": "#privacy/linkedin-search-bypass"
+    "link": "https://github.com/christopherlii/linkedin-search-bypass",
+    "content": "linkedin-search-bypass.md"
   }
 ]

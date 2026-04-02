@@ -13,9 +13,8 @@ class Site {
 
   // Initialize
   init() {
-    this.setupPanel();
     this.setupNavigation();
-    this.setupTimelineReveal();
+    this.setupContactReveal();
   }
 
   setupPhotoShuffle() {
@@ -36,8 +35,8 @@ class Site {
     });
   }
 
-  setupTimelineReveal() {
-    const els = document.querySelectorAll('.timeline-label, .timeline-row, .contact-email');
+  setupContactReveal() {
+    const els = document.querySelectorAll('.contact-email');
     if (!els.length) return;
     const prevIntersecting = new Map();
     const observer = new IntersectionObserver((entries) => {
@@ -55,42 +54,6 @@ class Site {
         }
       });
     }, 300);
-  }
-
-  // Panel setup
-  setupPanel() {
-    const overlay = document.getElementById('panel-overlay');
-    const closeBtn = document.getElementById('panel-close');
-    const expandBtn = document.getElementById('panel-expand');
-
-    overlay?.addEventListener('click', () => this.closePanel());
-    closeBtn?.addEventListener('click', () => this.closePanel());
-    expandBtn?.addEventListener('click', () => {
-      const idx = expandBtn.dataset.projectExpand;
-      if (idx != null) {
-        this.closePanel();
-        this.showProjectDetail(parseInt(idx, 10));
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.closePanel();
-    });
-  }
-
-  openPanel(content) {
-    document.getElementById('panel-content').innerHTML = content;
-    document.getElementById('detail-panel').classList.add('open');
-    document.getElementById('panel-overlay').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  closePanel() {
-    const panel = document.getElementById('detail-panel');
-    panel?.classList.remove('open');
-    document.getElementById('panel-overlay')?.classList.remove('open');
-    document.body.style.overflow = '';
-    const expandBtn = document.getElementById('panel-expand');
-    if (expandBtn) expandBtn.style.display = 'none';
   }
 
   // Navigation setup
@@ -383,12 +346,7 @@ class Site {
     grid.querySelectorAll('.project-card').forEach(card => {
       card.addEventListener('click', () => {
         const idx = parseInt(card.dataset.project);
-        const isMobile = window.matchMedia('(max-width: 640px)').matches;
-        if (isMobile) {
-          this.showProjectDetail(idx);
-        } else {
-          this.showProjectItem(this.projects[idx], idx);
-        }
+        this.showProjectDetail(idx);
       });
     });
 
@@ -448,62 +406,6 @@ class Site {
         img.addEventListener('load', applyGradient);
       }
     });
-  }
-
-  showProjectItem(project, index) {
-    const projectIdx = index ?? this.projects.findIndex(p => p.name === project.name);
-    const imageHtml = project.image
-      ? `<div class="panel-image"><img src="${project.image}" alt="${project.name}"></div>`
-      : '';
-    this.openPanel(`
-      <div class="panel-layout">
-        <div class="panel-main">
-          <div class="panel-top-row">
-            <div class="panel-top-content">
-              <div class="panel-title">${project.name}</div>
-              <div class="panel-author">${project.tech || ''}</div>
-              <div class="panel-section">
-                <div class="panel-label">description</div>
-                <div class="panel-notes">${project.description || '<span class="panel-empty">no description.</span>'}</div>
-              </div>
-            </div>
-            ${imageHtml}
-          </div>
-          <div class="panel-meta">
-            <div class="panel-meta-item">
-              <div class="panel-meta-label">year</div>
-              <div class="panel-meta-value">${project.year || '—'}</div>
-            </div>
-            <div class="panel-meta-item">
-              <div class="panel-meta-label">status</div>
-              <div class="panel-meta-value">${project.status || '—'}</div>
-            </div>
-            <div class="panel-meta-item">
-              <div class="panel-meta-label">link</div>
-              <div class="panel-meta-value">${project.name.toLowerCase() === 'this website' ? `<a href="#youre-already-here" class="panel-link panel-link-easter">view →</a>` : project.link ? `<a href="${project.link}" target="_blank" class="panel-link">view →</a>` : '—'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `);
-    // Setup expand button in header
-    const expandBtn = document.getElementById('panel-expand');
-    if (expandBtn) {
-      expandBtn.style.display = '';
-      expandBtn.dataset.projectExpand = String(projectIdx);
-    }
-    // Delegate click for easter egg link (this website) - close panel and navigate
-    document.getElementById('panel-content').querySelector('.panel-link-easter')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.closePanel();
-      this.showYoureAlreadyHere();
-    });
-  }
-
-  async showPrivacyLinkedInSearchBypass() {
-    this.closePanel();
-    await this.fadeToView('privacy-view');
-    history.pushState(null, '', '#privacy/linkedin-search-bypass');
   }
 
   async showYoureAlreadyHere() {
@@ -569,24 +471,33 @@ class Site {
 
   renderWorkDetail(work, options = {}) {
     const { isVibecode = false, linkLabel = 'view project' } = options;
-    const meta = isVibecode
-      ? `${work.tech || ''} · ${work.date || ''}`.replace(/^ · | · $/g, '').trim()
-      : `${work.tech || ''} · ${work.year || ''}`.replace(/^ · | · $/g, '').trim();
     const statusHtml = work.status
       ? `<span class="work-status work-status-${(work.status || '').toLowerCase()}">${work.status}</span>`
       : '';
+    const meta = isVibecode
+      ? `${work.tech || ''} · ${work.date || ''}`.replace(/^ · | · $/g, '').trim()
+      : `${work.tech || ''}`.trim();
+    const primaryLink = work.name.toLowerCase() === 'this website'
+      ? { href: '#youre-already-here', label: 'enter the easter egg' }
+      : work.link
+        ? { href: work.link, label: `${linkLabel} →`, external: true }
+        : null;
+    const imageHtml = work.image
+      ? `<div class="project-doc-hero">
+          <img src="${work.image}" alt="${work.name}">
+          ${statusHtml ? `<div class="project-doc-hero-status">${statusHtml}</div>` : ''}
+        </div>`
+      : '';
     let html = `
-      <header class="article-header work-header">
-        <h1 class="article-title">${work.name}</h1>
-        <div class="work-meta">
-          ${meta ? `<span class="article-date">${meta}</span>` : ''}
-          ${statusHtml}
-        </div>
-      </header>
-      <div class="article-body">
-        <p class="work-description">${work.description || 'No description.'}</p>
-        ${work.link ? `<p><a href="${work.link}" target="_blank">${linkLabel} →</a></p>` : ''}
-        ${work.privacy ? `<p><a href="${work.privacy}">privacy policy</a></p>` : ''}
+      <div class="project-detail-page">
+        ${imageHtml}
+        <header class="project-doc-header project-detail-header">
+          <h1 class="project-doc-title">${work.name}</h1>
+          ${meta ? `<p class="project-detail-tech">${meta}</p>` : ''}
+        </header>
+        <div class="project-detail-content article-body">
+          <p class="work-description">${work.description || 'No description.'}</p>
+          ${primaryLink ? `<p class="project-detail-link-row"><a href="${primaryLink.href}" class="project-detail-link"${primaryLink.external ? ' target="_blank"' : ''}>${primaryLink.label}</a></p>` : ''}
     `;
     if (work.thoughtProcess) {
       html += `<section class="work-section"><h2 class="work-section-title">thought process</h2><div class="work-section-body">${work.thoughtProcess}</div></section>`;
@@ -601,7 +512,7 @@ class Site {
     if (work.stills && work.stills.length > 0) {
       html += `<section class="work-section"><h2 class="work-section-title">stills</h2><div class="work-stills">${work.stills.map(src => `<figure><img src="${src}" alt=""></figure>`).join('')}</div></section>`;
     }
-    html += '</div>';
+    html += '</div></div>';
     return html;
   }
 
@@ -616,10 +527,108 @@ class Site {
     if (breadcrumb) breadcrumb.textContent = project.name;
 
     const content = document.getElementById('project-content');
-    content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+
+    if (project.content) {
+      try {
+        const resp = await fetch(`/projects/${project.content}`, { cache: 'no-store' });
+        if (resp.ok) {
+          const raw = await resp.text();
+          const { body } = this.parseFrontMatter(raw);
+          const htmlBody = typeof marked !== 'undefined' ? marked.parse(body) : body;
+          content.innerHTML = this.renderProjectDoc(project, htmlBody);
+          this.setupProjectDocSidebar(content);
+        } else {
+          content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+        }
+      } catch (_) {
+        content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+      }
+    } else {
+      content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+    }
 
     const slug = this.getProjectSlug(project);
     history.pushState(null, '', `#projects/${slug}`);
+  }
+
+  renderProjectDoc(project, htmlBody) {
+    const statusHtml = project.status
+      ? `<span class="work-status work-status-${(project.status || '').toLowerCase()}">${project.status}</span>`
+      : '';
+
+    const headings = [];
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlBody;
+    tempDiv.querySelectorAll('h2, h3').forEach(h => {
+      const id = h.id || h.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (!h.id) h.id = id;
+      headings.push({ level: h.tagName === 'H2' ? 2 : 3, id, text: h.textContent });
+    });
+    const updatedBody = tempDiv.innerHTML;
+
+    const sidebarHtml = headings.length > 0 ? `
+      <nav class="project-doc-sidebar">
+        ${headings.map(h => `<a href="#${h.id}" class="project-doc-sidebar-link${h.level === 3 ? ' indent' : ''}" data-target="${h.id}">${h.text}</a>`).join('')}
+        ${project.link ? `<div class="project-doc-sidebar-divider"></div><a href="${project.link}" target="_blank" class="project-doc-sidebar-link external">github ↗</a>` : ''}
+      </nav>
+    ` : '';
+
+    const imageHtml = project.image
+      ? `<div class="project-doc-hero">
+          <img src="${project.image}" alt="${project.name}">
+          ${statusHtml ? `<div class="project-doc-hero-status">${statusHtml}</div>` : ''}
+        </div>`
+      : '';
+
+    return `
+      <div class="project-doc">
+        ${imageHtml}
+        <div class="project-doc-header">
+          <h1 class="project-doc-title">${project.name}</h1>
+        </div>
+        <div class="project-doc-layout">
+          ${sidebarHtml}
+          <div class="project-doc-content article-body">
+            ${updatedBody}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  setupProjectDocSidebar(container) {
+    const sidebar = container.querySelector('.project-doc-sidebar');
+    if (!sidebar) return;
+
+    const links = sidebar.querySelectorAll('.project-doc-sidebar-link[data-target]');
+    const sections = [];
+    links.forEach(link => {
+      const target = container.querySelector(`#${link.dataset.target}`);
+      if (target) sections.push({ link, target });
+    });
+
+    // Click to scroll
+    links.forEach(link => {
+      link.addEventListener('click', (e) => {
+        if (link.classList.contains('external')) return;
+        e.preventDefault();
+        const target = container.querySelector(`#${link.dataset.target}`);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Highlight active section on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          const active = sidebar.querySelector(`[data-target="${entry.target.id}"]`);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+    sections.forEach(s => observer.observe(s.target));
   }
 
   async showReadingList() {
@@ -786,8 +795,6 @@ class Site {
       await this.showSolacesList();
     } else if (hash === 'youre-already-here') {
       await this.showYoureAlreadyHere();
-    } else if (hash === 'privacy/linkedin-search-bypass') {
-      await this.showPrivacyLinkedInSearchBypass();
     } else if (hash.startsWith('thought/')) {
       const postId = hash.replace('thought/', '');
       // When not from back/forward, inject thoughts list so browser back goes to writing list
