@@ -3,6 +3,7 @@ title: "If I Had To Do NYU CS Over Again"
 date: "2025-05-31"
 tags: ["random"]
 description: "Some things i learned over 3 years"
+published: false
 ---
 
 I don't really intend for people to read my writing—this archive is much more for myself than others—but in case someone ever asks me for advice specific to NYU CS, I'll point them towards this article. If you're reading this as an incoming CS student at NYU, congratulations! You'll probably have the best 4 years of your life here... if you make the most of it. Obviously, listen to the blanket advice, but there's a couple things I think people miss. I'm a rising senior at time of writing, and if I had another shot at NYU CS, this is what I'd do differently.
@@ -28,5 +29,4 @@ This is probably one of my biggest regrets. The CS community at NYU is missing s
 Most important for last: go out of your way to meet people. I'd honestly treat extroversion as a skill. One of my close friends used to taxi back to her dorm with the sole purpose of striking up and maintaining a conversation with the driver. Now, socializing comes naturally to her. NYU is a school where it's incredibly easy to feel alone in a big city. Having a support system underneath you and a wide reaching network not only advances your career, life is simply much more fun—you do more, risk more, live more. There's nothing more special than experiencing a moment (at the perfect place, with the perfect people) that you know you'll reminisce on later.
 
 I think that's enough rambling at 4 am, goodnight :)
-
 

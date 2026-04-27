@@ -52,7 +52,14 @@ def generate_posts_index():
         return
 
     md_files = sorted(posts_dir.glob('*.md'))
-    filenames = [f.name for f in md_files]
+    filenames = []
+
+    for path in md_files:
+        content = path.read_text()
+        attributes = parse_front_matter(content)
+        if str(attributes.get('published', '')).lower() == 'false':
+            continue
+        filenames.append(path.name)
 
     index_path = posts_dir / 'index.json'
     with open(index_path, 'w') as f:

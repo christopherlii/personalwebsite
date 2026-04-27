@@ -3,6 +3,7 @@ title: "Roses and Daffodils"
 date: "2026-03-10"
 tags: ["thoughts"]
 description: "My feelings on leaving college, SF, and my many solaces."
+published: false
 ---
 
 ## 1.
@@ -100,5 +101,4 @@ I can't wait to find the crevices that I fill in my future friends, and discover
 I hope my time in SF is one worth reminiscing on. One day, I'll arrive at SFO the same way I do my childhood room. I'll be a little older, a little wiser, with a few more daffodils. Everything will be exactly where it's supposed to be, except me.
 
 I'll be, again, nothing more than a traveler wandering old solaces.
-
 

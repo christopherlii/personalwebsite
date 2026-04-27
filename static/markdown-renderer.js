@@ -35,6 +35,20 @@ class Site {
     });
   }
 
+  enhanceArticleImages(container) {
+    const imgs = Array.from(container.querySelectorAll('.article-body img'));
+    imgs.forEach((img, idx) => {
+      img.decoding = 'async';
+      if (idx === 0) {
+        img.loading = 'eager';
+        img.fetchPriority = 'high';
+      } else {
+        img.loading = 'lazy';
+        img.fetchPriority = 'low';
+      }
+    });
+  }
+
   setupContactReveal() {
     const els = document.querySelectorAll('.contact-email');
     if (!els.length) return;
@@ -157,6 +171,7 @@ class Site {
           const resp = await fetch(`/posts/${file}`);
           const content = await resp.text();
           const { attributes, body } = this.parseFrontMatter(content);
+          if (String(attributes.published).toLowerCase() === 'false') continue;
           this.posts.push({
             filename: file.replace('.md', ''),
             title: attributes.title || file.replace('.md', '').replace(/-/g, ' '),
@@ -226,11 +241,11 @@ class Site {
     history.pushState(null, '', '/');
   }
 
-  async showThoughtsList(activeFilter = 'thoughts') {
+  async showThoughtsList(activeFilter = 'updates') {
     await this.fadeToView('thoughts-view');
 
-    // Nav bar filter: thoughts, updates, random (no all, default to thoughts)
-    const tagOrder = ['thoughts', 'updates', 'random'];
+    // Nav bar filter: updates, random
+    const tagOrder = ['updates', 'random'];
 
     // Render simple text filters
     const filters = document.getElementById('thoughts-filters');
@@ -245,14 +260,14 @@ class Site {
         });
       });
 
-      const activeLink = filters.querySelector(`[data-filter="${activeFilter}"]`) || filters.querySelector('[data-filter="thoughts"]');
+      const activeLink = filters.querySelector(`[data-filter="${activeFilter}"]`) || filters.querySelector('[data-filter="updates"]');
       if (activeLink) activeLink.classList.add('active');
       this.filterThoughts(activeFilter);
     } else {
       filters.innerHTML = '';
       this.renderThoughts(this.posts);
     }
-    const hash = activeFilter === 'thoughts' ? '#thoughts' : `#thoughts/${activeFilter}`;
+    const hash = activeFilter === 'updates' ? '#thoughts' : `#thoughts/${activeFilter}`;
     history.pushState(null, '', hash);
   }
 
@@ -261,15 +276,13 @@ class Site {
     list.classList.add('fading');
     await new Promise(r => setTimeout(r, 150));
     
-    const filtered = filter === 'all'
-      ? this.posts
-      : this.posts.filter(p => p.tags?.includes(filter));
+    const filtered = this.posts.filter(p => p.tags?.includes(filter));
     this.renderThoughts(filtered);
     
     list.classList.remove('fading');
 
     // Update URL so back button returns to this filter
-    const hash = filter === 'thoughts' ? '#thoughts' : `#thoughts/${filter}`;
+    const hash = filter === 'updates' ? '#thoughts' : `#thoughts/${filter}`;
     history.replaceState(null, '', hash);
   }
 
@@ -311,6 +324,7 @@ class Site {
       ${formattedDate ? `<footer class="article-footer"><time class="article-date">${formattedDate}</time></footer>` : ''}
     `;
 
+    this.enhanceArticleImages(document.getElementById('thought-content'));
     this.setupPhotoShuffle();
 
     if (!skipHistoryPush) {
@@ -745,7 +759,7 @@ class Site {
     const container = document.getElementById('solaces-list');
     if (!container) return;
 
-    const placeholderImg = '/static/images/blogs/2025_q4/apt_view.png';
+    const placeholderImg = '/static/images/blogs/2025_q4/apt_view.jpg';
     container.innerHTML = this.solaces.map(category => `
       <div class="solaces-category">
         <div class="solaces-category-title">${category.title}</div>
@@ -780,9 +794,9 @@ class Site {
     if (!hash || hash === '/') {
       await this.fadeToView('home-view');
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
-      const tagOrder = ['thoughts', 'updates', 'random'];
-      const filter = hash === 'thoughts' ? 'thoughts' : hash.replace('thoughts/', '');
-      const validFilter = tagOrder.includes(filter) ? filter : 'thoughts';
+      const tagOrder = ['updates', 'random'];
+      const filter = hash === 'thoughts' ? 'updates' : hash.replace('thoughts/', '');
+      const validFilter = tagOrder.includes(filter) ? filter : 'updates';
       await this.showThoughtsList(validFilter);
     } else if (hash === 'reading') {
       await this.showReadingList();
