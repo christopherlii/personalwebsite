@@ -1,9 +1,8 @@
 ---
-title: "Roses and Daffodils"
+title: "Solaces"
 date: "2026-03-10"
-tags: ["thoughts"]
+tags: ["random"]
 description: "My feelings on leaving college, SF, and my many solaces."
-published: false
 ---
 
 ## 1.
