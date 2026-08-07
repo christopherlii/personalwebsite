@@ -102,7 +102,7 @@ class Site {
       });
     });
 
-    document.querySelectorAll('a[href="#solaces"]').forEach(link => {
+    document.querySelectorAll('a[href="#favorites"]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         this.showSolacesList();
@@ -785,7 +785,7 @@ class Site {
 
     this.setupSolacePreviews();
 
-    history.pushState(null, '', '#solaces');
+    history.pushState(null, '', '#favorites');
   }
 
   // Routing
@@ -805,7 +805,7 @@ class Site {
     } else if (hash.startsWith('projects/')) {
       const slugOrIndex = hash.replace('projects/', '');
       await this.showProjectDetail(slugOrIndex);
-    } else if (hash === 'solaces') {
+    } else if (hash === 'favorites' || hash === 'solaces') {
       await this.showSolacesList();
     } else if (hash === 'youre-already-here') {
       await this.showYoureAlreadyHere();
