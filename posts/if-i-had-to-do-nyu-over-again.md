@@ -1,5 +1,5 @@
 ---
-title: "If I Had To Do NYU CS Over Again"
+title: "on nyu cs"
 date: "2025-05-31"
 tags: ["random"]
 description: "Some things i learned over 3 years"

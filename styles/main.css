@@ -23,6 +23,8 @@
   /* Sizing */
   --max-width: 720px;
   --header-height: 64px;
+  --banner-height: 380px;
+  --banner-bar: 64px;
 
   /* Font sizes (non-article: 4 sizes only) */
   --text-xs: 12px;
@@ -160,6 +162,111 @@ img {
 }
 
 .breadcrumb-current {
+  color: var(--fg-muted);
+}
+
+/* ========================================
+   COLLAPSING BANNER (home + article)
+   ======================================== */
+
+.banner {
+  position: sticky;
+  z-index: 50;
+  flex: none;
+  top: 0;
+  max-width: calc(var(--max-width) - 48px);
+  width: calc(100% - 48px);
+  margin: 24px auto 0;
+  height: var(--banner-height);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(250, 250, 250, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.banner-spacer {
+  flex: none;
+  height: 0;
+}
+
+.banner-media {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--banner-height);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.banner-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 130px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(8, 12, 18, 0.72) 0px,
+    rgba(8, 12, 18, 0.58) 60px,
+    rgba(8, 12, 18, 0) 130px
+  );
+}
+
+.banner-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: none;
+  height: var(--banner-bar);
+  padding: 0 20px;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.banner-header .logo,
+.banner-header .breadcrumb a,
+.banner-header .breadcrumb-home,
+.banner-header .breadcrumb-separator {
+  color: #fff;
+}
+
+.banner-header .breadcrumb-current {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Cover-less posts keep the plain bar, in the site's normal light chrome */
+.banner--bare {
+  height: var(--banner-bar) !important;
+}
+
+.banner--bare .banner-media,
+.banner--bare .banner-scrim {
+  display: none;
+}
+
+.banner--bare .banner-header {
+  text-shadow: none;
+}
+
+.banner--bare .banner-header .logo,
+.banner--bare .banner-header .breadcrumb a {
+  color: var(--fg);
+}
+
+.banner--bare .banner-header .breadcrumb-home,
+.banner--bare .banner-header .breadcrumb-separator {
+  color: var(--fg-secondary);
+}
+
+.banner--bare .banner-header .breadcrumb-current {
   color: var(--fg-muted);
 }
 
@@ -1253,6 +1360,19 @@ img {
    ======================================== */
 
 @media (max-width: 640px) {
+  :root {
+    --banner-height: 300px;
+  }
+
+  .banner {
+    width: calc(100% - 32px);
+    margin-top: 16px;
+  }
+
+  .banner-header {
+    padding: 0 16px;
+  }
+
   .header {
     padding: 16px;
   }

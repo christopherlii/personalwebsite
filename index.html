@@ -20,9 +20,14 @@
   <div class="site">
     <!-- Home View -->
     <div id="home-view" class="view">
-      <header class="header">
-        <a href="/" class="logo">Christopher Li</a>
-      </header>
+      <div class="banner">
+        <div class="banner-media" style="background-image: url('/static/images/hero/rock.jpg'); background-position: center 74%;"></div>
+        <div class="banner-scrim"></div>
+        <header class="header banner-header">
+          <a href="/" class="logo">Christopher Li</a>
+        </header>
+      </div>
+      <div class="banner-spacer"></div>
       <main class="main">
         <section class="hero">
           <p class="hero-text">hi, i'm chris :)</p>
@@ -53,15 +58,20 @@
 
     <!-- Thought Detail View -->
     <div id="thought-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#thoughts">writing</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current" id="thought-breadcrumb">post</span>
-        </div>
-      </header>
+      <div class="banner">
+        <div class="banner-media" id="thought-cover"></div>
+        <div class="banner-scrim"></div>
+        <header class="header banner-header">
+          <div class="breadcrumb">
+            <a href="/" class="breadcrumb-home">Christopher Li</a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="#thoughts">writing</a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current" id="thought-breadcrumb">post</span>
+          </div>
+        </header>
+      </div>
+      <div class="banner-spacer"></div>
       <div class="page-container">
         <article id="thought-content" class="article"></article>
       </div>

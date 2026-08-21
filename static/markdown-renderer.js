@@ -15,6 +15,62 @@ class Site {
   init() {
     this.setupNavigation();
     this.setupContactReveal();
+    this.setupBanners();
+  }
+
+  // ========================================
+  // COLLAPSING BANNER (home + article)
+  // ========================================
+
+  setupBanners() {
+    const styles = getComputedStyle(document.documentElement);
+    this.bannerFull = parseInt(styles.getPropertyValue('--banner-height'), 10) || 380;
+    this.bannerBar = parseInt(styles.getPropertyValue('--banner-bar'), 10) || 64;
+
+    this.updateBanners = () => {
+      const full = this.bannerFull;
+      const bar = this.bannerBar;
+      const h = Math.max(bar, full - window.scrollY);
+
+      document.querySelectorAll('.view:not(.hidden) > .banner').forEach(banner => {
+        const sib = banner.nextElementSibling;
+        const spacer = sib && sib.classList.contains('banner-spacer') ? sib : null;
+        if (banner.classList.contains('banner--bare')) {
+          if (spacer) spacer.style.height = '0px';
+          return;
+        }
+
+        banner.style.height = `${h}px`;
+        if (spacer) spacer.style.height = `${full - h}px`;
+      });
+    };
+
+    // Re-read the token on resize — it drops to 300px on narrow screens.
+    this.onBannerResize = () => {
+      const s = getComputedStyle(document.documentElement);
+      this.bannerFull = parseInt(s.getPropertyValue('--banner-height'), 10) || 380;
+      this.updateBanners();
+    };
+
+    window.addEventListener('scroll', this.updateBanners, { passive: true });
+    window.addEventListener('resize', this.onBannerResize);
+    this.updateBanners();
+  }
+
+  setPostCover(post) {
+    const banner = document.querySelector('#thought-view > .banner');
+    const media = document.getElementById('thought-cover');
+    if (!banner || !media) return;
+
+    if (post && post.cover) {
+      banner.classList.remove('banner--bare');
+      media.style.backgroundImage = `url('${post.cover}')`;
+      media.style.backgroundPosition = post.coverPosition || 'center';
+    } else {
+      banner.classList.add('banner--bare');
+      media.style.backgroundImage = '';
+    }
+    this.updateBanners();
   }
 
   setupPhotoShuffle() {
@@ -178,6 +234,8 @@ class Site {
             date: attributes.date || '',
             tags: attributes.tags || [],
             description: attributes.description || '',
+            cover: attributes.cover || '',
+            coverPosition: attributes.coverPosition || '',
             content: typeof marked !== 'undefined' ? marked.parse(body) : body
           });
         } catch (e) { console.error(e); }
@@ -234,6 +292,7 @@ class Site {
     }
     
     window.scrollTo(0, 0);
+    if (this.updateBanners) this.updateBanners();
   }
 
   async showHome() {
@@ -324,6 +383,7 @@ class Site {
       ${formattedDate ? `<footer class="article-footer"><time class="article-date">${formattedDate}</time></footer>` : ''}
     `;
 
+    this.setPostCover(post);
     this.enhanceArticleImages(document.getElementById('thought-content'));
     this.setupPhotoShuffle();
 

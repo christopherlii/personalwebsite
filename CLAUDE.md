@@ -15,7 +15,7 @@ Personal website for Christopher Li (www.christopherli.dev). A static site with 
 
 All content is data-driven via JSON index files and markdown:
 
-- **`posts/`** — blog posts as `.md` files with YAML front matter (`title`, `date`, `tags`, `description`). Index: `posts/index.json` (array of filenames)
+- **`posts/`** — blog posts as `.md` files with YAML front matter (`title`, `date`, `tags`, `description`, optional `cover` + `coverPosition`). Index: `posts/index.json` (array of filenames). `cover` is the image shown in the collapsing banner at the top of the article; `coverPosition` is a CSS `background-position` for its crop. Posts without a `cover` fall back to a plain bar.
 - **`projects/index.json`** — array of project objects (`name`, `slug`, `description`, `tech`, `year`, `status`, `image`, `link`, `privacy`). Project images go in `static/images/projects/` (e.g. `image: "/static/images/projects/my-project.png"`). Use `slug` for readable URLs like `#projects/linkedin-search-bypass`.
 - **`reading/index.json`** — reading list entries
 - **`solaces/index.json`** — solaces (things Chris likes)
@@ -37,6 +37,8 @@ All content is data-driven via JSON index files and markdown:
    date: "YYYY-MM-DD"
    tags: ["tag1", "tag2"]
    description: "Short description"
+   cover: "/static/images/blogs/your-post-slug/cover.jpg"
+   coverPosition: "center 70%"
    ---
    ```
 2. Run `python3 build.py` to regenerate `posts/index.json`
@@ -45,4 +47,5 @@ All content is data-driven via JSON index files and markdown:
 
 - Fonts: Fraunces (headings) and Source Serif 4 (body) via Google Fonts
 - The site uses a warm, minimal aesthetic with subtle animations (timeline reveal, panel slide-in)
+- The home page and article pages share a **collapsing banner** (`.banner` in `main.css`, `setupBanners()` in `markdown-renderer.js`): a sticky photo header that shrinks from `--banner-height` to `--banner-bar` as you scroll, with the breadcrumb overlaid in white. Home uses `/static/images/hero/rock.jpg`; articles use their `cover`.
 - Lowercase writing style throughout the site content
