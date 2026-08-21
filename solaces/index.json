@@ -24,27 +24,27 @@
     "items": [
       {
         "name": "good will hunting",
-        "previewImage": "/static/images/films/goodwillhunting.png"
+        "previewImage": "/static/images/films/goodwillhunting.jpg"
       },
       {
         "name": "interstellar",
-        "previewImage": "/static/images/films/interstellar.png"
+        "previewImage": "/static/images/films/interstellar.jpg"
       },
       {
         "name": "the social network",
-        "previewImage": "/static/images/films/socialnetwork.png"
+        "previewImage": "/static/images/films/socialnetwork.jpg"
       },
       {
         "name": "suits",
-        "previewImage": "/static/images/films/suits.png"
+        "previewImage": "/static/images/films/suits.jpg"
       },
       {
         "name": "dune",
-        "previewImage": "/static/images/films/dune.png"
+        "previewImage": "/static/images/films/dune.jpg"
       },
       {
         "name": "moneyball",
-        "previewImage": "/static/images/films/moneyball.png"
+        "previewImage": "/static/images/films/moneyball.jpg"
       }
     ]
   },
@@ -53,15 +53,15 @@
     "items": [
       {
         "name": "barcelona",
-        "previewImage": "/static/images/sports/barca.png"
+        "previewImage": "/static/images/sports/barca.jpg"
       },
       {
         "name": "manchester city",
-        "previewImage": "/static/images/sports/mancity.png"
+        "previewImage": "/static/images/sports/mancity.jpg"
       },
       {
         "name": "warriors",
-        "previewImage": "/static/images/sports/warriors.png"
+        "previewImage": "/static/images/sports/warriors.jpg"
       },
       {
         "name": "mclaren f1",

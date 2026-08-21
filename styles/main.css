@@ -938,6 +938,15 @@ body.no-top-fade .top-fade {
     height: 72px;
   }
 
+  /* More air between the photo and the content, less dead space below. */
+  .page {
+    padding: 32px var(--page-pad) 72px;
+  }
+
+  .page-home {
+    padding: 32px var(--page-pad) 0;
+  }
+
   .banner-header {
     padding: 0 14px;
   }
@@ -963,8 +972,14 @@ body.no-top-fade .top-fade {
     font-size: 11px;
   }
 
+  /* Two tighter columns instead of one sparse mile-long list. */
   .solaces-masonry {
-    column-count: 1;
+    column-count: 2;
+    column-gap: 24px;
+  }
+
+  .solaces-category {
+    margin-bottom: 24px;
   }
 
   .projects-grid {
