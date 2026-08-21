@@ -28,6 +28,7 @@
   --banner-top: 44px;
   --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
   --banner-ms: 650ms;
+  --banner-fade-ms: 350ms;
 }
 
 /* ========================================
@@ -171,7 +172,9 @@ body.no-top-fade .top-fade {
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0;
-  transition: opacity var(--banner-ms) ease;
+  /* Photo swaps run shorter than the banner's 650ms open/collapse — a quick,
+     quiet dissolve for hover previews rather than a slow feature fade. */
+  transition: opacity var(--banner-fade-ms) ease;
 }
 
 .banner-media.active {

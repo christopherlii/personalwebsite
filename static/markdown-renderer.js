@@ -401,10 +401,12 @@ class Site {
       });
 
       // Preview the post's cover in the bar on hover; clicking then expands
-      // the photo that's already showing. Leaving restores the home photo —
-      // unless the leave is the click-through itself, where a restore would
-      // flash the home photo mid-expansion.
+      // the photo that's already showing. The restore-to-home on leave is
+      // debounced: moving straight from one row to another cancels it, so
+      // covers cross-fade into each other instead of bouncing through the
+      // home photo (which reused the visible layer and read as a hard cut).
       item.addEventListener('mouseenter', () => {
+        clearTimeout(this._hoverRestoreT);
         const post = this.posts.find(p => p.filename === item.dataset.post);
         const photo = post && post.cover
           ? { src: post.cover, position: post.coverPosition }
@@ -412,10 +414,14 @@ class Site {
         this.setBannerPhoto(photo.src, photo.position || 'center');
       });
       item.addEventListener('mouseleave', () => {
-        if (!clickedThrough && this.view === 'thoughts') {
-          const photo = this.homePhoto();
-          this.setBannerPhoto(photo.src, photo.position);
-        }
+        if (clickedThrough) return;
+        clearTimeout(this._hoverRestoreT);
+        this._hoverRestoreT = setTimeout(() => {
+          if (!clickedThrough && this.view === 'thoughts') {
+            const photo = this.homePhoto();
+            this.setBannerPhoto(photo.src, photo.position);
+          }
+        }, 90);
       });
     });
 
