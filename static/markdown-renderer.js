@@ -50,7 +50,10 @@ class Site {
       if (this.mobileMq.matches) {
         this.banner.style.height = `${target}px`;
         this.banner.style.top = '';
-        if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
+        // While floating mid-slide, the spacer stands in for the banner.
+        if (this.bannerSpacer && !this.banner.classList.contains('banner--floating')) {
+          this.bannerSpacer.style.height = '0px';
+        }
         return;
       }
 
@@ -134,13 +137,32 @@ class Site {
   }
 
   // Runs the height/top change through a CSS transition rather than snapping.
+  // On phones the banner floats out of the flow for the duration: a spacer
+  // holds its final space, so the slide repaints only the banner instead of
+  // re-laying-out the page every frame.
   animateBanner() {
     if (!this.banner) return;
+
+    const floating = this.mobileMq && this.mobileMq.matches;
+    if (floating && this.bannerSpacer) {
+      const target = this.view === 'home' || this.view === 'thought' || this.view === 'solaces'
+        ? this.bannerFull
+        : this.bannerBar;
+      this.bannerSpacer.style.height = `${target}px`;
+      this.banner.classList.add('banner--floating');
+    }
+
     this.banner.classList.add('animating');
     this.banner.offsetHeight; // let the transition apply before the height moves
     clearTimeout(this._bannerAnimT);
     this._bannerAnimT = setTimeout(() => {
       this.banner.classList.remove('animating');
+      if (this.banner.classList.contains('banner--floating')) {
+        // Land in the same frame: banner re-enters the flow exactly as the
+        // spacer collapses, so nothing shifts.
+        this.banner.classList.remove('banner--floating');
+        if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
+      }
     }, this.bannerMs + 60);
   }
 
