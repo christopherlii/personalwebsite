@@ -95,6 +95,7 @@ img {
    ======================================== */
 
 .site {
+  position: relative;
   max-width: var(--col);
   margin: 0 auto;
   padding: 0 var(--col-pad);
@@ -158,6 +159,17 @@ body.no-top-fade .top-fade {
 .banner.animating {
   transition: height var(--banner-ms) var(--banner-ease),
               top var(--banner-ms) var(--banner-ease);
+}
+
+/* Phones float the banner out of the flow while it slides open or shut —
+   a spacer holds its final space, so the height animation repaints only
+   the banner instead of re-laying-out the whole page every frame. */
+.banner--floating {
+  position: absolute !important;
+  left: var(--col-pad);
+  right: var(--col-pad);
+  top: var(--banner-top) !important;
+  margin-top: 0;
 }
 
 .banner-spacer {
@@ -772,7 +784,7 @@ body.no-top-fade .top-fade {
    ======================================== */
 
 .solaces-masonry {
-  column-count: 3;
+  column-count: 2;
   column-gap: 40px;
 }
 
@@ -912,12 +924,6 @@ body.no-top-fade .top-fade {
    RESPONSIVE
    ======================================== */
 
-@media (max-width: 720px) {
-  .solaces-masonry {
-    column-count: 2;
-  }
-}
-
 @media (max-width: 640px) {
   :root {
     --banner-height: 300px;
@@ -932,6 +938,7 @@ body.no-top-fade .top-fade {
      blur is dropped too — it's expensive and sits over a photo anyway. */
   .banner {
     position: relative;
+    top: 0; /* the sticky offset would shift it 20px below its flow slot */
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -942,11 +949,11 @@ body.no-top-fade .top-fade {
 
   /* More air between the photo and the content, less dead space below. */
   .page {
-    padding: 32px var(--page-pad) 72px;
+    padding: 44px var(--page-pad) 72px;
   }
 
   .page-home {
-    padding: 32px var(--page-pad) 0;
+    padding: 44px var(--page-pad) 0;
   }
 
   .banner-header {
