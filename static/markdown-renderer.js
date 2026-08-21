@@ -393,8 +393,30 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
+    let clickedThrough = false;
     list.querySelectorAll('.thought-row').forEach(item => {
-      item.addEventListener('click', () => this.showThought(item.dataset.post));
+      item.addEventListener('click', () => {
+        clickedThrough = true;
+        this.showThought(item.dataset.post);
+      });
+
+      // Preview the post's cover in the bar on hover; clicking then expands
+      // the photo that's already showing. Leaving restores the home photo —
+      // unless the leave is the click-through itself, where a restore would
+      // flash the home photo mid-expansion.
+      item.addEventListener('mouseenter', () => {
+        const post = this.posts.find(p => p.filename === item.dataset.post);
+        const photo = post && post.cover
+          ? { src: post.cover, position: post.coverPosition }
+          : this.homePhoto();
+        this.setBannerPhoto(photo.src, photo.position || 'center');
+      });
+      item.addEventListener('mouseleave', () => {
+        if (!clickedThrough && this.view === 'thoughts') {
+          const photo = this.homePhoto();
+          this.setBannerPhoto(photo.src, photo.position);
+        }
+      });
     });
 
     history.pushState(null, '', '#thoughts');

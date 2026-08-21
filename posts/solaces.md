@@ -96,7 +96,7 @@ it's March and the city is alive again. the temperature is a cool 65 degrees—c
 
 i'm burning with excitement.
 
-i can't wait to find the crevices that i fill in my future friends, and discover the quirks of SF akin to ones i found Manhattan. patience has never been my strong suit though; if i could sprint there i'd be on my way. for now, i have other side quests to tackle.
+i can't wait to find the crevices that i fill in my future friends, and discover the quirks of SF akin to ones i found in Manhattan. patience has never been my strong suit though; if i could sprint there i'd be on my way. for now, i have other side quests to tackle.
 
 i hope my time in SF is one worth reminiscing on. one day, i'll arrive at SFO the same way i do my childhood room. i'll be a little older, a little wiser, with a few more daffodils. everything will be exactly where it's supposed to be, except me.
 
