@@ -160,12 +160,16 @@ class Site {
     this.breadcrumbEl.innerHTML = parts.join('');
 
     // Hovering the name previews the home photo, same sticky fade as the
-    // writing-list rows — clicking it then expands the photo already showing.
+    // writing-list rows — but only while the banner is condensed to the bar.
+    // Over an expanded hero (home, an article's cover, favorites) the name
+    // hover leaves the photo alone.
     const nameEl = this.breadcrumbEl.querySelector('.crumb-name');
     if (nameEl) {
       nameEl.addEventListener('mouseenter', () => {
-        const photo = this.homePhoto();
-        this.setBannerPhoto(photo.src, photo.position);
+        if (this.banner && this.banner.offsetHeight <= this.bannerBar + 2) {
+          const photo = this.homePhoto();
+          this.setBannerPhoto(photo.src, photo.position);
+        }
       });
     }
 
