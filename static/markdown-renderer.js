@@ -160,13 +160,15 @@ class Site {
     this.breadcrumbEl.innerHTML = parts.join('');
 
     // Hovering the name previews the home photo, same sticky fade as the
-    // writing-list rows — but only while the banner is condensed to the bar.
-    // Over an expanded hero (home, an article's cover, favorites) the name
-    // hover leaves the photo alone.
+    // writing-list rows — but only on fixed-frame pages where the banner sits
+    // condensed to the bar. Expanded heroes, articles, and any page that
+    // scrolls are left alone.
     const nameEl = this.breadcrumbEl.querySelector('.crumb-name');
     if (nameEl) {
       nameEl.addEventListener('mouseenter', () => {
-        if (this.banner && this.banner.offsetHeight <= this.bannerBar + 2) {
+        const condensed = this.banner && this.banner.offsetHeight <= this.bannerBar + 2;
+        const fixedFrame = document.documentElement.classList.contains('no-scroll');
+        if (condensed && fixedFrame) {
           const photo = this.homePhoto();
           this.setBannerPhoto(photo.src, photo.position);
         }
@@ -635,10 +637,10 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">nothing here yet.</p>';
 
-    // Hovering a favorite fades its image into the expanded hero, same
-    // sticky behavior as the writing list — no restore on leave.
+    // Clicking a favorite fades its image into the expanded hero, and it
+    // stays until another one is picked.
     container.querySelectorAll('.solaces-item-hero').forEach(el => {
-      el.addEventListener('mouseenter', () => {
+      el.addEventListener('click', () => {
         this.setBannerPhoto(el.dataset.previewImg, 'center');
       });
     });

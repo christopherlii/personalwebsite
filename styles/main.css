@@ -813,7 +813,7 @@ body.no-top-fade .top-fade {
 }
 
 .solaces-item-hero {
-  cursor: default;
+  cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: opacity 0.25s ease;
 }
