@@ -230,6 +230,7 @@ body.no-top-fade .top-fade {
   font-weight: 500;
   color: #fff;
   cursor: pointer;
+  transition: opacity 0.25s ease;
 }
 
 .breadcrumb .crumb-sep {
@@ -240,6 +241,7 @@ body.no-top-fade .top-fade {
 .breadcrumb .crumb-link {
   color: #fff;
   cursor: pointer;
+  transition: opacity 0.25s ease;
 }
 
 .breadcrumb .crumb-current {
