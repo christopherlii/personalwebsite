@@ -370,6 +370,17 @@ class Site {
     return { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
   }
 
+  // Bar-only views don't pick a photo — the condensed bar keeps showing
+  // whatever hero you just came from, so the collapse reads as that photo
+  // condensing. The held photo is also what hover previews restore to.
+  holdBannerPhoto() {
+    if (!this.bannerPhoto) {
+      const photo = this.homePhoto();
+      this.setBannerPhoto(photo.src, photo.position);
+    }
+    this.heldPhoto = { ...this.bannerPhoto };
+  }
+
   async showHome() {
     await this.fadeToView('home-view', 'home');
     const photo = this.homePhoto();
@@ -381,8 +392,7 @@ class Site {
 
   async showThoughtsList() {
     await this.fadeToView('thoughts-view', 'thoughts');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null);
 
     const list = document.getElementById('thoughts-full-list');
@@ -410,16 +420,15 @@ class Site {
         const post = this.posts.find(p => p.filename === item.dataset.post);
         const photo = post && post.cover
           ? { src: post.cover, position: post.coverPosition }
-          : this.homePhoto();
+          : this.heldPhoto;
         this.setBannerPhoto(photo.src, photo.position || 'center');
       });
       item.addEventListener('mouseleave', () => {
         if (clickedThrough) return;
         clearTimeout(this._hoverRestoreT);
         this._hoverRestoreT = setTimeout(() => {
-          if (!clickedThrough && this.view === 'thoughts') {
-            const photo = this.homePhoto();
-            this.setBannerPhoto(photo.src, photo.position);
+          if (!clickedThrough && this.view === 'thoughts' && this.heldPhoto) {
+            this.setBannerPhoto(this.heldPhoto.src, this.heldPhoto.position);
           }
         }, 90);
       });
@@ -437,8 +446,7 @@ class Site {
     if (post.cover) {
       this.setBannerPhoto(post.cover, post.coverPosition);
     } else {
-      const photo = this.homePhoto();
-      this.setBannerPhoto(photo.src, photo.position);
+      this.holdBannerPhoto();
     }
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
 
@@ -487,8 +495,7 @@ class Site {
 
   async showProjectsList() {
     await this.fadeToView('projects-view', 'projects');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
 
     const grid = document.getElementById('projects-full-list');
@@ -520,8 +527,7 @@ class Site {
     if (!project) return this.showProjectsList();
 
     await this.fadeToView('project-view', 'project');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, project.name);
 
     let bodyHtml = '';
@@ -576,8 +582,7 @@ class Site {
 
   async showReadingList() {
     await this.fadeToView('reading-view', 'reading');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, 'reading');
 
     const list = document.getElementById('reading-list');
@@ -599,8 +604,7 @@ class Site {
 
   async showSolacesList() {
     await this.fadeToView('solaces-view', 'solaces');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb({ label: 'favorites', hash: 'favorites' }, null);
 
     const container = document.getElementById('solaces-list');
@@ -706,8 +710,7 @@ class Site {
 
   async showStats() {
     await this.fadeToView('youre-already-here-view', 'stats');
-    const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.holdBannerPhoto();
     this.renderBreadcrumb(null, 'stats');
     this.startAgeCounter();
     this.updateJsLines();
