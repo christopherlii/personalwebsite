@@ -159,6 +159,16 @@ class Site {
     }
     this.breadcrumbEl.innerHTML = parts.join('');
 
+    // Hovering the name previews the home photo, same sticky fade as the
+    // writing-list rows — clicking it then expands the photo already showing.
+    const nameEl = this.breadcrumbEl.querySelector('.crumb-name');
+    if (nameEl) {
+      nameEl.addEventListener('mouseenter', () => {
+        const photo = this.homePhoto();
+        this.setBannerPhoto(photo.src, photo.position);
+      });
+    }
+
     this.breadcrumbEl.querySelectorAll('[data-nav]').forEach(el => {
       el.addEventListener('click', () => {
         const nav = el.dataset.nav;
