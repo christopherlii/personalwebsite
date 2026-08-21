@@ -161,16 +161,6 @@ body.no-top-fade .top-fade {
               top var(--banner-ms) var(--banner-ease);
 }
 
-/* Phones float the banner out of the flow while it slides open or shut —
-   a spacer holds its final space, so the height animation repaints only
-   the banner instead of re-laying-out the whole page every frame. */
-.banner--floating {
-  position: absolute !important;
-  left: var(--col-pad);
-  right: var(--col-pad);
-  top: var(--banner-top) !important;
-  margin-top: 0;
-}
 
 .banner-spacer {
   height: 0;
