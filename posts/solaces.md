@@ -1,76 +1,78 @@
 ---
-title: "Solaces"
-date: "2026-03-10"
+title: "solaces"
+date: "2026-05-10"
 tags: ["random"]
 description: "My feelings on leaving college, SF, and my many solaces."
+cover: "/static/images/blogs/solaces/grad.jpg"
+coverPosition: "center 72%"
 ---
 
 ## 1.
 
-Lately, I've been nostalgizing the smaller things more than usual. The realization that I'm approaching a series of lasts isn't settling well. I'll miss strolling through Bobst with absolutely no intention of getting any work done. I'll miss the chatter of k-town and waiting long lines outside random stores. I'll miss the side quests that end the night at the Brooklyn promenade.
+lately, i've been nostalgizing the smaller things more than usual. the realization that i'm approaching a series of lasts isn't settling well. i'll miss strolling through Bobst with absolutely no intention of getting any work done. i'll miss the chatter of k-town and waiting long lines outside random stores. i'll miss the side quests that end the night at the Brooklyn promenade.
 
-I can't help but wonder if one day, I'll step into the city the same way I do my childhood room. I'm a little bigger, a little older. Everything is exactly where it's supposed to be, except me.
+i can't help but wonder if one day, i'll step into the city the same way i do my childhood room. i'm a little bigger, a little older. everything is exactly where it's supposed to be, except me.
 
-I'll be nothing more than a traveler wandering through my own memories.
+i'll be nothing more than a traveler wandering through my own solaces.
 
 ## 2.
 
-I love my people. Maybe more than anything else.
+i love my people. maybe more than anything else.
 
-> "I am a forest, and a night full of dark trees: but he who is not afraid of my darkness will find banks full of roses under my cypresses."
+> "i am a forest, and a night full of dark trees: but he who is not afraid of my darkness will find banks full of roses under my cypresses."
 > <cite>Nietzsche</cite>
 
-I think about this line a lot when I meet new faces. At first you only see shadows—sheltered opinions, a chuckle when they don't know what to say, nodding without understanding. A careful mask that needs persistence before you begin to find the roses.
+i think about this line a lot when i meet new faces. at first you only see shadows—sheltered opinions, a chuckle when they don't know what to say, nodding without understanding. a careful mask that needs persistence before you begin to find the roses.
 
-However, I've always envisioned a second half to this quote, something along the lines of: he who is not afraid of my darkness will find banks full of roses under my cypresses, *and proceed to plant his own tulips or daffodils or peonies.*
+however, i've always envisioned a second half to this quote, something along the lines of: he who is not afraid of my darkness will find banks full of roses under my cypresses, *and proceed to plant his own tulips or daffodils or peonies.*
 
-There's something awfully idyllic in the way people shape each other. I feel it just as much when my dad tries (and fails) to use Gen Z slang as I do when I lock eyes with my best friend as we laugh until we're out of breath.
+there's something awfully idyllic in the way people shape each other. i feel it just as much when my dad tries (and fails) to use Gen Z slang as i do when i lock eyes with my best friend as we laugh until we're out of breath.
 
-This kind of feeling lingers—small but undeniable proof that something in our universe makes sense.
+this kind of feeling lingers—small but undeniable proof that something in our universe makes sense.
 
 ## 3.
 
-It's freshman year, and I'm wading through a crowd on the top floor of Kimmel to find a friend I'd met 8 minutes ago. In the wake, I stumble upon someone else who went to the same elementary, middle, and high school as me. Someone I'd never given a second thought to.
+it's freshman year, and i'm wading through a crowd on the top floor of Kimmel to find a friend i'd met 8 minutes ago. in the wake, i stumble upon someone else who went to the same elementary, middle, and high school as me. someone i'd never given a second thought to.
 
-My first "worlds colliding" moment.
+my first "worlds colliding" moment.
 
-There's nothing better than realizing the sheer amount of random decisions and coincidences that had to happen for you to have met certain people, and in extension, for you to have become who you are. I cherish conversations that backtrack and decipher how unlikely the forming of a friend group was.
+there's nothing better than realizing the sheer amount of random decisions and coincidences that had to happen for you to have met certain people, and in extension, for you to have become who you are. i cherish conversations that backtrack and decipher how unlikely the forming of a friend group was.
 
-Oh, to have the privilege of living in a world worth colliding with others.
+oh, to have the privilege of living in a world worth colliding with others.
 
-I'm so grateful.
+i'm so grateful.
 
 ## 4.
 
-I feel so old at 21. Like I'm nearing the end of my useful life.
+i feel so old at 21. like i'm nearing the end of my useful life.
 
-I think it's because we've had goals set for us our entire lives. We also have a good idea of what success looked like, common ones being:
+i think it's because we've had goals set for us our entire lives. we also have a good idea of what success looked like, common ones being:
 
-- Get into a prestigious college
-- Do a prestigious internship
-- Get married
+- get into a prestigious college
+- do a prestigious internship
+- get married
 
-And suddenly, when it's not clear what we're optimizing for anymore, we go batshit crazy (or we rave or join run clubs). I've realized that our generation is extremely performative in our search for purpose—we have to be able to justify why we do what we do.
+and suddenly, when it's not clear what we're optimizing for anymore, we go batshit crazy (or we rave or join run clubs). i've realized that our generation is extremely performative in our search for purpose—we have to be able to justify why we do what we do.
 
-I used to be a little scared that everything I want or do is driven by my environment, friends, or even how much "aura" it has. It's hard to decipher why I want what I want, but I know that:
+i used to be a little scared that everything i want or do is driven by my environment, friends, or even how much "aura" it has. it's hard to decipher why i want what i want, but i know that:
 
-I want to work in cafes, and volunteer at soup kitchens. I want to box, Duolingo Korean, pick up French. I want to be a writer, founder, athlete. I want to build projects and win hackathons and travel the world. I want to work in SF, party in Manhattan, hike Mount Acatenango, sip wine in France. I want to read substacks that give me goosebumps. I want to learn game theory, philosophy and become disgustingly educated.
+i want to work in cafes, and volunteer at soup kitchens. i want to box, Duolingo Korean, pick up French. i want to be a writer, founder, athlete. i want to build projects and win hackathons and travel the world. i want to work in SF, party in Manhattan, hike Mount Acatenango, sip wine in France. i want to read substacks that give me goosebumps. i want to learn game theory, philosophy and become disgustingly educated.
 
-I want to do everything, maybe in an effort to forget that I'm already 21.
+i want to do everything, maybe in an effort to forget that i'm already 21.
 
 ## 5.
 
-Upon expressing my desire to leave Tabs, my CTO asked why I was choosing SF over New York. Despite knowing the conversation was coming, I struggled to express my feelings.
+upon expressing my desire to leave Tabs, my CTO asked why i was choosing SF over New York. despite knowing the conversation was coming, i struggled to express my feelings.
 
-After all, there's plenty of reasons why not to go. Many of my friends won't be there. New York is the fun capital of the world. Historically, I haven't fared well in a new city (for my east coast friends, the Bay Area is NOT just SF). I was homesick for much of freshman year. The laughter I'm familiar with is soon to be replaced by ol' reliable "what's your name?", "where'd you go to school?", "what're you building?". Maybe most importantly, I was sure I'd stay in New York post grad for most of my four years.
+after all, there's plenty of reasons why not to go. many of my friends won't be there. New York is the fun capital of the world. historically, i haven't fared well in a new city (for my east coast friends, the Bay Area is NOT just SF). i was homesick for much of freshman year. the laughter i'm familiar with is soon to be replaced by ol' reliable "what's your name?", "where'd you go to school?", "what're you building?". maybe most importantly, i was sure i'd stay in New York post grad for most of my four years.
 
-Just guessing, I'd say only 30% of the NYU undergraduate student body is truly "visible," a byproduct of how lonely and small the big apple can make you feel. That's a lot of roses that go undiscovered. It's a city where, if you're not constantly putting yourself out there socially, you'll find it increasingly more likely to be on the outside looking in.
+just guessing, i'd say only 30% of the NYU undergraduate student body is truly "visible," a byproduct of how lonely and small the big apple can make you feel. that's a lot of roses that go undiscovered. it's a city where, if you're not constantly putting yourself out there socially, you'll find it increasingly more likely to be on the outside looking in.
 
-SF is a different type of mosh pit. The city optimizes for passion, experimentation, and for people taking risks. You're not lost in the noise so much as you are measured against it.
+SF is a different type of mosh pit. the city optimizes for passion, experimentation, and for people taking risks. you're not lost in the noise so much as you are measured against it.
 
-In many ways, it's a question of density versus diversity. I've loved meeting future doctors, businessmen, artists in New York, but I'm someone who needs a density of excellence to thrive—a place where I can be inspired, curious and easily obsessed.
+in many ways, it's a question of density versus diversity. i've loved meeting future doctors, businessmen, artists in New York, but i'm someone who needs a density of excellence to thrive—a place where i can be inspired, curious and easily obsessed.
 
-The math works out to something like:
+the math works out to something like:
 
 <table>
 <thead>
@@ -82,22 +84,21 @@ The math works out to something like:
 </tbody>
 </table>
 
-At the end of the day, I'm now comfortable in New York, and that's quite scary to me. I want to throw myself in the deep end, and see what kind of person I become when all is said and done.
+at the end of the day, i'm now comfortable in New York, and that's quite scary to me. i want to throw myself in the deep end, and see what kind of person i become when all is said and done.
 
 ## 6.
 
-It's March and the city is alive again. The temperature is a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. I'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. The sky is my favorite color, a lush, scarlet sunset. I wonder if that'll change back to a soft blue after spending time again next to the Pacific.
+it's March and the city is alive again. the temperature is a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. i'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. the sky is my favorite color, a lush, scarlet sunset. i wonder if that'll change back to a soft blue after spending time again next to the Pacific.
 
 <figure>
-  <img src="/static/images/blogs/solaces/hawkhill.png" alt="Hawk Hill" />
-  <figcaption>Hawk Hill!</figcaption>
+  <img src="/static/images/blogs/solaces/skyline.jpg" alt="Skyline from pier 26" style="width: 100%; aspect-ratio: 9 / 4; object-fit: cover; object-position: center 69%; border-radius: 8px;" />
 </figure> 
 
-I'm burning with excitement.
+i'm burning with excitement.
 
-I can't wait to find the crevices that I fill in my future friends, and discover the quirks of SF akin to ones I found Manhattan. Patience has never been my strong suit though; if I could sprint there I'd be on my way. For now, I have other side quests to tackle.
+i can't wait to find the crevices that i fill in my future friends, and discover the quirks of SF akin to ones i found in Manhattan. patience has never been my strong suit though; if i could sprint there i'd be on my way. for now, i have other side quests to tackle.
 
-I hope my time in SF is one worth reminiscing on. One day, I'll arrive at SFO the same way I do my childhood room. I'll be a little older, a little wiser, with a few more daffodils. Everything will be exactly where it's supposed to be, except me.
+i hope my time in SF is one worth reminiscing on. one day, i'll arrive at SFO the same way i do my childhood room. i'll be a little older, a little wiser, with a few more daffodils. everything will be exactly where it's supposed to be, except me.
 
-I'll be, again, nothing more than a traveler wandering old solaces.
+i'll be, again, nothing more than a traveler wandering old solaces.
 

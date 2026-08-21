@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="/logos/CL.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/main.css">
   <script>
     if (window.location.hash && window.location.hash !== '#') {
@@ -17,179 +17,132 @@
   </script>
 </head>
 <body>
-  <div class="site">
-    <!-- Home View -->
-    <div id="home-view" class="view">
-      <header class="header">
-        <a href="/" class="logo">Christopher Li</a>
-      </header>
-      <main class="main">
-        <section class="hero">
-          <p class="hero-text">hi, i'm chris :)</p>
-          <p class="hero-text">i'm currently tinkering and traveling while finishing up my degree at NYU. previously, i was Tabs' first new grad hire and interned at Amazon.</p>
-          <p class="hero-text">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a>, <a href="#projects" class="inline-link">projects</a>, and <a href="#favorites" class="inline-link">favorites</a>.</p>
-        </section>
+  <div class="top-fade"></div>
 
+  <div class="site">
+    <!-- Collapsing banner: full height on home + article, a bar everywhere else -->
+    <div class="banner" id="banner">
+      <div class="banner-media" data-layer="0"></div>
+      <div class="banner-media" data-layer="1"></div>
+      <div class="banner-scrim"></div>
+      <header class="banner-header">
+        <nav class="breadcrumb" id="breadcrumb"></nav>
+        <div class="social">
+          <a href="https://www.instagram.com/christopherrli/" target="_blank" rel="noopener" title="instagram" aria-label="instagram">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+          </a>
+          <a href="https://x.com/christopherrli" target="_blank" rel="noopener" title="x (twitter)" aria-label="x (twitter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+          </a>
+          <a href="https://www.linkedin.com/in/christopherrli/" target="_blank" rel="noopener" title="linkedin" aria-label="linkedin">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4V8h4v2"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </header>
+    </div>
+    <div class="banner-spacer" id="banner-spacer"></div>
+
+    <!-- Home -->
+    <div id="home-view" class="view">
+      <main class="page page-home">
+        <section>
+          <p class="home-title">hi, i'm chris :)</p>
+          <p class="home-text">i'm currently solving fun at <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
+          <p class="home-text">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
+        </section>
         <section class="contact">
           <p class="contact-email">christopherli [at] nyu [dot] edu</p>
         </section>
       </main>
     </div>
 
-    <!-- Thoughts List View -->
+    <!-- Writing list -->
     <div id="thoughts-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">writing</span>
-        </div>
-      </header>
-      <div class="page-container">
-        <div id="thoughts-filters" class="filters-inline"></div>
+      <div class="page">
         <div id="thoughts-full-list" class="thoughts-list"></div>
       </div>
     </div>
 
-    <!-- Thought Detail View -->
+    <!-- Article -->
     <div id="thought-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#thoughts">writing</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current" id="thought-breadcrumb">post</span>
-        </div>
-      </header>
-      <div class="page-container">
+      <div class="page">
         <article id="thought-content" class="article"></article>
       </div>
     </div>
 
-    <!-- Reading List View -->
+    <!-- Reading list -->
     <div id="reading-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#thoughts">writing</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">reading</span>
-        </div>
-      </header>
-      <div class="page-container">
+      <div class="page">
         <p class="page-blurb">writings by others that moved me — words i wish i'd found myself.</p>
         <div id="reading-list" class="reading-list"></div>
       </div>
     </div>
 
-    <!-- Project Detail View (full page) -->
-    <div id="project-view" class="view hidden">
-      <header class="header header-wide">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#projects">projects</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current" id="project-breadcrumb">project</span>
-        </div>
-      </header>
-      <div class="page-container page-container-wide">
-        <article id="project-content" class="project-article work-detail"></article>
-      </div>
-    </div>
-
-    <!-- Projects List View -->
+    <!-- Projects list -->
     <div id="projects-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">projects</span>
-        </div>
-      </header>
-      <div class="page-container">
+      <div class="page">
         <p class="page-blurb">random stuff that i can't stop thinking about until i build it</p>
         <div id="projects-full-list" class="projects-grid"></div>
       </div>
     </div>
 
-    <!-- Easter Egg: You're Already Here -->
+    <!-- Project detail -->
+    <div id="project-view" class="view hidden">
+      <div class="page">
+        <article id="project-content" class="project-article"></article>
+      </div>
+    </div>
+
+    <!-- Favorites -->
+    <div id="solaces-view" class="view hidden">
+      <div class="page">
+        <div id="solaces-list" class="solaces-masonry"></div>
+      </div>
+    </div>
+
+    <!-- Stats (reached by clicking the name on the home page) -->
     <div id="youre-already-here-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#projects">projects</a>
-          <span class="breadcrumb-separator">/</span>
-          <a href="#projects/this-website">this website</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">you're already here</span>
-        </div>
-      </header>
-      <div class="page-container easter-egg-container">
-        <div class="easter-egg-content">
-          <h1 class="easter-egg-title">you're already here...</h1>
-          <p class="easter-egg-subtitle">but here's a reward for being curious :)</p>
-
-          <h2 class="easter-egg-section">about me</h2>
-          <table class="easter-egg-table">
-            <tr><td>current age</td><td><span id="easter-age">—</span></td></tr>
-            <tr><td>countries visited</td><td>11</td></tr>
-            <tr><td>current city</td><td>New York, NY</td></tr>
+      <div class="page">
+        <h2 class="stats-heading">about me</h2>
+        <table class="stats-table">
+          <tbody>
+            <tr><td>current age</td><td class="tabular"><span id="easter-age">—</span></td></tr>
+            <tr><td>countries visited</td><td>15</td></tr>
+            <tr><td>current city</td><td>San Francisco, CA</td></tr>
             <tr><td>currently reading</td><td>The Three-Body Problem</td></tr>
-            <tr><td>last updated</td><td>february 14, 2026</td></tr>
-            <tr><td>lines of javascript powering this website</td><td><span id="easter-js-lines">—</span></td></tr>
-          </table>
+            <tr><td>last updated</td><td>aug 20, 2026</td></tr>
+            <tr><td>lines of javascript powering this website</td><td class="tabular"><span id="easter-js-lines">—</span></td></tr>
+          </tbody>
+        </table>
 
-          <h2 class="easter-egg-section">whimsical stats</h2>
-          <table class="easter-egg-table">
+        <h2 class="stats-heading">whimsical stats</h2>
+        <table class="stats-table">
+          <tbody>
             <tr><td>record soccer juggles</td><td>2412</td></tr>
-            <tr><td>half marathon time</td><td>i run my first in april!</td></tr>
-            <tr><td>queen's daily streak</td><td><span id="easter-queens-streak">—</span></td></tr>
             <tr><td>energy drinks today</td><td>hopefully 0</td></tr>
             <tr><td>calories today</td><td>probably too many</td></tr>
-            <tr><td>favorite clothing brand</td><td>GU</td></tr>
-            <tr><td>favorite song</td><td>it changes too often</td></tr>
+            <tr><td>favorite clothing brand</td><td>Lacoste / Ralph Lauren</td></tr>
+            <tr><td>favorite song</td><td>Malcolm in the Middle by Malcolm Todd</td></tr>
             <tr><td>favorite artist</td><td>Tame Impala</td></tr>
             <tr><td>favorite restaurant</td><td>Dubu Haus</td></tr>
             <tr><td>favorite city</td><td>New York City</td></tr>
             <tr><td>favorite f1 track</td><td>Suzuka</td></tr>
             <tr><td>favorite soccer player</td><td>Pedri / Foden</td></tr>
-          </table>
+          </tbody>
+        </table>
 
-          <h2 class="easter-egg-section">i dream of</h2>
-          <ul class="easter-egg-list">
-            <li>inspiring and feeling inspired.</li>
-            <li>building something that outlives me.</li>
-            <li>treating everybody with genuine kindness.</li>
-            <li>more "worlds colliding" moments.</li>
-            <li>forever staying curious.</li>
-            <li>making Mom and Dad proud.</li>
-            <li>you reaching out. let's connect :D</li>
-          </ul>
-
-          <a href="#projects/this-website" class="easter-egg-back">← back to reality</a>
-        </div>
+        <h2 class="stats-heading">i dream of</h2>
+        <ul class="stats-list">
+          <li>inspiring and feeling inspired.</li>
+          <li>building something that outlives me.</li>
+          <li>treating everybody with genuine kindness.</li>
+          <li>more "worlds colliding" moments.</li>
+          <li>forever staying curious.</li>
+          <li>making Mom and Dad proud.</li>
+          <li>you reaching out. let's connect :D</li>
+        </ul>
       </div>
     </div>
-
-    <!-- Favorites View -->
-    <div id="solaces-view" class="view hidden">
-      <header class="header">
-        <div class="breadcrumb">
-          <a href="/" class="breadcrumb-home">Christopher Li</a>
-          <span class="breadcrumb-separator">/</span>
-          <span class="breadcrumb-current">favorites</span>
-        </div>
-      </header>
-      <div class="page-container">
-        <p class="page-blurb">things i like.</p>
-        <div id="solaces-list" class="solaces-masonry"></div>
-      </div>
-    </div>
-
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
