@@ -8,70 +8,108 @@ class Site {
     this.projects = [];
     this.reading = [];
     this.solaces = [];
+    this.view = 'home';
+    this.slug = null;
     this.init();
   }
 
-  // Initialize
   init() {
     this.setupNavigation();
     this.setupContactReveal();
-    this.setupBanners();
+    this.setupBanner();
   }
 
   // ========================================
-  // COLLAPSING BANNER (home + article)
+  // BANNER
   // ========================================
+  //
+  // One sticky banner sits above every view. On home and article pages it
+  // opens to --banner-height and shrinks with the scroll; everywhere else it
+  // stays a --banner-bar strip. Articles show their own cover, everything
+  // else shows the home photo.
 
-  setupBanners() {
-    const styles = getComputedStyle(document.documentElement);
-    this.bannerFull = parseInt(styles.getPropertyValue('--banner-height'), 10) || 380;
-    this.bannerBar = parseInt(styles.getPropertyValue('--banner-bar'), 10) || 64;
+  setupBanner() {
+    this.banner = document.getElementById('banner');
+    this.bannerMedia = document.getElementById('banner-media');
+    this.bannerSpacer = document.getElementById('banner-spacer');
+    this.breadcrumbEl = document.getElementById('breadcrumb');
 
-    this.updateBanners = () => {
-      const full = this.bannerFull;
-      const bar = this.bannerBar;
-      const h = Math.max(bar, full - window.scrollY);
+    this.readBannerTokens();
 
-      document.querySelectorAll('.view:not(.hidden) > .banner').forEach(banner => {
-        const sib = banner.nextElementSibling;
-        const spacer = sib && sib.classList.contains('banner-spacer') ? sib : null;
-        if (banner.classList.contains('banner--bare')) {
-          if (spacer) spacer.style.height = '0px';
-          return;
-        }
+    this.updateBanner = () => {
+      if (!this.banner) return;
+      const target = this.view === 'home' || this.view === 'thought'
+        ? this.bannerFull
+        : this.bannerBar;
+      const h = Math.max(this.bannerBar, target - window.scrollY);
 
-        banner.style.height = `${h}px`;
-        if (spacer) spacer.style.height = `${full - h}px`;
-      });
+      this.banner.style.height = `${h}px`;
+      if (this.bannerSpacer) this.bannerSpacer.style.height = `${target - h}px`;
+
+      // On an article the bar slides away once it has finished collapsing,
+      // so long posts get the full column back.
+      const past = Math.max(0, window.scrollY - (target - this.bannerBar));
+      const top = this.view === 'thought' ? this.bannerTop - past : this.bannerTop;
+      this.banner.style.top = `${top}px`;
     };
 
-    // Re-read the token on resize — it drops to 300px on narrow screens.
     this.onBannerResize = () => {
-      const s = getComputedStyle(document.documentElement);
-      this.bannerFull = parseInt(s.getPropertyValue('--banner-height'), 10) || 380;
-      this.updateBanners();
+      this.readBannerTokens();
+      this.updateBanner();
     };
 
-    window.addEventListener('scroll', this.updateBanners, { passive: true });
+    window.addEventListener('scroll', this.updateBanner, { passive: true });
     window.addEventListener('resize', this.onBannerResize);
-    this.updateBanners();
+    this.updateBanner();
   }
 
-  setPostCover(post) {
-    const banner = document.querySelector('#thought-view > .banner');
-    const media = document.getElementById('thought-cover');
-    if (!banner || !media) return;
+  readBannerTokens() {
+    const s = getComputedStyle(document.documentElement);
+    this.bannerFull = parseInt(s.getPropertyValue('--banner-height'), 10) || 380;
+    this.bannerBar = parseInt(s.getPropertyValue('--banner-bar'), 10) || 60;
+    this.bannerTop = parseInt(s.getPropertyValue('--banner-top'), 10) || 44;
+  }
 
-    if (post && post.cover) {
-      banner.classList.remove('banner--bare');
-      media.style.backgroundImage = `url('${post.cover}')`;
-      media.style.backgroundPosition = post.coverPosition || 'center';
-    } else {
-      banner.classList.add('banner--bare');
-      media.style.backgroundImage = '';
+  setBannerPhoto(src, position) {
+    if (!this.bannerMedia) return;
+    const next = `url("${src}")`;
+    if (this.bannerMedia.style.backgroundImage !== next) {
+      this.bannerMedia.style.backgroundImage = next;
     }
-    this.updateBanners();
+    this.bannerMedia.style.backgroundPosition = position || 'center';
   }
+
+  // Breadcrumb: name / section / detail. Clicking the name goes home, except
+  // on the home page itself, where it opens the stats page.
+  renderBreadcrumb(section, detail) {
+    if (!this.breadcrumbEl) return;
+    const parts = ['<span class="crumb-name" data-nav="name">Christopher Li</span>'];
+    if (section) {
+      parts.push('<span class="crumb-sep">/</span>');
+      parts.push(`<span class="crumb-link" data-nav="${section.hash}">${section.label}</span>`);
+    }
+    if (detail) {
+      parts.push('<span class="crumb-sep">/</span>');
+      parts.push(`<span class="crumb-current">${detail}</span>`);
+    }
+    this.breadcrumbEl.innerHTML = parts.join('');
+
+    this.breadcrumbEl.querySelectorAll('[data-nav]').forEach(el => {
+      el.addEventListener('click', () => {
+        const nav = el.dataset.nav;
+        if (nav === 'name') {
+          if (this.view === 'home') this.showStats();
+          else this.showHome();
+        } else {
+          window.location.hash = nav;
+        }
+      });
+    });
+  }
+
+  // ========================================
+  // ARTICLE ENHANCEMENTS
+  // ========================================
 
   setupPhotoShuffle() {
     document.querySelectorAll('.article-body .photo-shuffle').forEach(container => {
@@ -79,7 +117,6 @@ class Site {
       if (imgs.length === 0) return;
 
       let idx = 0;
-
       const showNext = () => {
         imgs.forEach(img => img.classList.remove('visible'));
         imgs[idx].classList.add('visible');
@@ -123,12 +160,10 @@ class Site {
           el.classList.add('reveal');
         }
       });
-    }, 300);
+    }, 600);
   }
 
-  // Navigation setup
   setupNavigation() {
-    // Home links (logo and breadcrumb)
     document.querySelectorAll('a[href="/"]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -136,36 +171,6 @@ class Site {
       });
     });
 
-    // Section links
-    document.querySelectorAll('a[href="#thoughts"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showThoughtsList();
-      });
-    });
-
-    document.querySelectorAll('a[href="#projects"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showProjectsList();
-      });
-    });
-
-    document.querySelectorAll('a[href="#reading"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showReadingList();
-      });
-    });
-
-    document.querySelectorAll('a[href="#favorites"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showSolacesList();
-      });
-    });
-
-    // Handle browser back/forward and hash changes
     window.addEventListener('popstate', () => {
       this._fromPopstate = true;
       this.handleRoute();
@@ -176,15 +181,20 @@ class Site {
     });
   }
 
-  formatArticleDate(dateStr) {
+  // "2026-05-10" -> "may 10, 2026"
+  formatDate(dateStr) {
     if (!dateStr) return '';
     const m = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (!m) return dateStr;
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
     const [, year, month, day] = m;
-    return `${parseInt(month, 10)}.${parseInt(day, 10)}.${year}`;
+    return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)}, ${year}`;
   }
 
-  // Data loading
+  // ========================================
+  // DATA
+  // ========================================
+
   parseFrontMatter(content) {
     const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
     if (!match) return { attributes: {}, body: content };
@@ -224,7 +234,7 @@ class Site {
 
       for (const file of mdFiles) {
         try {
-          const resp = await fetch(`/posts/${file}`);
+          const resp = await fetch(`/posts/${file}`, { cache: 'no-store' });
           const content = await resp.text();
           const { attributes, body } = this.parseFrontMatter(content);
           if (String(attributes.published).toLowerCase() === 'false') continue;
@@ -240,7 +250,6 @@ class Site {
           });
         } catch (e) { console.error(e); }
       }
-      // Sort by date, most recent first
       this.posts.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     } catch (e) { console.error(e); }
   }
@@ -266,167 +275,122 @@ class Site {
     } catch (e) { console.error(e); }
   }
 
+  // ========================================
+  // VIEW MANAGEMENT
+  // ========================================
 
-
-  // View management with fade transitions
-  async fadeToView(viewId) {
+  async fadeToView(viewId, viewName) {
     const currentView = document.querySelector('.view:not(.hidden)');
     const targetView = document.getElementById(viewId);
-    
+
     if (currentView && currentView.id === 'youre-already-here-view') {
-      this.stopEasterEggAge();
+      this.stopAgeCounter();
     }
-    
+
     if (currentView && currentView !== targetView) {
       currentView.classList.add('fade-out');
       await new Promise(resolve => setTimeout(resolve, 150));
       currentView.classList.add('hidden');
       currentView.classList.remove('fade-out');
     }
-    
+
     if (targetView) {
       targetView.classList.add('fade-out');
       targetView.classList.remove('hidden');
-      targetView.offsetHeight; // Force reflow
+      targetView.offsetHeight; // force reflow
       targetView.classList.remove('fade-out');
+      const page = targetView.querySelector('.page');
+      if (page) {
+        page.style.animation = 'none';
+        page.offsetHeight;
+        page.style.animation = '';
+      }
     }
-    
+
+    this.view = viewName;
+    // Articles let the bar scroll away, so they don't need the top fade;
+    // every other view keeps it floating and needs the strip above covered.
+    document.body.classList.toggle('no-top-fade', viewName === 'thought');
     window.scrollTo(0, 0);
-    if (this.updateBanners) this.updateBanners();
+    if (this.updateBanner) this.updateBanner();
+  }
+
+  homePhoto() {
+    return { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
   }
 
   async showHome() {
-    await this.fadeToView('home-view');
+    await this.fadeToView('home-view', 'home');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb(null, null);
     history.pushState(null, '', '/');
   }
 
-  async showThoughtsList(activeFilter = 'updates') {
-    await this.fadeToView('thoughts-view');
+  async showThoughtsList() {
+    await this.fadeToView('thoughts-view', 'thoughts');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null);
 
-    // Nav bar filter: updates, random
-    const tagOrder = ['updates', 'random'];
-
-    // Render simple text filters
-    const filters = document.getElementById('thoughts-filters');
-    if (tagOrder.length > 0) {
-      filters.innerHTML = tagOrder.map(tag => `<span class="filter-link" data-filter="${tag}">${tag}</span>`).join('');
-
-      filters.querySelectorAll('.filter-link').forEach(link => {
-        link.addEventListener('click', () => {
-          filters.querySelectorAll('.filter-link').forEach(l => l.classList.remove('active'));
-          link.classList.add('active');
-          this.filterThoughts(link.dataset.filter);
-        });
-      });
-
-      const activeLink = filters.querySelector(`[data-filter="${activeFilter}"]`) || filters.querySelector('[data-filter="updates"]');
-      if (activeLink) activeLink.classList.add('active');
-      this.filterThoughts(activeFilter);
-    } else {
-      filters.innerHTML = '';
-      this.renderThoughts(this.posts);
-    }
-    const hash = activeFilter === 'updates' ? '#thoughts' : `#thoughts/${activeFilter}`;
-    history.pushState(null, '', hash);
-  }
-
-  async filterThoughts(filter) {
     const list = document.getElementById('thoughts-full-list');
-    list.classList.add('fading');
-    await new Promise(r => setTimeout(r, 150));
-    
-    const filtered = this.posts.filter(p => p.tags?.includes(filter));
-    this.renderThoughts(filtered);
-    
-    list.classList.remove('fading');
-
-    // Update URL so back button returns to this filter
-    const hash = filter === 'updates' ? '#thoughts' : `#thoughts/${filter}`;
-    history.replaceState(null, '', hash);
-  }
-
-  renderThoughts(posts) {
-    const list = document.getElementById('thoughts-full-list');
-    list.innerHTML = posts.map(post => `
+    list.innerHTML = this.posts.map(post => `
       <div class="thought-row" data-post="${post.filename}">
         <span class="thought-title">${post.title}</span>
-        <span class="thought-date">${post.date || ''}</span>
+        <span class="thought-date">${this.formatDate(post.date)}</span>
       </div>
-    `).join('') || '<p style="color:var(--fg-muted);font-size:14px;">no thoughts yet.</p>';
+    `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
     list.querySelectorAll('.thought-row').forEach(item => {
       item.addEventListener('click', () => this.showThought(item.dataset.post));
     });
+
+    history.pushState(null, '', '#thoughts');
   }
 
   async showThought(postId, skipHistoryPush) {
     const post = this.posts.find(p => p.filename === postId);
-    if (!post) return;
+    if (!post) return this.showThoughtsList();
 
-    await this.fadeToView('thought-view');
+    await this.fadeToView('thought-view', 'thought');
 
-    // Update breadcrumb with post title
-    const breadcrumb = document.getElementById('thought-breadcrumb');
-    if (breadcrumb) {
-      breadcrumb.textContent = post.title.toLowerCase();
+    if (post.cover) {
+      this.setBannerPhoto(post.cover, post.coverPosition);
+    } else {
+      const photo = this.homePhoto();
+      this.setBannerPhoto(photo.src, photo.position);
     }
+    this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
 
-    const descriptionHtml = post.description && typeof marked !== 'undefined'
-      ? marked.parse(post.description) : (post.description || '');
-    const formattedDate = this.formatArticleDate(post.date);
     document.getElementById('thought-content').innerHTML = `
       <header class="article-header">
         <h1 class="article-title">${post.title}</h1>
-        ${descriptionHtml ? `<div class="article-description">${descriptionHtml}</div>` : ''}
+        <time class="article-date">${this.formatDate(post.date)}</time>
       </header>
       <div class="article-body">${post.content}</div>
-      ${formattedDate ? `<footer class="article-footer"><time class="article-date">${formattedDate}</time></footer>` : ''}
+      <footer class="article-footer"><a data-nav="thoughts">← all writing</a></footer>
     `;
 
-    this.setPostCover(post);
+    const back = document.querySelector('#thought-content .article-footer a');
+    if (back) back.addEventListener('click', () => this.showThoughtsList());
+
     this.enhanceArticleImages(document.getElementById('thought-content'));
     this.setupPhotoShuffle();
+    this.updateBanner();
 
     if (!skipHistoryPush) {
       history.pushState(null, '', `#thought/${postId}`);
     }
   }
 
-  async showProjectsList() {
-    await this.fadeToView('projects-view');
+  // ========================================
+  // PROJECTS
+  // ========================================
 
-    const grid = document.getElementById('projects-full-list');
-    grid.innerHTML = this.projects.map((p, i) => `
-      <div class="project-card" data-project="${i}" data-slug="${p.slug || p.name.toLowerCase().replace(/\s+/g, '-')}"${p.gradient ? ` style="background: ${p.gradient}"` : ''}>
-        <div class="project-image">
-          ${p.image
-            ? `<img src="${p.image}" alt="${p.name}">`
-            : `<div class="project-image-placeholder">
-                <div class="project-cubes">
-                  ${Array(6).fill('<div class="project-cube"></div>').join('')}
-                </div>
-              </div>`
-          }
-        </div>
-        <div class="project-name">${p.name}</div>
-        ${p.description ? `<div class="project-desc">${p.description}</div>` : ''}
-        <div class="project-meta">
-          ${p.tech ? `<span class="project-tech">${p.tech}</span>` : ''}
-          ${p.year ? `<span class="project-status">${p.year}</span>` : ''}
-        </div>
-      </div>
-    `).join('') || '<p style="color:var(--fg-muted);font-size:14px;">no projects yet.</p>';
-
-    grid.querySelectorAll('.project-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const idx = parseInt(card.dataset.project);
-        this.showProjectDetail(idx);
-      });
-    });
-
-    this.applyProjectCardGradients();
-
-    history.pushState(null, '', '#projects');
+  statusPill(status) {
+    if (!status) return '';
+    const cls = `status-pill status-${String(status).toLowerCase()}`;
+    return `<span class="${cls}">${status}</span>`;
   }
 
   getProjectSlug(project) {
@@ -437,157 +401,37 @@ class Site {
     const parsed = parseInt(slugOrIndex, 10);
     if (!isNaN(parsed) && parsed >= 0 && parsed < this.projects.length) return parsed;
     const slug = String(slugOrIndex);
-    const idx = this.projects.findIndex(p => (p.slug || p.name.toLowerCase().replace(/\s+/g, '-')) === slug);
+    const idx = this.projects.findIndex(p => this.getProjectSlug(p) === slug);
     return idx >= 0 ? idx : -1;
   }
 
-  applyProjectCardGradients() {
-    document.querySelectorAll('.project-card .project-image img').forEach(img => {
-      const card = img.closest('.project-card');
-      if (card.style.background) return;
-      const applyGradient = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const w = Math.min(img.naturalWidth, 60);
-          const h = Math.min(img.naturalHeight, 60);
-          if (!w || !h) return;
-          canvas.width = w;
-          canvas.height = h;
-          ctx.drawImage(img, 0, 0, w, h);
-          const data = ctx.getImageData(0, 0, w, h).data;
+  async showProjectsList() {
+    await this.fadeToView('projects-view', 'projects');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
 
-          const sample = (x, y) => {
-            const i = (Math.floor(y) * w + Math.floor(x)) * 4;
-            return [data[i], data[i + 1], data[i + 2]];
-          };
-          const topLeft = sample(0, 0);
-          const topRight = sample(w - 1, 0);
-          const bottom = sample(w / 2, h - 1);
+    const grid = document.getElementById('projects-full-list');
+    grid.innerHTML = this.projects.map((p, i) => `
+      <div class="project-card" data-project="${i}">
+        <div class="project-image">
+          ${p.image ? `<img src="${p.image}" alt="${p.name}">` : ''}
+        </div>
+        <div class="project-name">${p.name}</div>
+        <div class="project-meta">
+          ${this.statusPill(p.status)}
+          ${p.year ? `<span>${p.year}</span>` : ''}
+        </div>
+      </div>
+    `).join('') || '<p class="empty-note">no projects yet.</p>';
 
-          const soften = (rgb) => rgb.map((c) => Math.round(c * 0.35 + 255 * 0.65));
-          const c1 = soften(topLeft);
-          const c2 = soften(topRight);
-          const c3 = soften(bottom);
-
-          card.style.background = `linear-gradient(180deg, rgb(${c1.join(',')}) 0%, rgb(${c2.join(',')}) 45%, rgb(${c3.join(',')}) 100%)`;
-        } catch (_) {}
-      };
-
-      if (img.complete && img.naturalWidth) {
-        applyGradient();
-      } else {
-        img.addEventListener('load', applyGradient);
-      }
+    grid.querySelectorAll('.project-card').forEach(card => {
+      card.addEventListener('click', () => {
+        this.showProjectDetail(parseInt(card.dataset.project, 10));
+      });
     });
-  }
 
-  async showYoureAlreadyHere() {
-    await this.fadeToView('youre-already-here-view');
-    history.pushState(null, '', '#youre-already-here');
-    this.startEasterEggAge();
-    this.updateEasterEggJsLines();
-    this.updateQueensStreak();
-  }
-
-  updateQueensStreak() {
-    const el = document.getElementById('easter-queens-streak');
-    if (!el) return;
-    const baseDate = new Date('2026-02-15');
-    const baseValue = 211;
-    const now = new Date();
-    const diffDays = Math.floor((now - baseDate) / (24 * 60 * 60 * 1000));
-    el.textContent = String(Math.max(0, baseValue + diffDays));
-  }
-
-  async updateEasterEggJsLines() {
-    const el = document.getElementById('easter-js-lines');
-    if (!el) return;
-    try {
-      const mainRes = await fetch('/static/markdown-renderer.js', { cache: 'no-store' });
-      if (mainRes.ok) {
-        const mainJs = await mainRes.text();
-        const mainLines = mainJs.split('\n').length;
-        const inlineLines = 4; // route-pending script in index.html
-        el.textContent = String(mainLines + inlineLines);
-      } else {
-        el.textContent = '—';
-      }
-    } catch {
-      el.textContent = '—';
-    }
-  }
-
-  startEasterEggAge() {
-    const el = document.getElementById('easter-age');
-    if (!el) return;
-    const birth = new Date('2004-06-10T08:00:00');
-    const msPerYear = 365.25 * 24 * 60 * 60 * 1000;
-    const setAge = () => {
-      const now = new Date();
-      const ageYears = (now - birth) / msPerYear;
-      el.textContent = ageYears.toFixed(14);
-    };
-    setAge(); // Set immediately
-    const update = () => {
-      setAge();
-      this._easterAgeFrame = requestAnimationFrame(update);
-    };
-    this._easterAgeFrame = requestAnimationFrame(update);
-  }
-
-  stopEasterEggAge() {
-    if (this._easterAgeFrame) {
-      cancelAnimationFrame(this._easterAgeFrame);
-      this._easterAgeFrame = null;
-    }
-  }
-
-  renderWorkDetail(work, options = {}) {
-    const { isVibecode = false, linkLabel = 'view project' } = options;
-    const statusHtml = work.status
-      ? `<span class="work-status work-status-${(work.status || '').toLowerCase()}">${work.status}</span>`
-      : '';
-    const meta = isVibecode
-      ? `${work.tech || ''} · ${work.date || ''}`.replace(/^ · | · $/g, '').trim()
-      : `${work.tech || ''}`.trim();
-    const primaryLink = work.name.toLowerCase() === 'this website'
-      ? { href: '#youre-already-here', label: 'enter the easter egg' }
-      : work.link
-        ? { href: work.link, label: `${linkLabel} →`, external: true }
-        : null;
-    const imageHtml = work.image
-      ? `<div class="project-doc-hero">
-          <img src="${work.image}" alt="${work.name}">
-          ${statusHtml ? `<div class="project-doc-hero-status">${statusHtml}</div>` : ''}
-        </div>`
-      : '';
-    let html = `
-      <div class="project-detail-page">
-        ${imageHtml}
-        <header class="project-doc-header project-detail-header">
-          <h1 class="project-doc-title">${work.name}</h1>
-          ${meta ? `<p class="project-detail-tech">${meta}</p>` : ''}
-        </header>
-        <div class="project-detail-content article-body">
-          <p class="work-description">${work.description || 'No description.'}</p>
-          ${primaryLink ? `<p class="project-detail-link-row"><a href="${primaryLink.href}" class="project-detail-link"${primaryLink.external ? ' target="_blank"' : ''}>${primaryLink.label}</a></p>` : ''}
-    `;
-    if (work.thoughtProcess) {
-      html += `<section class="work-section"><h2 class="work-section-title">thought process</h2><div class="work-section-body">${work.thoughtProcess}</div></section>`;
-    }
-    if (work.prd) {
-      const prdContent = work.prd.startsWith('http') ? `<a href="${work.prd}" target="_blank">view PRD →</a>` : `<div class="work-section-body">${work.prd}</div>`;
-      html += `<section class="work-section"><h2 class="work-section-title">PRD</h2>${prdContent}</section>`;
-    }
-    if (work.howBuilt) {
-      html += `<section class="work-section"><h2 class="work-section-title">how i built it</h2><div class="work-section-body">${work.howBuilt}</div></section>`;
-    }
-    if (work.stills && work.stills.length > 0) {
-      html += `<section class="work-section"><h2 class="work-section-title">stills</h2><div class="work-stills">${work.stills.map(src => `<figure><img src="${src}" alt=""></figure>`).join('')}</div></section>`;
-    }
-    html += '</div></div>';
-    return html;
+    history.pushState(null, '', '#projects');
   }
 
   async showProjectDetail(slugOrIndex) {
@@ -595,142 +439,124 @@ class Site {
     const project = index >= 0 ? this.projects[index] : null;
     if (!project) return this.showProjectsList();
 
-    await this.fadeToView('project-view');
+    await this.fadeToView('project-view', 'project');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, project.name);
 
-    const breadcrumb = document.getElementById('project-breadcrumb');
-    if (breadcrumb) breadcrumb.textContent = project.name;
-
-    const content = document.getElementById('project-content');
-
+    let bodyHtml = '';
     if (project.content) {
       try {
         const resp = await fetch(`/projects/${project.content}`, { cache: 'no-store' });
         if (resp.ok) {
           const raw = await resp.text();
           const { body } = this.parseFrontMatter(raw);
-          const htmlBody = typeof marked !== 'undefined' ? marked.parse(body) : body;
-          content.innerHTML = this.renderProjectDoc(project, htmlBody);
-          this.setupProjectDocSidebar(content);
-        } else {
-          content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+          bodyHtml = typeof marked !== 'undefined' ? marked.parse(body) : body;
         }
-      } catch (_) {
-        content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
-      }
-    } else {
-      content.innerHTML = this.renderWorkDetail(project, { linkLabel: 'view project' });
+      } catch (_) {}
     }
 
-    const slug = this.getProjectSlug(project);
-    history.pushState(null, '', `#projects/${slug}`);
-  }
+    const isThisWebsite = project.name.toLowerCase() === 'this website';
+    const linkHtml = isThisWebsite
+      ? '<p class="project-link-row"><a data-nav="stats">enter the easter egg</a></p>'
+      : project.link
+        ? `<p class="project-link-row"><a href="${project.link}" target="_blank" rel="noopener">visit ↗</a></p>`
+        : '';
 
-  renderProjectDoc(project, htmlBody) {
-    const statusHtml = project.status
-      ? `<span class="work-status work-status-${(project.status || '').toLowerCase()}">${project.status}</span>`
-      : '';
-
-    const headings = [];
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlBody;
-    tempDiv.querySelectorAll('h2, h3').forEach(h => {
-      const id = h.id || h.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      if (!h.id) h.id = id;
-      headings.push({ level: h.tagName === 'H2' ? 2 : 3, id, text: h.textContent });
-    });
-    const updatedBody = tempDiv.innerHTML;
-
-    const sidebarHtml = headings.length > 0 ? `
-      <nav class="project-doc-sidebar">
-        ${headings.map(h => `<a href="#${h.id}" class="project-doc-sidebar-link${h.level === 3 ? ' indent' : ''}" data-target="${h.id}">${h.text}</a>`).join('')}
-        ${project.link ? `<div class="project-doc-sidebar-divider"></div><a href="${project.link}" target="_blank" class="project-doc-sidebar-link external">github ↗</a>` : ''}
-      </nav>
-    ` : '';
-
-    const imageHtml = project.image
-      ? `<div class="project-doc-hero">
-          <img src="${project.image}" alt="${project.name}">
-          ${statusHtml ? `<div class="project-doc-hero-status">${statusHtml}</div>` : ''}
-        </div>`
-      : '';
-
-    return `
-      <div class="project-doc">
-        ${imageHtml}
-        <div class="project-doc-header">
-          <h1 class="project-doc-title">${project.name}</h1>
+    const content = document.getElementById('project-content');
+    content.innerHTML = `
+      <header class="project-header">
+        <h1 class="project-title">${project.name}</h1>
+        <div class="project-detail-meta">
+          ${this.statusPill(project.status)}
+          ${project.year ? `<span>${project.year}</span>` : ''}
+          ${project.tech ? `<span>${project.tech}</span>` : ''}
         </div>
-        <div class="project-doc-layout">
-          ${sidebarHtml}
-          <div class="project-doc-content article-body">
-            ${updatedBody}
-          </div>
-        </div>
-      </div>
+      </header>
+      ${project.description ? `<p class="project-desc">${project.description}</p>` : ''}
+      ${linkHtml}
+      ${project.image ? `<figure class="project-shot"><img src="${project.image}" alt="${project.name}"></figure>` : ''}
+      ${bodyHtml ? `<div class="article-body">${bodyHtml}</div>` : ''}
+      <footer class="article-footer"><a data-nav="projects">← all projects</a></footer>
     `;
+
+    const easter = content.querySelector('[data-nav="stats"]');
+    if (easter) easter.addEventListener('click', () => this.showStats());
+    const back = content.querySelector('[data-nav="projects"]');
+    if (back) back.addEventListener('click', () => this.showProjectsList());
+
+    history.pushState(null, '', `#projects/${this.getProjectSlug(project)}`);
   }
 
-  setupProjectDocSidebar(container) {
-    const sidebar = container.querySelector('.project-doc-sidebar');
-    if (!sidebar) return;
-
-    const links = sidebar.querySelectorAll('.project-doc-sidebar-link[data-target]');
-    const sections = [];
-    links.forEach(link => {
-      const target = container.querySelector(`#${link.dataset.target}`);
-      if (target) sections.push({ link, target });
-    });
-
-    // Click to scroll
-    links.forEach(link => {
-      link.addEventListener('click', (e) => {
-        if (link.classList.contains('external')) return;
-        e.preventDefault();
-        const target = container.querySelector(`#${link.dataset.target}`);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-
-    // Highlight active section on scroll
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          links.forEach(l => l.classList.remove('active'));
-          const active = sidebar.querySelector(`[data-target="${entry.target.id}"]`);
-          if (active) active.classList.add('active');
-        }
-      });
-    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
-
-    sections.forEach(s => observer.observe(s.target));
-  }
+  // ========================================
+  // READING
+  // ========================================
 
   async showReadingList() {
-    await this.fadeToView('reading-view');
-    
+    await this.fadeToView('reading-view', 'reading');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, 'reading');
+
     const list = document.getElementById('reading-list');
     list.innerHTML = this.reading.map(item => `
       <div class="reading-item">
         <div class="reading-item-title">
-          ${item.url ? `<a href="${item.url}" target="_blank">${item.title}</a>` : item.title}
+          ${item.url ? `<a href="${item.url}" target="_blank" rel="noopener">${item.title}</a>` : item.title}
         </div>
         ${item.author ? `<div class="reading-item-author">${item.author}</div>` : ''}
       </div>
-    `).join('') || '<p style="color:var(--fg-muted);font-size:14px;">no readings yet.</p>';
+    `).join('') || '<p class="empty-note">no readings yet.</p>';
 
     history.pushState(null, '', '#reading');
+  }
+
+  // ========================================
+  // FAVORITES
+  // ========================================
+
+  async showSolacesList() {
+    await this.fadeToView('solaces-view', 'solaces');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb({ label: 'favorites', hash: 'favorites' }, null);
+
+    const container = document.getElementById('solaces-list');
+    if (!container) return;
+
+    container.innerHTML = this.solaces.map(category => `
+      <div class="solaces-category">
+        <div class="solaces-category-title">${category.title}</div>
+        <div class="solaces-category-items">
+          ${category.items.map(item => {
+            if (item.url) {
+              return `<span class="solaces-item"><a href="${item.url}" target="_blank" rel="noopener">${item.name}</a></span>`;
+            }
+            if (item.previewImage) {
+              return `<span class="solaces-item"><span class="solaces-item-wrapper" data-preview-img="${item.previewImage}">${item.name}</span></span>`;
+            }
+            return `<span class="solaces-item">${item.name}</span>`;
+          }).join('')}
+        </div>
+      </div>
+    `).join('') || '<p class="empty-note">nothing here yet.</p>';
+
+    this.setupSolacePreviews();
+
+    history.pushState(null, '', '#favorites');
   }
 
   setupSolacePreviews() {
     if ('ontouchstart' in window) return;
     const wrappers = document.querySelectorAll('.solaces-item-wrapper');
+    if (!wrappers.length) return;
+
     let previewEl = document.getElementById('solace-preview');
     if (!previewEl) {
       previewEl = document.createElement('div');
       previewEl.id = 'solace-preview';
       previewEl.className = 'solace-preview';
       previewEl.innerHTML = '<img src="" alt="" />';
-      previewEl.style.pointerEvents = 'none';
       document.body.appendChild(previewEl);
     }
     const img = previewEl.querySelector('img');
@@ -739,28 +565,21 @@ class Site {
     const previewWidth = 240;
     const previewHeight = 160;
     const lerpFactor = 0.12;
-    let targetLeft = 0;
-    let targetTop = 0;
-    let currentLeft = 0;
-    let currentTop = 0;
-    let rafId = null;
-
     const horizontalDampen = 0.25;
+    let targetLeft = 0, targetTop = 0, currentLeft = 0, currentTop = 0, rafId = null;
 
-    const updatePosition = (wrapper, clientX) => {
+    const place = (wrapper, clientX) => {
       const rect = wrapper.getBoundingClientRect();
       const linkCenterX = rect.left + rect.width / 2;
       const targetCenterX = linkCenterX + (clientX - linkCenterX) * horizontalDampen;
       let left = targetCenterX - previewWidth / 2;
       if (left + previewWidth > window.innerWidth) left = window.innerWidth - previewWidth;
       if (left < 0) left = 0;
-      const top = rect.bottom + gapBelow;
-      if (top + previewHeight > window.innerHeight) {
-        targetTop = Math.max(0, rect.top - previewHeight - gapBelow);
-      } else {
-        targetTop = top;
-      }
+      const below = rect.bottom + gapBelow;
       targetLeft = left;
+      targetTop = below + previewHeight > window.innerHeight
+        ? Math.max(0, rect.top - previewHeight - gapBelow)
+        : below;
     };
 
     const animate = () => {
@@ -776,32 +595,18 @@ class Site {
     wrappers.forEach(wrapper => {
       wrapper.addEventListener('mouseenter', (e) => {
         const src = wrapper.dataset.previewImg;
-        if (src) {
-          img.src = src;
-          img.alt = '';
-          const rect = wrapper.getBoundingClientRect();
-          const linkCenterX = rect.left + rect.width / 2;
-          const targetCenterX = linkCenterX + (e.clientX - linkCenterX) * horizontalDampen;
-          const top = rect.bottom + gapBelow;
-          let left = targetCenterX - previewWidth / 2;
-          if (left + previewWidth > window.innerWidth) left = window.innerWidth - previewWidth;
-          if (left < 0) left = 0;
-          targetLeft = left;
-          targetTop = top + previewHeight > window.innerHeight
-            ? Math.max(0, rect.top - previewHeight - gapBelow)
-            : top;
-          currentLeft = targetLeft;
-          currentTop = targetTop;
-          previewEl.style.left = `${currentLeft}px`;
-          previewEl.style.top = `${currentTop}px`;
-          previewEl.classList.add('visible');
-          if (!rafId) rafId = requestAnimationFrame(animate);
-        }
+        if (!src) return;
+        img.src = src;
+        place(wrapper, e.clientX);
+        currentLeft = targetLeft;
+        currentTop = targetTop;
+        previewEl.style.left = `${currentLeft}px`;
+        previewEl.style.top = `${currentTop}px`;
+        previewEl.classList.add('visible');
+        if (!rafId) rafId = requestAnimationFrame(animate);
       });
       wrapper.addEventListener('mousemove', (e) => {
-        if (previewEl.classList.contains('visible')) {
-          updatePosition(wrapper, e.clientX);
-        }
+        if (previewEl.classList.contains('visible')) place(wrapper, e.clientX);
       });
       wrapper.addEventListener('mouseleave', () => {
         previewEl.classList.remove('visible');
@@ -813,72 +618,69 @@ class Site {
     });
   }
 
-  async showSolacesList() {
-    await this.fadeToView('solaces-view');
-    
-    const container = document.getElementById('solaces-list');
-    if (!container) return;
+  // ========================================
+  // STATS
+  // ========================================
 
-    const placeholderImg = '/static/images/blogs/2025_q4/apt_view.jpg';
-    container.innerHTML = this.solaces.map(category => `
-      <div class="solaces-category">
-        <div class="solaces-category-title">${category.title}</div>
-        <div class="solaces-category-items">
-          ${category.items.map(item => {
-            const hasPreview = (category.title === 'films' || category.title === 'sports') && item.previewImage;
-            const previewImg = item.previewImage || placeholderImg;
-            if (hasPreview) {
-              return `
-            <div class="solaces-item">
-              <span class="solaces-item-wrapper" data-preview-img="${previewImg}">${item.name}</span>
-            </div>`;
-            }
-            return `
-            <div class="solaces-item">
-              ${item.url ? `<a href="${item.url}" target="_blank">${item.name}</a>` : item.name}
-            </div>`;
-          }).join('')}
-          ${category.more ? `<div class="solaces-item solaces-more"><a href="${category.more.url}">${category.more.text}</a></div>` : ''}
-        </div>
-      </div>
-    `).join('') || '<p style="color:var(--fg-muted);">nothing here yet.</p>';
-
-    this.setupSolacePreviews();
-
-    history.pushState(null, '', '#favorites');
+  async showStats() {
+    await this.fadeToView('youre-already-here-view', 'stats');
+    const photo = this.homePhoto();
+    this.setBannerPhoto(photo.src, photo.position);
+    this.renderBreadcrumb(null, 'stats');
+    this.startAgeCounter();
+    history.pushState(null, '', '#stats');
   }
 
-  // Routing
+  startAgeCounter() {
+    const el = document.getElementById('easter-age');
+    if (!el) return;
+    const birth = new Date('2004-06-10T08:00:00');
+    const msPerYear = 365.2425 * 24 * 60 * 60 * 1000;
+    const update = () => {
+      el.textContent = ((Date.now() - birth.getTime()) / msPerYear).toFixed(9);
+      this._ageFrame = requestAnimationFrame(update);
+    };
+    update();
+  }
+
+  stopAgeCounter() {
+    if (this._ageFrame) {
+      cancelAnimationFrame(this._ageFrame);
+      this._ageFrame = null;
+    }
+  }
+
+  // ========================================
+  // ROUTING
+  // ========================================
+
   async handleRoute() {
     const hash = window.location.hash.replace('#', '');
+
     if (!hash || hash === '/') {
-      await this.fadeToView('home-view');
+      await this.showHome();
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
-      const tagOrder = ['updates', 'random'];
-      const filter = hash === 'thoughts' ? 'updates' : hash.replace('thoughts/', '');
-      const validFilter = tagOrder.includes(filter) ? filter : 'updates';
-      await this.showThoughtsList(validFilter);
+      await this.showThoughtsList();
     } else if (hash === 'reading') {
       await this.showReadingList();
     } else if (hash === 'projects') {
       await this.showProjectsList();
     } else if (hash.startsWith('projects/')) {
-      const slugOrIndex = hash.replace('projects/', '');
-      await this.showProjectDetail(slugOrIndex);
+      await this.showProjectDetail(hash.replace('projects/', ''));
     } else if (hash === 'favorites' || hash === 'solaces') {
       await this.showSolacesList();
-    } else if (hash === 'youre-already-here') {
-      await this.showYoureAlreadyHere();
+    } else if (hash === 'stats' || hash === 'youre-already-here') {
+      await this.showStats();
     } else if (hash.startsWith('thought/')) {
       const postId = hash.replace('thought/', '');
-      // When not from back/forward, inject thoughts list so browser back goes to writing list
+      // Inject the writing list behind the article so browser-back lands there
       if (!this._fromPopstate) {
         history.replaceState(null, '', '#thoughts');
         history.pushState(null, '', `#thought/${postId}`);
       }
-      await this.showThought(postId, true); // skip push - we injected or history already correct
+      await this.showThought(postId, true);
     } else {
-      await this.fadeToView('home-view');
+      await this.showHome();
     }
   }
 }
@@ -899,6 +701,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await site.handleRoute();
 
-  // Show content after routing (prevents flash of home when reloading with hash)
   document.documentElement.classList.remove('route-pending');
 });
