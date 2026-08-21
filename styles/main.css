@@ -26,6 +26,8 @@
   --banner-height: 380px;
   --banner-bar: 60px;
   --banner-top: 44px;
+  --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
+  --banner-ms: 650ms;
 }
 
 /* ========================================
@@ -40,7 +42,13 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Only articles and the stats page scroll; every other view is a fixed frame. */
+html.no-scroll,
+html.no-scroll body {
+  overflow: hidden;
 }
 
 /* Prevent a flash of home when reloading with a hash */
@@ -57,7 +65,6 @@ body {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  min-height: 100vh;
 }
 
 a {
@@ -144,6 +151,12 @@ body.no-top-fade .top-fade {
   box-shadow: 0 6px 20px rgba(10, 20, 30, 0.14);
 }
 
+/* Only while navigating — during a scroll the height tracks scrollY directly. */
+.banner.animating {
+  transition: height var(--banner-ms) var(--banner-ease),
+              top var(--banner-ms) var(--banner-ease);
+}
+
 .banner-spacer {
   height: 0;
 }
@@ -157,7 +170,12 @@ body.no-top-fade .top-fade {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: opacity 400ms ease;
+  opacity: 0;
+  transition: opacity var(--banner-ms) ease;
+}
+
+.banner-media.active {
+  opacity: 1;
 }
 
 .banner-scrim {
@@ -165,13 +183,13 @@ body.no-top-fade .top-fade {
   left: 0;
   right: 0;
   top: 0;
-  height: 130px;
+  height: 140px;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgba(8, 12, 18, 0.72) 0px,
-    rgba(8, 12, 18, 0.58) 60px,
-    rgba(8, 12, 18, 0) 130px
+    rgba(8, 12, 18, 0.52) 0px,
+    rgba(8, 12, 18, 0.38) 60px,
+    rgba(8, 12, 18, 0) 140px
   );
 }
 
@@ -898,6 +916,10 @@ body.no-top-fade .top-fade {
 
   .banner-header {
     padding: 0 14px;
+  }
+
+  .contact {
+    padding: 20px 0 40px;
   }
 
   .home-title {

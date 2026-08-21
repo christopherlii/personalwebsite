@@ -15,7 +15,7 @@ class Site {
 
   init() {
     this.setupNavigation();
-    this.setupContactReveal();
+    this.setupScrollLock();
     this.setupBanner();
   }
 
@@ -30,7 +30,9 @@ class Site {
 
   setupBanner() {
     this.banner = document.getElementById('banner');
-    this.bannerMedia = document.getElementById('banner-media');
+    this.bannerLayers = Array.from(document.querySelectorAll('.banner-media'));
+    this.activeLayer = 0;
+    this.bannerPhoto = null;
     this.bannerSpacer = document.getElementById('banner-spacer');
     this.breadcrumbEl = document.getElementById('breadcrumb');
 
@@ -63,20 +65,72 @@ class Site {
     this.updateBanner();
   }
 
+  // Articles and stats always scroll. Everything else is meant to be a fixed
+  // frame — but only lock it when the page genuinely fits, otherwise a long
+  // list (favorites and projects on a phone) would be unreachable.
+  setupScrollLock() {
+    this.syncScrollLock = () => {
+      const root = document.documentElement;
+      root.classList.remove('no-scroll');
+      if (this.view === 'thought' || this.view === 'stats') return;
+
+      // Measure the real content, not the page's trailing padding — that
+      // padding only exists to give scrolling views room at the end, and
+      // clipping empty space costs nothing.
+      const page = document.querySelector('.view:not(.hidden) .page');
+      const last = page && page.lastElementChild;
+      if (!last) return;
+      const bottom = last.getBoundingClientRect().bottom + window.scrollY;
+      if (bottom <= window.innerHeight - 12) {
+        root.classList.add('no-scroll');
+      }
+    };
+    window.addEventListener('resize', this.syncScrollLock);
+    // Images without reserved space change the page height as they arrive,
+    // so re-measure rather than locking a page that is about to grow.
+    document.addEventListener('load', (e) => {
+      if (e.target.tagName === 'IMG') this.syncScrollLock();
+    }, true);
+  }
+
   readBannerTokens() {
     const s = getComputedStyle(document.documentElement);
     this.bannerFull = parseInt(s.getPropertyValue('--banner-height'), 10) || 380;
     this.bannerBar = parseInt(s.getPropertyValue('--banner-bar'), 10) || 60;
     this.bannerTop = parseInt(s.getPropertyValue('--banner-top'), 10) || 44;
+    this.bannerMs = parseInt(s.getPropertyValue('--banner-ms'), 10) || 650;
   }
 
+  // Two stacked layers so a photo change cross-fades instead of cutting.
   setBannerPhoto(src, position) {
-    if (!this.bannerMedia) return;
-    const next = `url("${src}")`;
-    if (this.bannerMedia.style.backgroundImage !== next) {
-      this.bannerMedia.style.backgroundImage = next;
+    if (!this.bannerLayers || this.bannerLayers.length < 2) return;
+    const pos = position || 'center';
+    if (this.bannerPhoto && this.bannerPhoto.src === src && this.bannerPhoto.position === pos) {
+      return;
     }
-    this.bannerMedia.style.backgroundPosition = position || 'center';
+
+    const current = this.bannerLayers[this.activeLayer];
+    const next = this.bannerLayers[1 - this.activeLayer];
+
+    next.style.backgroundImage = `url("${src}")`;
+    next.style.backgroundPosition = pos;
+    next.offsetHeight; // commit the new image before flipping opacity
+    next.classList.add('active');
+    current.classList.remove('active');
+
+    this.activeLayer = 1 - this.activeLayer;
+    this.bannerPhoto = { src, position: pos };
+  }
+
+  // Runs the height/top change through a CSS transition rather than snapping.
+  animateBanner() {
+    if (!this.banner) return;
+    this.banner.classList.add('animating');
+    this.banner.offsetHeight; // let the transition apply before the height moves
+    clearTimeout(this._bannerAnimT);
+    this._bannerAnimT = setTimeout(() => {
+      this.banner.classList.remove('animating');
+    }, this.bannerMs + 60);
   }
 
   // Breadcrumb: name / section / detail. Clicking the name goes home, except
@@ -142,25 +196,14 @@ class Site {
     });
   }
 
-  setupContactReveal() {
-    const els = document.querySelectorAll('.contact-email');
-    if (!els.length) return;
-    const prevIntersecting = new Map();
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        const prev = prevIntersecting.get(e.target);
-        prevIntersecting.set(e.target, e.isIntersecting);
-        if (prev === false && e.isIntersecting) e.target.classList.add('reveal');
-      });
-    }, { threshold: 0.1, rootMargin: '0px 0px -20px 0px' });
-    els.forEach((el) => observer.observe(el));
-    setTimeout(() => {
-      els.forEach((el) => {
-        if (!el.classList.contains('reveal') && prevIntersecting.get(el)) {
-          el.classList.add('reveal');
-        }
-      });
-    }, 600);
+  // Home is a fixed frame now, so the email can't reveal on scroll — fade it
+  // in shortly after the view settles instead.
+  revealContact() {
+    const el = document.querySelector('.contact-email');
+    if (!el) return;
+    el.classList.remove('reveal');
+    clearTimeout(this._contactT);
+    this._contactT = setTimeout(() => el.classList.add('reveal'), 450);
   }
 
   setupNavigation() {
@@ -308,10 +351,18 @@ class Site {
     }
 
     this.view = viewName;
+
     // Articles let the bar scroll away, so they don't need the top fade;
     // every other view keeps it floating and needs the strip above covered.
     document.body.classList.toggle('no-top-fade', viewName === 'thought');
+
+    document.documentElement.classList.remove('no-scroll');
     window.scrollTo(0, 0);
+    this.syncScrollLock();
+    // Run again once the view's content has actually been rendered.
+    setTimeout(this.syncScrollLock, 0);
+
+    this.animateBanner();
     if (this.updateBanner) this.updateBanner();
   }
 
@@ -324,6 +375,7 @@ class Site {
     const photo = this.homePhoto();
     this.setBannerPhoto(photo.src, photo.position);
     this.renderBreadcrumb(null, null);
+    this.revealContact();
     history.pushState(null, '', '/');
   }
 
@@ -484,6 +536,8 @@ class Site {
     if (easter) easter.addEventListener('click', () => this.showStats());
     const back = content.querySelector('[data-nav="projects"]');
     if (back) back.addEventListener('click', () => this.showProjectsList());
+
+    this.syncScrollLock();
 
     history.pushState(null, '', `#projects/${this.getProjectSlug(project)}`);
   }
