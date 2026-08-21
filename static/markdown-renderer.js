@@ -29,6 +29,7 @@ class Site {
   // else shows the home photo.
 
   setupBanner() {
+    this.mobileMq = window.matchMedia('(max-width: 640px)');
     this.banner = document.getElementById('banner');
     this.bannerLayers = Array.from(document.querySelectorAll('.banner-media'));
     this.activeLayer = 0;
@@ -40,9 +41,19 @@ class Site {
 
     this.updateBanner = () => {
       if (!this.banner) return;
-      const target = this.view === 'home' || this.view === 'thought'
+      const target = this.view === 'home' || this.view === 'thought' || this.view === 'solaces'
         ? this.bannerFull
         : this.bannerBar;
+
+      // Phones: the banner isn't sticky (it scrolls away natively), so no
+      // per-scroll height tracking — just hold the view's target height.
+      if (this.mobileMq.matches) {
+        this.banner.style.height = `${target}px`;
+        this.banner.style.top = '';
+        if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
+        return;
+      }
+
       const h = Math.max(this.bannerBar, target - window.scrollY);
 
       this.banner.style.height = `${h}px`;
@@ -602,7 +613,7 @@ class Site {
               return `<span class="solaces-item"><a href="${item.url}" target="_blank" rel="noopener">${item.name}</a></span>`;
             }
             if (item.previewImage) {
-              return `<span class="solaces-item"><span class="solaces-item-wrapper" data-preview-img="${item.previewImage}">${item.name}</span></span>`;
+              return `<span class="solaces-item"><span class="solaces-item-hero" data-preview-img="${item.previewImage}">${item.name}</span></span>`;
             }
             return `<span class="solaces-item">${item.name}</span>`;
           }).join('')}
@@ -610,81 +621,15 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">nothing here yet.</p>';
 
-    this.setupSolacePreviews();
-
-    history.pushState(null, '', '#favorites');
-  }
-
-  setupSolacePreviews() {
-    if ('ontouchstart' in window) return;
-    const wrappers = document.querySelectorAll('.solaces-item-wrapper');
-    if (!wrappers.length) return;
-
-    let previewEl = document.getElementById('solace-preview');
-    if (!previewEl) {
-      previewEl = document.createElement('div');
-      previewEl.id = 'solace-preview';
-      previewEl.className = 'solace-preview';
-      previewEl.innerHTML = '<img src="" alt="" />';
-      document.body.appendChild(previewEl);
-    }
-    const img = previewEl.querySelector('img');
-
-    const gapBelow = 8;
-    const previewWidth = 240;
-    const previewHeight = 160;
-    const lerpFactor = 0.12;
-    const horizontalDampen = 0.25;
-    let targetLeft = 0, targetTop = 0, currentLeft = 0, currentTop = 0, rafId = null;
-
-    const place = (wrapper, clientX) => {
-      const rect = wrapper.getBoundingClientRect();
-      const linkCenterX = rect.left + rect.width / 2;
-      const targetCenterX = linkCenterX + (clientX - linkCenterX) * horizontalDampen;
-      let left = targetCenterX - previewWidth / 2;
-      if (left + previewWidth > window.innerWidth) left = window.innerWidth - previewWidth;
-      if (left < 0) left = 0;
-      const below = rect.bottom + gapBelow;
-      targetLeft = left;
-      targetTop = below + previewHeight > window.innerHeight
-        ? Math.max(0, rect.top - previewHeight - gapBelow)
-        : below;
-    };
-
-    const animate = () => {
-      currentLeft += (targetLeft - currentLeft) * lerpFactor;
-      currentTop += (targetTop - currentTop) * lerpFactor;
-      previewEl.style.left = `${currentLeft}px`;
-      previewEl.style.top = `${currentTop}px`;
-      if (previewEl.classList.contains('visible')) {
-        rafId = requestAnimationFrame(animate);
-      }
-    };
-
-    wrappers.forEach(wrapper => {
-      wrapper.addEventListener('mouseenter', (e) => {
-        const src = wrapper.dataset.previewImg;
-        if (!src) return;
-        img.src = src;
-        place(wrapper, e.clientX);
-        currentLeft = targetLeft;
-        currentTop = targetTop;
-        previewEl.style.left = `${currentLeft}px`;
-        previewEl.style.top = `${currentTop}px`;
-        previewEl.classList.add('visible');
-        if (!rafId) rafId = requestAnimationFrame(animate);
-      });
-      wrapper.addEventListener('mousemove', (e) => {
-        if (previewEl.classList.contains('visible')) place(wrapper, e.clientX);
-      });
-      wrapper.addEventListener('mouseleave', () => {
-        previewEl.classList.remove('visible');
-        if (rafId) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
-        }
+    // Hovering a favorite fades its image into the expanded hero, same
+    // sticky behavior as the writing list — no restore on leave.
+    container.querySelectorAll('.solaces-item-hero').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        this.setBannerPhoto(el.dataset.previewImg, 'center');
       });
     });
+
+    history.pushState(null, '', '#favorites');
   }
 
   // ========================================

@@ -10,7 +10,7 @@ Personal website for Christopher Li (www.christopherli.dev). A static site with 
 - **`index.html`** — the single HTML entry point with all views defined inline (home, writing, article, projects, reading, favorites, stats)
 - **`static/markdown-renderer.js`** — the `Site` class: routing, markdown rendering (via `marked` CDN), the banner, data loading
 - **`styles/main.css`** — the whole stylesheet. (`filters.css` and `archives.css` are left over and not linked from `index.html`.)
-- **One shared banner** sits above every view: a sticky photo header holding the breadcrumb and social links. It opens to `--banner-height` on home and article pages and shrinks with the scroll; on every other view it stays a `--banner-bar` strip. See `setupBanner()` and the `.banner` rules in `main.css`.
+- **One shared banner** sits above every view: a sticky photo header holding the breadcrumb and social links. It opens to `--banner-height` on home, article, and favorites pages and shrinks with the scroll; on every other view it stays a `--banner-bar` strip. On phones it is not sticky — it scrolls away natively. Hovering a writing-list row (or a favorite with a `previewImage`) fades that image into the banner, and it sticks. See `setupBanner()` and the `.banner` rules in `main.css`.
 
 ## Content
 
