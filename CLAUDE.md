@@ -51,4 +51,4 @@ All content is data-driven via JSON index files and markdown:
 - Column is 640px wide (`--col`) with 24px gutters; figures use an 8px radius
 - Home uses `/static/images/hero/rock.jpg` as its banner photo; articles use their own `cover`
 - The site uses a warm, minimal aesthetic with subtle animations (view fade-in, banner collapse, photo shuffle)
-- Lowercase writing style throughout the site content
+- Lowercase writing style throughout the site content, post prose included: sentence starts and the pronoun "i" are lowercase, proper nouns (Bobst, New York, NYU, LinkedIn) keep their capitals

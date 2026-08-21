@@ -388,6 +388,7 @@ body.no-top-fade .top-fade {
   opacity: 0.6;
 }
 
+.article-body h1,
 .article-body h2 {
   font-family: var(--font-display);
   font-size: 20px;
@@ -395,6 +396,7 @@ body.no-top-fade .top-fade {
   margin: 44px 0 14px;
 }
 
+.article-body > h1:first-child,
 .article-body > h2:first-child {
   margin-top: 0;
 }
