@@ -403,34 +403,17 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
-    let clickedThrough = false;
     list.querySelectorAll('.thought-row').forEach(item => {
-      item.addEventListener('click', () => {
-        clickedThrough = true;
-        this.showThought(item.dataset.post);
-      });
+      item.addEventListener('click', () => this.showThought(item.dataset.post));
 
-      // Preview the post's cover in the bar on hover; clicking then expands
-      // the photo that's already showing. The restore-to-home on leave is
-      // debounced: moving straight from one row to another cancels it, so
-      // covers cross-fade into each other instead of bouncing through the
-      // home photo (which reused the visible layer and read as a hard cut).
+      // Hovering a row fades the bar to that post's cover — and it sticks,
+      // so clicking expands the photo already showing. No restore on leave;
+      // the bar just keeps the last cover you previewed.
       item.addEventListener('mouseenter', () => {
-        clearTimeout(this._hoverRestoreT);
         const post = this.posts.find(p => p.filename === item.dataset.post);
-        const photo = post && post.cover
-          ? { src: post.cover, position: post.coverPosition }
-          : this.heldPhoto;
-        this.setBannerPhoto(photo.src, photo.position || 'center');
-      });
-      item.addEventListener('mouseleave', () => {
-        if (clickedThrough) return;
-        clearTimeout(this._hoverRestoreT);
-        this._hoverRestoreT = setTimeout(() => {
-          if (!clickedThrough && this.view === 'thoughts' && this.heldPhoto) {
-            this.setBannerPhoto(this.heldPhoto.src, this.heldPhoto.position);
-          }
-        }, 90);
+        if (post && post.cover) {
+          this.setBannerPhoto(post.cover, post.coverPosition || 'center');
+        }
       });
     });
 
