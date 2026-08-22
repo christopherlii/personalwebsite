@@ -91,7 +91,7 @@ at the end of the day, i'm now comfortable in New York, and that's quite scary t
 it's March and the city is alive again. the temperature is a cool 65 degrees—couples are skipping down the sidewalks and friends are yapping on fire escapes. i'm at pier 26, where it's quiet and the skyline flickers every now and then to remind you there's something alive in the distance. the sky is my favorite color, a lush, scarlet sunset. i wonder if that'll change back to a soft blue after spending time again next to the Pacific.
 
 <figure>
-  <img src="/static/images/blogs/solaces/skyline.jpg" alt="Skyline from pier 26" style="width: 100%; aspect-ratio: 9 / 4; object-fit: cover; object-position: center 69%; border-radius: 8px;" />
+  <img src="/static/images/blogs/solaces/skyline.jpg" alt="Skyline from pier 26" style="width: 100%; aspect-ratio: 9 / 4; object-fit: cover; object-position: center 69%;" />
 </figure> 
 
 i'm burning with excitement.
