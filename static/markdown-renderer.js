@@ -114,24 +114,55 @@ class Site {
   }
 
   // Two stacked layers so a photo change cross-fades instead of cutting.
+  // The swap waits for the image to decode, so the incoming layer never
+  // fades in as the bare navy background while the photo downloads.
   setBannerPhoto(src, position) {
     if (!this.bannerLayers || this.bannerLayers.length < 2) return;
     const pos = position || 'center';
     if (this.bannerPhoto && this.bannerPhoto.src === src && this.bannerPhoto.position === pos) {
       return;
     }
-
-    const current = this.bannerLayers[this.activeLayer];
-    const next = this.bannerLayers[1 - this.activeLayer];
-
-    next.style.backgroundImage = `url("${src}")`;
-    next.style.backgroundPosition = pos;
-    next.offsetHeight; // commit the new image before flipping opacity
-    next.classList.add('active');
-    current.classList.remove('active');
-
-    this.activeLayer = 1 - this.activeLayer;
     this.bannerPhoto = { src, position: pos };
+
+    const swap = () => {
+      // A later request may have superseded this one while it decoded.
+      if (this.bannerPhoto.src !== src || this.bannerPhoto.position !== pos) return;
+
+      const current = this.bannerLayers[this.activeLayer];
+      const next = this.bannerLayers[1 - this.activeLayer];
+
+      next.style.backgroundImage = `url("${src}")`;
+      next.style.backgroundPosition = pos;
+      next.offsetHeight; // commit the new image before flipping opacity
+      next.classList.add('active');
+      current.classList.remove('active');
+
+      this.activeLayer = 1 - this.activeLayer;
+    };
+
+    // Gate on the load event only — decode() looks tempting but never
+    // settles in hidden tabs, which would leave the banner empty for anyone
+    // opening the site in the background. A failed download keeps the
+    // current photo.
+    const img = new Image();
+    img.src = src;
+    if (img.complete && img.naturalWidth) {
+      swap();
+    } else {
+      img.addEventListener('load', swap, { once: true });
+    }
+  }
+
+  // Warm the covers a view is about to offer, so the cross-fade is instant.
+  preloadImages(srcs) {
+    this._preloaded = this._preloaded || new Set();
+    srcs.filter(Boolean).forEach(src => {
+      if (this._preloaded.has(src)) return;
+      this._preloaded.add(src);
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = src;
+    });
   }
 
   // Runs the height/top change through a CSS transition rather than snapping.
@@ -432,6 +463,8 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
+    this.preloadImages(this.posts.map(p => p.cover));
+
     list.querySelectorAll('.thought-row').forEach(item => {
       item.addEventListener('click', () => this.showThought(item.dataset.post));
 
@@ -638,6 +671,8 @@ class Site {
         </div>
       </div>
     `).join('') || '<p class="empty-note">nothing here yet.</p>';
+
+    this.preloadImages(this.solaces.flatMap(c => c.items.map(i => i.previewImage)));
 
     // Clicking a favorite fades its image into the expanded hero, and it
     // stays until another one is picked.
