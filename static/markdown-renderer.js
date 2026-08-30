@@ -17,6 +17,7 @@ class Site {
     this.setupNavigation();
     this.setupScrollLock();
     this.setupBanner();
+    this.setupCopyEmail();
   }
 
   // ========================================
@@ -51,6 +52,7 @@ class Site {
       if (this.mobileMq.matches) {
         this.banner.style.height = `${this.bannerFull}px`;
         this.banner.style.top = '';
+        this.banner.classList.remove('condensed');
         if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
         return;
       }
@@ -58,6 +60,7 @@ class Site {
       const h = Math.max(this.bannerBar, target - window.scrollY);
 
       this.banner.style.height = `${h}px`;
+      this.banner.classList.toggle('condensed', h <= this.bannerBar + 1);
       if (this.bannerSpacer) this.bannerSpacer.style.height = `${target - h}px`;
 
       // On an article the bar slides away once it has finished collapsing,
@@ -184,7 +187,7 @@ class Site {
     const parts = ['<span class="crumb-name" data-nav="name">Christopher Li</span>'];
     if (section) {
       parts.push('<span class="crumb-sep">/</span>');
-      parts.push(`<span class="crumb-link" data-nav="${section.hash}">${section.label}</span>`);
+      parts.push(`<a class="crumb-link" href="#${section.hash}">${section.label}</a>`);
     }
     if (detail) {
       parts.push('<span class="crumb-sep">/</span>');
@@ -256,16 +259,6 @@ class Site {
     });
   }
 
-  // Home is a fixed frame now, so the email can't reveal on scroll — fade it
-  // in shortly after the view settles instead.
-  revealContact() {
-    const el = document.querySelector('.contact-email');
-    if (!el) return;
-    el.classList.remove('reveal');
-    clearTimeout(this._contactT);
-    this._contactT = setTimeout(() => el.classList.add('reveal'), 450);
-  }
-
   setupNavigation() {
     document.querySelectorAll('a[href="/"]').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -274,14 +267,31 @@ class Site {
       });
     });
 
-    window.addEventListener('popstate', () => {
-      this._fromPopstate = true;
-      this.handleRoute();
+    // Back/forward fires popstate and then hashchange for the same move —
+    // route once, not twice. Plain anchor clicks only fire hashchange.
+    window.addEventListener('popstate', async () => {
+      this._suppressHash = true;
+      try {
+        await this.handleRoute();
+      } finally {
+        setTimeout(() => { this._suppressHash = false; }, 0);
+      }
     });
     window.addEventListener('hashchange', () => {
-      this._fromPopstate = false;
+      if (this._suppressHash) return;
       this.handleRoute();
     });
+  }
+
+  // Push a history entry only when the address actually changes — clicking a
+  // real anchor already set the hash before the router ran, and pushing again
+  // would double the entry.
+  syncUrl(url) {
+    if (url === '/') {
+      if (window.location.hash) history.pushState(null, '', '/');
+    } else if (window.location.hash !== url) {
+      history.pushState(null, '', url);
+    }
   }
 
   // "2026-05-10" -> "may 10, 2026"
@@ -321,40 +331,47 @@ class Site {
     return { attributes, body: match[2] };
   }
 
+  // The index carries every post's metadata (build.py), so lists render
+  // without downloading a single post body — bodies load on demand in
+  // loadPostBody. Plain-filename entries (the old index format) still work.
   async loadPosts() {
     try {
-      let mdFiles = [];
+      let entries = [];
       try {
         const resp = await fetch('/posts/index.json', { cache: 'no-store' });
-        if (resp.ok) mdFiles = (await resp.json()).filter(f => f.endsWith('.md'));
+        if (resp.ok) entries = await resp.json();
       } catch (_) {}
 
-      if (!mdFiles.length) {
-        const resp = await fetch('/posts/');
-        const text = await resp.text();
-        mdFiles = text.match(/href="([^"]*\.md)"/g)?.map(m => m.slice(6, -1)) || [];
-      }
-
-      for (const file of mdFiles) {
-        try {
-          const resp = await fetch(`/posts/${file}`, { cache: 'no-store' });
-          const content = await resp.text();
-          const { attributes, body } = this.parseFrontMatter(content);
-          if (String(attributes.published).toLowerCase() === 'false') continue;
-          this.posts.push({
-            filename: file.replace('.md', ''),
-            title: attributes.title || file.replace('.md', '').replace(/-/g, ' '),
-            date: attributes.date || '',
-            tags: attributes.tags || [],
-            description: attributes.description || '',
-            cover: attributes.cover || '',
-            coverPosition: attributes.coverPosition || '',
-            content: typeof marked !== 'undefined' ? marked.parse(body) : body
-          });
-        } catch (e) { console.error(e); }
-      }
+      this.posts = entries
+        .map(e => (typeof e === 'string' ? { file: e } : e))
+        .filter(e => e.file && e.file.endsWith('.md'))
+        .map(e => ({
+          filename: e.file.replace('.md', ''),
+          title: e.title || e.file.replace('.md', '').replace(/-/g, ' '),
+          date: e.date || '',
+          tags: e.tags || [],
+          description: e.description || '',
+          cover: e.cover || '',
+          coverPosition: e.coverPosition || '',
+          words: e.words || 0,
+          content: null
+        }));
       this.posts.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     } catch (e) { console.error(e); }
+  }
+
+  async loadPostBody(post) {
+    if (post.content !== null) return;
+    try {
+      const resp = await fetch(`/posts/${post.filename}.md`, { cache: 'no-store' });
+      const raw = await resp.text();
+      const { body } = this.parseFrontMatter(raw);
+      if (!post.words) post.words = body.split(/\s+/).length;
+      post.content = typeof marked !== 'undefined' ? marked.parse(body) : body;
+    } catch (e) {
+      console.error(e);
+      post.content = '<p>this post refused to load. try a refresh?</p>';
+    }
   }
 
   async loadProjects() {
@@ -391,10 +408,14 @@ class Site {
     }
 
     if (currentView && currentView !== targetView) {
-      currentView.classList.add('fade-out');
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // A choreographed view (home) exits in reverse — last element in leaves
+      // first — which needs a longer hold than the plain fade.
+      const reverseExit = currentView.querySelector('.page-entrance') &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      currentView.classList.add(reverseExit ? 'exiting' : 'fade-out');
+      await new Promise(resolve => setTimeout(resolve, reverseExit ? 320 : 150));
       currentView.classList.add('hidden');
-      currentView.classList.remove('fade-out');
+      currentView.classList.remove('fade-out', 'exiting');
     }
 
     if (targetView) {
@@ -446,8 +467,7 @@ class Site {
     const photo = this.homePhoto();
     this.setBannerPhoto(photo.src, photo.position);
     this.renderBreadcrumb(null, null);
-    this.revealContact();
-    history.pushState(null, '', '/');
+    this.syncUrl('/');
   }
 
   async showThoughtsList() {
@@ -457,17 +477,15 @@ class Site {
 
     const list = document.getElementById('thoughts-full-list');
     list.innerHTML = this.posts.map(post => `
-      <div class="thought-row" data-post="${post.filename}">
+      <a class="thought-row" href="#thought/${post.filename}" data-post="${post.filename}">
         <span class="thought-title">${post.title}</span>
         <span class="thought-date">${this.formatDate(post.date)}</span>
-      </div>
+      </a>
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
     this.preloadImages(this.posts.map(p => p.cover));
 
     list.querySelectorAll('.thought-row').forEach(item => {
-      item.addEventListener('click', () => this.showThought(item.dataset.post));
-
       // Hovering a row fades the bar to that post's cover — and it sticks,
       // so clicking expands the photo already showing. No restore on leave;
       // the bar just keeps the last cover you previewed.
@@ -479,14 +497,22 @@ class Site {
       });
     });
 
-    history.pushState(null, '', '#thoughts');
+    this.syncUrl('#thoughts');
   }
 
-  async showThought(postId, skipHistoryPush) {
+  readingTime(post) {
+    return Math.max(1, Math.round((post.words || 0) / 200));
+  }
+
+  async showThought(postId) {
     const post = this.posts.find(p => p.filename === postId);
     if (!post) return this.showThoughtsList();
 
-    await this.fadeToView('thought-view', 'thought');
+    await Promise.all([
+      this.fadeToView('thought-view', 'thought'),
+      this.loadPostBody(post)
+    ]);
+    this.slug = postId;
 
     if (post.cover) {
       this.setBannerPhoto(post.cover, post.coverPosition);
@@ -495,25 +521,26 @@ class Site {
     }
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
 
+    // "next" walks backward in time, like flipping deeper into an archive.
+    const older = this.posts[this.posts.indexOf(post) + 1];
+
     document.getElementById('thought-content').innerHTML = `
       <header class="article-header">
         <h1 class="article-title">${post.title}</h1>
-        <time class="article-date">${this.formatDate(post.date)}</time>
+        <time class="article-date">${this.formatDate(post.date)} · ${this.readingTime(post)} min read</time>
       </header>
       <div class="article-body">${post.content}</div>
-      <footer class="article-footer"><a data-nav="thoughts">← all writing</a></footer>
+      <footer class="article-footer">
+        <a href="#thoughts">← all writing</a>
+        ${older ? `<a href="#thought/${older.filename}">next: ${older.title} →</a>` : ''}
+      </footer>
     `;
-
-    const back = document.querySelector('#thought-content .article-footer a');
-    if (back) back.addEventListener('click', () => this.showThoughtsList());
 
     this.enhanceArticleImages(document.getElementById('thought-content'));
     this.setupPhotoShuffle();
     this.updateBanner();
 
-    if (!skipHistoryPush) {
-      history.pushState(null, '', `#thought/${postId}`);
-    }
+    this.syncUrl(`#thought/${postId}`);
   }
 
   // ========================================
@@ -544,8 +571,8 @@ class Site {
     this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
 
     const grid = document.getElementById('projects-full-list');
-    grid.innerHTML = this.projects.map((p, i) => `
-      <div class="project-card" data-project="${i}">
+    grid.innerHTML = this.projects.map(p => `
+      <a class="project-card" href="#projects/${this.getProjectSlug(p)}">
         <div class="project-image">
           ${p.image ? `<img src="${p.image}" alt="${p.name}">` : ''}
         </div>
@@ -554,16 +581,10 @@ class Site {
           ${this.statusPill(p.status)}
           ${p.year ? `<span>${p.year}</span>` : ''}
         </div>
-      </div>
+      </a>
     `).join('') || '<p class="empty-note">no projects yet.</p>';
 
-    grid.querySelectorAll('.project-card').forEach(card => {
-      card.addEventListener('click', () => {
-        this.showProjectDetail(parseInt(card.dataset.project, 10));
-      });
-    });
-
-    history.pushState(null, '', '#projects');
+    this.syncUrl('#projects');
   }
 
   async showProjectDetail(slugOrIndex) {
@@ -589,7 +610,7 @@ class Site {
 
     const isThisWebsite = project.name.toLowerCase() === 'this website';
     const linkHtml = isThisWebsite
-      ? '<p class="project-link-row"><a data-nav="stats">enter the easter egg</a></p>'
+      ? '<p class="project-link-row"><a href="#stats">enter the easter egg</a></p>'
       : project.link
         ? `<p class="project-link-row"><a href="${project.link}" target="_blank" rel="noopener">visit ↗</a></p>`
         : '';
@@ -608,17 +629,12 @@ class Site {
       ${linkHtml}
       ${project.image ? `<figure class="project-shot"><img src="${project.image}" alt="${project.name}"></figure>` : ''}
       ${bodyHtml ? `<div class="article-body">${bodyHtml}</div>` : ''}
-      <footer class="article-footer"><a data-nav="projects">← all projects</a></footer>
+      <footer class="article-footer"><a href="#projects">← all projects</a></footer>
     `;
-
-    const easter = content.querySelector('[data-nav="stats"]');
-    if (easter) easter.addEventListener('click', () => this.showStats());
-    const back = content.querySelector('[data-nav="projects"]');
-    if (back) back.addEventListener('click', () => this.showProjectsList());
 
     this.syncScrollLock();
 
-    history.pushState(null, '', `#projects/${this.getProjectSlug(project)}`);
+    this.syncUrl(`#projects/${this.getProjectSlug(project)}`);
   }
 
   // ========================================
@@ -640,7 +656,7 @@ class Site {
       </div>
     `).join('') || '<p class="empty-note">no readings yet.</p>';
 
-    history.pushState(null, '', '#reading');
+    this.syncUrl('#reading');
   }
 
   // ========================================
@@ -682,7 +698,7 @@ class Site {
       });
     });
 
-    history.pushState(null, '', '#favorites');
+    this.syncUrl('#favorites');
   }
 
   // ========================================
@@ -695,7 +711,7 @@ class Site {
     this.renderBreadcrumb(null, 'stats');
     this.startAgeCounter();
     this.updateJsLines();
-    history.pushState(null, '', '#stats');
+    this.syncUrl('#stats');
   }
 
   // Counts the renderer plus whatever inline script index.html carries.
@@ -734,6 +750,27 @@ class Site {
   }
 
   // ========================================
+  // CONTACT
+  // ========================================
+
+  // The email line copies the real address on click and briefly says so.
+  setupCopyEmail() {
+    const btn = document.getElementById('copy-email');
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText('christopherli@nyu.edu');
+      } catch (_) {
+        return; // no clipboard access — leave the text as the hint it is
+      }
+      btn.textContent = 'copied :)';
+      clearTimeout(this._copyT);
+      this._copyT = setTimeout(() => { btn.textContent = original; }, 1600);
+    });
+  }
+
+  // ========================================
   // ROUTING
   // ========================================
 
@@ -756,15 +793,18 @@ class Site {
       await this.showStats();
     } else if (hash.startsWith('thought/')) {
       const postId = hash.replace('thought/', '');
-      // Inject the writing list behind the article so browser-back lands there
-      if (!this._fromPopstate) {
+      // On a direct load, inject the writing list behind the article so
+      // browser-back lands there. In-app clicks already have it behind them.
+      if (!this._routedOnce) {
         history.replaceState(null, '', '#thoughts');
         history.pushState(null, '', `#thought/${postId}`);
       }
-      await this.showThought(postId, true);
+      await this.showThought(postId);
     } else {
       await this.showHome();
     }
+
+    this._routedOnce = true;
   }
 }
 

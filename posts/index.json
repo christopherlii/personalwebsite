@@ -1,4 +1,26 @@
 [
-  "2025_q4.md",
-  "solaces.md"
+  {
+    "file": "solaces.md",
+    "title": "solaces",
+    "date": "2026-05-10",
+    "tags": [
+      "random"
+    ],
+    "description": "My feelings on leaving college, SF, and my many solaces.",
+    "cover": "/static/images/blogs/solaces/grad.jpg",
+    "coverPosition": "center 72%",
+    "words": 1218
+  },
+  {
+    "file": "2025_q4.md",
+    "title": "all in",
+    "date": "2025-12-27",
+    "tags": [
+      "updates"
+    ],
+    "description": "A letter on poker, autopilot, and folding too often in 2025",
+    "cover": "/static/images/blogs/2025_q4/sunset_with_sam.jpg",
+    "coverPosition": "",
+    "words": 1598
+  }
 ]
