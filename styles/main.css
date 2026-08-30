@@ -244,7 +244,7 @@ img {
    ENTRANCE CHOREOGRAPHY
    ======================================== */
 
-/* Elements enter one at a time: content first, chrome after. A from-only
+/* Elements enter one at a time, top of the page first. A from-only
    keyframe with backwards fill means the element holds its start state
    through the delay, then lands on plain CSS — so hover transitions on
    opacity/transform keep working once the entrance is done. */
@@ -260,8 +260,8 @@ img {
 
 .entrance-delay-120 { --entrance-delay: 120ms; }
 .entrance-delay-240 { --entrance-delay: 240ms; }
-.entrance-delay-600 { --entrance-delay: 600ms; }
-.entrance-delay-720 { --entrance-delay: 720ms; }
+.entrance-delay-360 { --entrance-delay: 360ms; }
+.entrance-delay-480 { --entrance-delay: 480ms; }
 .entrance-delay-960 { --entrance-delay: 960ms; }
 .entrance-duration-400 { --entrance-duration: 400ms; }
 .entrance-distance-neg-12 { --entrance-distance: -12px; }
@@ -594,19 +594,6 @@ body.no-top-fade .top-fade {
   .contact-email:hover {
     opacity: 0.6;
   }
-}
-
-/* Appears only once the distance lookup succeeds. */
-.contact-distance {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin-top: 6px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.contact-distance.reveal {
-  opacity: 1;
 }
 
 /* ========================================

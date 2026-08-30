@@ -34,11 +34,11 @@
       <div class="banner-media" data-layer="0"></div>
       <div class="banner-media" data-layer="1"></div>
       <div class="banner-scrim"></div>
-      <!-- Chrome enters after the content below it, dropping down while the
-           content rises — the page settles rather than loads. -->
+      <!-- The page settles top to bottom: chrome drops in first, then the
+           content below rises in sequence. -->
       <header class="banner-header">
-        <nav class="breadcrumb page-entrance entrance-delay-600 entrance-duration-400 entrance-distance-neg-12" id="breadcrumb"><span class="crumb-name">Christopher Li</span></nav>
-        <div class="social page-entrance entrance-delay-720 entrance-duration-400 entrance-distance-neg-12">
+        <nav class="breadcrumb page-entrance entrance-duration-400 entrance-distance-neg-12" id="breadcrumb"><span class="crumb-name">Christopher Li</span></nav>
+        <div class="social page-entrance entrance-delay-120 entrance-duration-400 entrance-distance-neg-12">
           <a href="https://www.instagram.com/christopherrli/" target="_blank" rel="noopener" title="instagram" aria-label="instagram">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
           </a>
@@ -57,13 +57,12 @@
     <div id="home-view" class="view">
       <main class="page page-home">
         <section>
-          <p class="home-title page-entrance">hi, i'm chris :)</p>
-          <p class="home-text page-entrance entrance-delay-120">i'm currently solving fun at <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
-          <p class="home-text page-entrance entrance-delay-240">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
+          <p class="home-title page-entrance entrance-delay-240">hi, i'm chris :)</p>
+          <p class="home-text page-entrance entrance-delay-360">i'm currently solving fun at <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
+          <p class="home-text page-entrance entrance-delay-480">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
         </section>
         <section class="contact">
           <p class="page-entrance entrance-delay-960"><button type="button" id="copy-email" class="contact-email" title="click to copy">christopherli [at] nyu [dot] edu</button></p>
-          <p class="contact-distance" id="contact-distance"></p>
         </section>
       </main>
     </div>
@@ -121,7 +120,6 @@
             <tr><td>current age</td><td class="tabular"><span id="easter-age">—</span></td></tr>
             <tr><td>countries visited</td><td>15</td></tr>
             <tr><td>current city</td><td>San Francisco, CA</td></tr>
-            <tr><td>distance between us right now</td><td class="tabular"><span id="easter-distance">—</span></td></tr>
             <tr><td>currently reading</td><td>The Three-Body Problem</td></tr>
             <tr><td>last updated</td><td>aug 20, 2026</td></tr>
             <tr><td>lines of javascript powering this website</td><td class="tabular"><span id="easter-js-lines">—</span></td></tr>

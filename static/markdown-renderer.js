@@ -10,8 +10,6 @@ class Site {
     this.solaces = [];
     this.view = 'home';
     this.slug = null;
-    // Where I am — update alongside the "current city" row on the stats page.
-    this.homeCoords = { lat: 37.7749, lon: -122.4194 };
     this.darkMq = window.matchMedia('(prefers-color-scheme: dark)');
     this.init();
   }
@@ -494,7 +492,6 @@ class Site {
     const photo = this.homePhoto();
     this.setBannerPhoto(photo.src, photo.position);
     this.renderBreadcrumb(null, null);
-    this.showDistance();
     this.syncUrl('/');
   }
 
@@ -739,7 +736,6 @@ class Site {
     this.renderBreadcrumb(null, 'stats');
     this.startAgeCounter();
     this.updateJsLines();
-    this.showDistance();
     this.syncUrl('#stats');
   }
 
@@ -776,78 +772,6 @@ class Site {
       cancelAnimationFrame(this._ageFrame);
       this._ageFrame = null;
     }
-  }
-
-  // ========================================
-  // DISTANCE
-  // ========================================
-  //
-  // "we're roughly X miles apart right now!" — visitor location comes from a
-  // city-level IP lookup (GeoJS: keyless, HTTPS, CORS). It's the site's one
-  // third-party call, it can't identify anyone, and when it fails (adblock,
-  // timeout, VPN weirdness) the line simply never appears.
-
-  haversineMiles(lat1, lon1, lat2, lon2) {
-    const rad = d => d * Math.PI / 180;
-    const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 +
-      Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
-    return 3959 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  getVisitorDistance() {
-    if (this._distanceP) return this._distanceP;
-    this._distanceP = (async () => {
-      try {
-        const cached = sessionStorage.getItem('distance-miles');
-        if (cached !== null) return cached === '' ? null : Number(cached);
-      } catch (_) {}
-
-      let miles = null;
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 4000);
-        const resp = await fetch('https://get.geojs.io/v1/ip/geo.json', { signal: ctrl.signal });
-        clearTimeout(t);
-        if (resp.ok) {
-          const geo = await resp.json();
-          const lat = parseFloat(geo.latitude);
-          const lon = parseFloat(geo.longitude);
-          if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            miles = this.haversineMiles(lat, lon, this.homeCoords.lat, this.homeCoords.lon);
-          }
-        }
-      } catch (_) {}
-
-      try { sessionStorage.setItem('distance-miles', miles === null ? '' : String(miles)); } catch (_) {}
-      return miles;
-    })();
-    return this._distanceP;
-  }
-
-  // IP location is only city-accurate, so everything says "roughly" and
-  // rounds to 10 — false precision would read worse than honesty.
-  distanceLine(miles) {
-    const n = (Math.round(miles / 10) * 10).toLocaleString('en-US');
-    if (miles < 25) return "we're in the same city right now?! coffee?";
-    if (miles < 300) return `we're only ~${n} miles apart — practically neighbors`;
-    if (miles >= 7000) return `we're ~${n} miles apart right now. that's a long flight, but i'd take the call`;
-    return `we're roughly ${n} miles apart right now!`;
-  }
-
-  async showDistance() {
-    const miles = await this.getVisitorDistance();
-    if (miles === null) return; // fail invisibly
-
-    const home = document.getElementById('contact-distance');
-    if (home) {
-      home.textContent = this.distanceLine(miles);
-      home.classList.add('reveal');
-    }
-    const stat = document.getElementById('easter-distance');
-    if (stat) {
-      stat.textContent = miles < 25 ? 'basically zero' : `~${(Math.round(miles / 10) * 10).toLocaleString('en-US')} miles`;
-    }
-    this.syncScrollLock();
   }
 
   // ========================================

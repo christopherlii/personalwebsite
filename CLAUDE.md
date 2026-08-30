@@ -25,7 +25,7 @@ All content is data-driven via JSON index files and markdown:
 
 - **`build.py`** — Python script that scans `posts/*.md` and regenerates `posts/index.json` (post metadata) and `feed.xml` (RSS). Run this after adding/removing/editing posts.
 - **`server.py`** — local dev server on port 8001 with markdown content-type support. Run with `python3 server.py`.
-- `marked` is vendored at `static/vendor/marked.min.js` (no CDN); the site makes no third-party requests except the GeoJS distance lookup.
+- `marked` is vendored at `static/vendor/marked.min.js` (no CDN); the site makes no third-party requests.
 
 ## Adding a New Post
 
@@ -49,7 +49,6 @@ All content is data-driven via JSON index files and markdown:
 - Column is 640px wide (`--col`) with 24px gutters; figures use an 8px radius
 - Home uses `/static/images/hero/rock.jpg` as its banner photo; articles use their own `cover`. Dark mode prefers night photo variants when they exist (`homePhoto()`/`postCover()` in the renderer, `coverNight` front matter) and falls back to the day photo
 - Dark mode is a token swap in `main.css` (`prefers-color-scheme: dark` over the `:root` variables); keep new colors behind variables so both themes stay in sync
-- The stats page and home contact line show the visitor's rough distance via a GeoJS IP lookup; `homeCoords` in `markdown-renderer.js` must be updated together with the "current city" stats row
 - The site uses a warm, minimal aesthetic with subtle animations (view fade-in, banner collapse, photo shuffle)
-- First-paint choreography is pure CSS: home content and banner chrome enter via `.page-entrance` + `entrance-*` utility classes (content first, chrome drops in after), list views cascade rows via `.stagger-children` (50ms per child). Both respect `prefers-reduced-motion`. Fraunces/Instrument Sans have metric-matched local fallbacks (`size-adjust` etc.) so the font swap doesn't reflow
+- First-paint choreography is pure CSS: the page settles top to bottom via `.page-entrance` + `entrance-*` utility classes (banner chrome first, then home content), list views cascade rows via `.stagger-children` (50ms per child). Both respect `prefers-reduced-motion`. Fraunces/Instrument Sans have metric-matched local fallbacks (`size-adjust` etc.) so the font swap doesn't reflow
 - Lowercase writing style throughout the site content, post prose included: sentence starts and the pronoun "i" are lowercase, proper nouns (Bobst, New York, NYU, LinkedIn) keep their capitals
