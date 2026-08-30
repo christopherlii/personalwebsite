@@ -41,34 +41,6 @@
   color-scheme: light;
 }
 
-/* Same warmth, lights off. Applied via data-theme, which the inline head
-   script sets from the stored toggle choice or the system scheme — so the
-   moon/sun button can override the OS. Photos keep their daylight look unless
-   a night variant exists (see homePhoto/postCover in the renderer). */
-html[data-theme="dark"] {
-  --bg: #151312;
-  --bg-alt: #1e1b19;
-  --fg: #eae6e1;
-  --fg-body: #d3cec8;
-  --fg-quote: #d9d4ce;
-  --fg-muted: #96908a;
-  --fg-faint: #6f6a64;
-  --border: #2b2825;
-  --accent: #a8c5e4;
-  --accent-hover: #c2d8ef;
-  --accent-rule: rgba(168, 197, 228, 0.45);
-
-  --code-bg: rgba(255, 255, 255, 0.08);
-  --card-bg: var(--bg-alt);
-  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  --card-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.55);
-  --pill-blue: #93c5fd;
-  --pill-green: #6ee7a0;
-  --pill-yellow: #e0b34a;
-
-  color-scheme: dark;
-}
-
 /* ========================================
    FONTS
    ======================================== */
@@ -525,8 +497,7 @@ body.no-top-fade .top-fade {
   flex-shrink: 0;
 }
 
-.social a,
-.social button {
+.social a {
   width: 32px;
   height: 32px;
   display: flex;
@@ -536,25 +507,11 @@ body.no-top-fade .top-fade {
   color: #fff;
 }
 
-.social button {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
 @media (hover: hover) {
-  .social a:hover,
-  .social button:hover {
+  .social a:hover {
     color: #fff;
     opacity: 0.6;
   }
-}
-
-/* The toggle shows the mode you'd switch to. */
-html[data-theme="dark"] .icon-moon,
-html:not([data-theme="dark"]) .icon-sun {
-  display: none;
 }
 
 /* ========================================

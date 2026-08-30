@@ -69,7 +69,6 @@ def collect_posts():
             'description': attributes.get('description', ''),
             'cover': attributes.get('cover', ''),
             'coverPosition': attributes.get('coverPosition', ''),
-            'coverNight': attributes.get('coverNight', ''),
             'words': len(body.split()),
             '_body': body,
         })

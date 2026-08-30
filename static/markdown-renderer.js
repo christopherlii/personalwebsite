@@ -10,7 +10,6 @@ class Site {
     this.solaces = [];
     this.view = 'home';
     this.slug = null;
-    this.darkMq = window.matchMedia('(prefers-color-scheme: dark)');
     this.init();
   }
 
@@ -19,11 +18,6 @@ class Site {
     this.setupScrollLock();
     this.setupBanner();
     this.setupCopyEmail();
-    this.setupThemeToggle();
-    // Follow the system scheme unless the toggle has stored an override.
-    this.darkMq.addEventListener('change', () => {
-      if (!this.storedTheme()) this.applyTheme(this.darkMq.matches ? 'dark' : 'light');
-    });
   }
 
   // ========================================
@@ -359,7 +353,6 @@ class Site {
           description: e.description || '',
           cover: e.cover || '',
           coverPosition: e.coverPosition || '',
-          coverNight: e.coverNight || '',
           words: e.words || 0,
           content: null
         }));
@@ -454,29 +447,8 @@ class Site {
     if (this.updateBanner) this.updateBanner();
   }
 
-  // Photos come in a day and an optional night flavor: dark mode prefers the
-  // night variant and falls back to the day one until it exists.
   homePhoto() {
-    const day = { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
-    const night = null; // e.g. { src: '/static/images/hero/rock-night.jpg', position: 'center 74%' }
-    return (this.isDark() && night) || day;
-  }
-
-  postCover(post) {
-    const src = (this.isDark() && post.coverNight) || post.cover;
-    return src ? { src, position: post.coverPosition || 'center' } : null;
-  }
-
-  // Re-pick the current view's photo (used when the color scheme flips).
-  applyViewPhoto() {
-    if (this.view === 'thought') {
-      const post = this.posts.find(p => p.filename === this.slug);
-      const cover = post && this.postCover(post);
-      if (cover) this.setBannerPhoto(cover.src, cover.position);
-    } else if (this.view === 'home') {
-      const photo = this.homePhoto();
-      this.setBannerPhoto(photo.src, photo.position);
-    }
+    return { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
   }
 
   // Bar-only views don't pick a photo — the condensed bar keeps showing
@@ -511,7 +483,7 @@ class Site {
       </a>
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
-    this.preloadImages(this.posts.flatMap(p => [p.cover, p.coverNight]));
+    this.preloadImages(this.posts.map(p => p.cover));
 
     list.querySelectorAll('.thought-row').forEach(item => {
       // Hovering a row fades the bar to that post's cover — and it sticks,
@@ -519,8 +491,9 @@ class Site {
       // the bar just keeps the last cover you previewed.
       item.addEventListener('mouseenter', () => {
         const post = this.posts.find(p => p.filename === item.dataset.post);
-        const cover = post && this.postCover(post);
-        if (cover) this.setBannerPhoto(cover.src, cover.position);
+        if (post && post.cover) {
+          this.setBannerPhoto(post.cover, post.coverPosition || 'center');
+        }
       });
     });
 
@@ -541,9 +514,8 @@ class Site {
     ]);
     this.slug = postId;
 
-    const cover = this.postCover(post);
-    if (cover) {
-      this.setBannerPhoto(cover.src, cover.position);
+    if (post.cover) {
+      this.setBannerPhoto(post.cover, post.coverPosition);
     } else {
       this.holdBannerPhoto();
     }
@@ -780,39 +752,6 @@ class Site {
   // ========================================
   // CONTACT
   // ========================================
-
-  // ========================================
-  // THEME
-  // ========================================
-  //
-  // The inline script in index.html sets data-theme before first paint; the
-  // moon/sun button beside the social icons flips it and the choice sticks
-  // in localStorage. Without a stored choice the site follows the system.
-
-  storedTheme() {
-    try { return localStorage.getItem('theme'); } catch (_) { return null; }
-  }
-
-  isDark() {
-    return document.documentElement.dataset.theme === 'dark';
-  }
-
-  applyTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = theme === 'dark' ? '#151312' : '#fafafa';
-    this.applyViewPhoto();
-  }
-
-  setupThemeToggle() {
-    const btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      const next = this.isDark() ? 'light' : 'dark';
-      try { localStorage.setItem('theme', next); } catch (_) {}
-      this.applyTheme(next);
-    });
-  }
 
   // The email line copies the real address on click and briefly says so.
   setupCopyEmail() {

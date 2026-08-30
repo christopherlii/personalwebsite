@@ -9,7 +9,6 @@
     "description": "My feelings on leaving college, SF, and my many solaces.",
     "cover": "/static/images/blogs/solaces/grad.jpg",
     "coverPosition": "center 72%",
-    "coverNight": "",
     "words": 1218
   },
   {
@@ -22,7 +21,6 @@
     "description": "A letter on poker, autopilot, and folding too often in 2025",
     "cover": "/static/images/blogs/2025_q4/sunset_with_sam.jpg",
     "coverPosition": "",
-    "coverNight": "",
     "words": 1598
   }
 ]
