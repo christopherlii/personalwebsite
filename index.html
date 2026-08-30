@@ -12,6 +12,9 @@
        required even same-origin. -->
   <link rel="preload" as="font" type="font/woff2" href="/static/fonts/fraunces-latin.woff2" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="/static/fonts/instrument-sans-latin.woff2" crossorigin>
+  <!-- The banner photo is a CSS background set by JS, so without this hint it
+       wouldn't start downloading until routing has resolved. -->
+  <link rel="preload" as="image" href="/static/images/hero/rock.jpg" fetchpriority="high">
   <link rel="stylesheet" href="/styles/main.css">
   <script>
     if (window.location.hash && window.location.hash !== '#') {
@@ -28,9 +31,11 @@
       <div class="banner-media" data-layer="0"></div>
       <div class="banner-media" data-layer="1"></div>
       <div class="banner-scrim"></div>
+      <!-- Chrome enters after the content below it, dropping down while the
+           content rises — the page settles rather than loads. -->
       <header class="banner-header">
-        <nav class="breadcrumb" id="breadcrumb"></nav>
-        <div class="social">
+        <nav class="breadcrumb page-entrance entrance-delay-600 entrance-duration-400 entrance-distance-neg-12" id="breadcrumb"><span class="crumb-name">Christopher Li</span></nav>
+        <div class="social page-entrance entrance-delay-720 entrance-duration-400 entrance-distance-neg-12">
           <a href="https://www.instagram.com/christopherrli/" target="_blank" rel="noopener" title="instagram" aria-label="instagram">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
           </a>
@@ -49,63 +54,63 @@
     <div id="home-view" class="view">
       <main class="page page-home">
         <section>
-          <p class="home-title">hi, i'm chris :)</p>
-          <p class="home-text">i'm currently solving fun at <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
-          <p class="home-text">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
+          <p class="home-title page-entrance">hi, i'm chris :)</p>
+          <p class="home-text page-entrance entrance-delay-120">i'm currently solving fun at <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
+          <p class="home-text page-entrance entrance-delay-240">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
         </section>
         <section class="contact">
-          <p class="contact-email">christopherli [at] nyu [dot] edu</p>
+          <p class="contact-email page-entrance entrance-delay-960">christopherli [at] nyu [dot] edu</p>
         </section>
       </main>
     </div>
 
     <!-- Writing list -->
     <div id="thoughts-view" class="view hidden">
-      <div class="page">
-        <div id="thoughts-full-list" class="thoughts-list"></div>
+      <div class="page page-stagger">
+        <div id="thoughts-full-list" class="thoughts-list stagger-children"></div>
       </div>
     </div>
 
     <!-- Article -->
     <div id="thought-view" class="view hidden">
-      <div class="page">
-        <article id="thought-content" class="article"></article>
+      <div class="page page-stagger">
+        <article id="thought-content" class="article stagger-children"></article>
       </div>
     </div>
 
     <!-- Reading list -->
     <div id="reading-view" class="view hidden">
-      <div class="page">
+      <div class="page page-stagger">
         <p class="page-blurb">writings by others that moved me — words i wish i'd found myself.</p>
-        <div id="reading-list" class="reading-list"></div>
+        <div id="reading-list" class="reading-list stagger-children"></div>
       </div>
     </div>
 
     <!-- Projects list -->
     <div id="projects-view" class="view hidden">
-      <div class="page">
+      <div class="page page-stagger">
         <p class="page-blurb">random stuff that i can't stop thinking about until i build it</p>
-        <div id="projects-full-list" class="projects-grid"></div>
+        <div id="projects-full-list" class="projects-grid stagger-children"></div>
       </div>
     </div>
 
     <!-- Project detail -->
     <div id="project-view" class="view hidden">
-      <div class="page">
-        <article id="project-content" class="project-article"></article>
+      <div class="page page-stagger">
+        <article id="project-content" class="project-article stagger-children"></article>
       </div>
     </div>
 
     <!-- Favorites -->
     <div id="solaces-view" class="view hidden">
-      <div class="page">
-        <div id="solaces-list" class="solaces-masonry"></div>
+      <div class="page page-stagger">
+        <div id="solaces-list" class="solaces-masonry stagger-children"></div>
       </div>
     </div>
 
     <!-- Stats (reached by clicking the name on the home page) -->
     <div id="youre-already-here-view" class="view hidden">
-      <div class="page">
+      <div class="page page-stagger stagger-children">
         <h2 class="stats-heading">about me</h2>
         <table class="stats-table">
           <tbody>

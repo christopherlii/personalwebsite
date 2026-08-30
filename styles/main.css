@@ -191,6 +191,87 @@ img {
   to { opacity: 1; transform: none; }
 }
 
+@keyframes viewFade {
+  from { opacity: 0; }
+}
+
+/* ========================================
+   ENTRANCE CHOREOGRAPHY
+   ======================================== */
+
+/* Elements enter one at a time: content first, chrome after. A from-only
+   keyframe with backwards fill means the element holds its start state
+   through the delay, then lands on plain CSS — so hover transitions on
+   opacity/transform keep working once the entrance is done. */
+
+@keyframes entranceIn {
+  from { opacity: 0; transform: translateY(var(--entrance-distance, 12px)); }
+}
+
+.page-entrance {
+  animation: entranceIn var(--entrance-duration, 0.5s) ease-out backwards;
+  animation-delay: var(--entrance-delay, 0s);
+}
+
+.entrance-delay-120 { --entrance-delay: 120ms; }
+.entrance-delay-240 { --entrance-delay: 240ms; }
+.entrance-delay-600 { --entrance-delay: 600ms; }
+.entrance-delay-720 { --entrance-delay: 720ms; }
+.entrance-delay-960 { --entrance-delay: 960ms; }
+.entrance-duration-400 { --entrance-duration: 400ms; }
+.entrance-distance-neg-12 { --entrance-distance: -12px; }
+
+/* Leaving a choreographed view, elements exit in reverse — last in, first
+   out — sinking back the way they came. JS holds the view for ~320ms. */
+
+@keyframes entranceOut {
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+.view.exiting .page-entrance {
+  animation: entranceOut 150ms ease-in forwards;
+  animation-delay: calc((960ms - var(--entrance-delay, 0s)) / 6);
+}
+
+/* List rows cascade in, each child 50ms behind the last. Re-runs whenever a
+   view is re-shown or a list re-renders, because both reset the animation. */
+
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.stagger-children > * {
+  animation: staggerIn 0.3s ease-out backwards;
+}
+
+.stagger-children > :nth-child(2) { animation-delay: 50ms; }
+.stagger-children > :nth-child(3) { animation-delay: 100ms; }
+.stagger-children > :nth-child(4) { animation-delay: 150ms; }
+.stagger-children > :nth-child(5) { animation-delay: 200ms; }
+.stagger-children > :nth-child(6) { animation-delay: 250ms; }
+.stagger-children > :nth-child(7) { animation-delay: 300ms; }
+.stagger-children > :nth-child(8) { animation-delay: 350ms; }
+.stagger-children > :nth-child(9) { animation-delay: 400ms; }
+.stagger-children > :nth-child(10) { animation-delay: 450ms; }
+.stagger-children > :nth-child(11) { animation-delay: 500ms; }
+.stagger-children > :nth-child(12) { animation-delay: 550ms; }
+.stagger-children > :nth-child(13) { animation-delay: 600ms; }
+.stagger-children > :nth-child(14) { animation-delay: 650ms; }
+.stagger-children > :nth-child(15) { animation-delay: 700ms; }
+.stagger-children > :nth-child(16) { animation-delay: 750ms; }
+.stagger-children > :nth-child(17) { animation-delay: 800ms; }
+.stagger-children > :nth-child(18) { animation-delay: 850ms; }
+.stagger-children > :nth-child(19) { animation-delay: 900ms; }
+.stagger-children > :nth-child(20) { animation-delay: 950ms; }
+.stagger-children > :nth-child(n+21) { animation-delay: 1s; }
+
+/* While a hash route is resolving the site is hidden — hold every entrance
+   at its start so the choreography plays once the view is actually visible. */
+html.route-pending .page-entrance,
+html.route-pending .stagger-children > * {
+  animation-play-state: paused;
+}
+
 /* ========================================
    LAYOUT
    ======================================== */
@@ -222,6 +303,14 @@ img {
 
 .page-home {
   padding: 32px var(--page-pad) 0;
+  /* Home's title, paragraphs, and email carry their own entrance — a page-level
+     rise underneath them would double the motion. */
+  animation: none;
+}
+
+/* Pages whose rows cascade in only fade as a frame, for the same reason. */
+.page-stagger {
+  animation-name: viewFade;
 }
 
 /* Covers the strip of page that scrolls past above the floating banner */
@@ -262,6 +351,22 @@ body.no-top-fade .top-fade {
               top var(--banner-ms) var(--banner-ease);
 }
 
+/* Condensed to a bar, the photo gets a touch more tint under the breadcrumb. */
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(8, 12, 18, 0.18);
+  opacity: 0;
+  transition: opacity var(--banner-fade-ms) ease;
+}
+
+.banner.condensed::after {
+  opacity: 1;
+}
+
 
 .banner-spacer {
   height: 0;
@@ -278,12 +383,16 @@ body.no-top-fade .top-fade {
   background-repeat: no-repeat;
   opacity: 0;
   /* Photo swaps run shorter than the banner's 650ms open/collapse — a quick,
-     quiet dissolve for hover previews rather than a slow feature fade. */
-  transition: opacity var(--banner-fade-ms) ease;
+     quiet dissolve for hover previews rather than a slow feature fade. The
+     incoming photo also settles from a slight zoom, for a little depth. */
+  transform: scale(1.06);
+  transition: opacity var(--banner-fade-ms) ease,
+              transform 1200ms cubic-bezier(0.2, 0.6, 0.2, 1);
 }
 
 .banner-media.active {
   opacity: 1;
+  transform: scale(1);
 }
 
 .banner-scrim {
@@ -306,6 +415,7 @@ body.no-top-fade .top-fade {
   top: 0;
   left: 0;
   right: 0;
+  z-index: 1; /* above the condensed tint */
   height: var(--banner-bar);
   display: flex;
   align-items: center;
@@ -427,12 +537,6 @@ body.no-top-fade .top-fade {
 .contact-email {
   font-size: 13px;
   color: var(--fg-muted);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.contact-email.reveal {
-  opacity: 1;
 }
 
 /* ========================================
@@ -777,6 +881,13 @@ body.no-top-fade .top-fade {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 600ms ease;
+}
+
+@media (hover: hover) {
+  .project-card:hover .project-image img {
+    transform: scale(1.04);
+  }
 }
 
 .project-name {
@@ -1084,5 +1195,37 @@ body.no-top-fade .top-fade {
 
   .projects-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================
+   REDUCED MOTION
+   ======================================== */
+
+/* Last so it wins every same-specificity animation above. View opacity fades
+   are kept — it's the translate movement that has to go. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .page,
+  .page-entrance,
+  .stagger-children > *,
+  .view.exiting .page-entrance {
+    animation: none;
+  }
+
+  .banner.animating {
+    transition: none;
+  }
+
+  .banner-media {
+    transform: none;
+    transition: opacity var(--banner-fade-ms) ease;
+  }
+
+  .project-card:hover .project-image img {
+    transform: none;
   }
 }

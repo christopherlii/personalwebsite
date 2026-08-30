@@ -51,6 +51,7 @@ class Site {
       if (this.mobileMq.matches) {
         this.banner.style.height = `${this.bannerFull}px`;
         this.banner.style.top = '';
+        this.banner.classList.remove('condensed');
         if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
         return;
       }
@@ -58,6 +59,7 @@ class Site {
       const h = Math.max(this.bannerBar, target - window.scrollY);
 
       this.banner.style.height = `${h}px`;
+      this.banner.classList.toggle('condensed', h <= this.bannerBar + 1);
       if (this.bannerSpacer) this.bannerSpacer.style.height = `${target - h}px`;
 
       // On an article the bar slides away once it has finished collapsing,
@@ -256,16 +258,6 @@ class Site {
     });
   }
 
-  // Home is a fixed frame now, so the email can't reveal on scroll — fade it
-  // in shortly after the view settles instead.
-  revealContact() {
-    const el = document.querySelector('.contact-email');
-    if (!el) return;
-    el.classList.remove('reveal');
-    clearTimeout(this._contactT);
-    this._contactT = setTimeout(() => el.classList.add('reveal'), 450);
-  }
-
   setupNavigation() {
     document.querySelectorAll('a[href="/"]').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -391,10 +383,14 @@ class Site {
     }
 
     if (currentView && currentView !== targetView) {
-      currentView.classList.add('fade-out');
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // A choreographed view (home) exits in reverse — last element in leaves
+      // first — which needs a longer hold than the plain fade.
+      const reverseExit = currentView.querySelector('.page-entrance') &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      currentView.classList.add(reverseExit ? 'exiting' : 'fade-out');
+      await new Promise(resolve => setTimeout(resolve, reverseExit ? 320 : 150));
       currentView.classList.add('hidden');
-      currentView.classList.remove('fade-out');
+      currentView.classList.remove('fade-out', 'exiting');
     }
 
     if (targetView) {
@@ -446,7 +442,6 @@ class Site {
     const photo = this.homePhoto();
     this.setBannerPhoto(photo.src, photo.position);
     this.renderBreadcrumb(null, null);
-    this.revealContact();
     history.pushState(null, '', '/');
   }
 
