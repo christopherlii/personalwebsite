@@ -19,8 +19,11 @@ class Site {
     this.setupScrollLock();
     this.setupBanner();
     this.setupCopyEmail();
-    // Photos can carry a night variant — swap when the scheme flips.
-    this.darkMq.addEventListener('change', () => this.applyViewPhoto());
+    this.setupThemeToggle();
+    // Follow the system scheme unless the toggle has stored an override.
+    this.darkMq.addEventListener('change', () => {
+      if (!this.storedTheme()) this.applyTheme(this.darkMq.matches ? 'dark' : 'light');
+    });
   }
 
   // ========================================
@@ -456,11 +459,11 @@ class Site {
   homePhoto() {
     const day = { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
     const night = null; // e.g. { src: '/static/images/hero/rock-night.jpg', position: 'center 74%' }
-    return (this.darkMq.matches && night) || day;
+    return (this.isDark() && night) || day;
   }
 
   postCover(post) {
-    const src = (this.darkMq.matches && post.coverNight) || post.cover;
+    const src = (this.isDark() && post.coverNight) || post.cover;
     return src ? { src, position: post.coverPosition || 'center' } : null;
   }
 
@@ -777,6 +780,39 @@ class Site {
   // ========================================
   // CONTACT
   // ========================================
+
+  // ========================================
+  // THEME
+  // ========================================
+  //
+  // The inline script in index.html sets data-theme before first paint; the
+  // moon/sun button beside the social icons flips it and the choice sticks
+  // in localStorage. Without a stored choice the site follows the system.
+
+  storedTheme() {
+    try { return localStorage.getItem('theme'); } catch (_) { return null; }
+  }
+
+  isDark() {
+    return document.documentElement.dataset.theme === 'dark';
+  }
+
+  applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === 'dark' ? '#151312' : '#fafafa';
+    this.applyViewPhoto();
+  }
+
+  setupThemeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const next = this.isDark() ? 'light' : 'dark';
+      try { localStorage.setItem('theme', next); } catch (_) {}
+      this.applyTheme(next);
+    });
+  }
 
   // The email line copies the real address on click and briefly says so.
   setupCopyEmail() {

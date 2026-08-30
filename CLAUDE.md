@@ -48,7 +48,7 @@ All content is data-driven via JSON index files and markdown:
 - Type scale: 30px Fraunces page titles, 20px h2, 17px h3, 14px body copy, 13px meta, 14px captions in `--fg-muted`
 - Column is 640px wide (`--col`) with 24px gutters; figures use an 8px radius
 - Home uses `/static/images/hero/rock.jpg` as its banner photo; articles use their own `cover`. Dark mode prefers night photo variants when they exist (`homePhoto()`/`postCover()` in the renderer, `coverNight` front matter) and falls back to the day photo
-- Dark mode is a token swap in `main.css` (`prefers-color-scheme: dark` over the `:root` variables); keep new colors behind variables so both themes stay in sync
+- Dark mode is a token swap in `main.css` keyed on `html[data-theme="dark"]`; an inline head script sets it before first paint (stored toggle choice in localStorage, else the system scheme), and the moon/sun button beside the social icons flips it. Keep new colors behind variables so both themes stay in sync
 - The site uses a warm, minimal aesthetic with subtle animations (view fade-in, banner collapse, photo shuffle)
 - First-paint choreography is pure CSS: the page settles top to bottom via `.page-entrance` + `entrance-*` utility classes (banner chrome first, then home content), list views cascade rows via `.stagger-children` (50ms per child). Both respect `prefers-reduced-motion`. Fraunces/Instrument Sans have metric-matched local fallbacks (`size-adjust` etc.) so the font swap doesn't reflow
 - Lowercase writing style throughout the site content, post prose included: sentence starts and the pronoun "i" are lowercase, proper nouns (Bobst, New York, NYU, LinkedIn) keep their capitals
