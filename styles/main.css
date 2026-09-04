@@ -28,7 +28,8 @@
   --banner-top: 44px;
   --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
   --banner-ms: 650ms;
-  --banner-fade-ms: 350ms;
+  --banner-fade-ms: 700ms;
+  --chrome-ms: 300ms;
 
   --code-bg: rgba(0, 0, 0, 0.06);
   --card-bg: var(--bg);
@@ -358,14 +359,35 @@ body.no-top-fade .top-fade {
   margin-top: var(--banner-top);
   border-radius: 0;
   overflow: hidden;
-  background: var(--accent);
+  /* Page-colored backing, so the frame before an image paints — and the
+     surround mid-morph — shows nothing rather than flashing a panel color. */
+  background: var(--bg);
   box-shadow: 0 6px 20px rgba(10, 20, 30, 0.14);
+  transition: box-shadow var(--banner-fade-ms) ease;
+}
+
+/* Drawn mode: the image is a torn-paper card inset below the chrome instead
+   of a full-bleed photo behind it. Home stays full-bleed. */
+.banner.drawn {
+  box-shadow: none;
+}
+
+/* The panel shadow belongs to a full-bleed photo owning the frame. While the
+   active layer is a card or is still behind a travelling window, a full-box
+   shadow would outline an empty rectangle that the photo is only part-way
+   through filling. */
+.banner:has(.banner-media.active.card),
+.banner:has(.banner-media.active.cropped),
+.banner:has(.banner-media.active.beyond),
+.banner:has(.banner-media.active.travelling) {
+  box-shadow: none;
 }
 
 /* Only while navigating — during a scroll the height tracks scrollY directly. */
 .banner.animating {
   transition: height var(--banner-ms) var(--banner-ease),
-              top var(--banner-ms) var(--banner-ease);
+              top var(--banner-ms) var(--banner-ease),
+              box-shadow var(--banner-fade-ms) ease;
 }
 
 /* Condensed to a bar, the photo gets a touch more tint under the breadcrumb. */
@@ -380,10 +402,9 @@ body.no-top-fade .top-fade {
   transition: opacity var(--banner-fade-ms) ease;
 }
 
-.banner.condensed::after {
+.banner.condensed:not(.drawn)::after {
   opacity: 1;
 }
-
 
 .banner-spacer {
   height: 0;
@@ -399,17 +420,65 @@ body.no-top-fade .top-fade {
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0;
-  /* Photo swaps run shorter than the banner's 650ms open/collapse — a quick,
-     quiet dissolve for hover previews rather than a slow feature fade. The
-     incoming photo also settles from a slight zoom, for a little depth. */
-  transform: scale(1.06);
+  /* Swaps are a plain dissolve, shorter than the banner's 650ms open/collapse.
+     No zoom-settle: a scale transform would scale the torn mask edge with it
+     (a paper cutout shouldn't zoom), and would drift the pinned figure during
+     the home<->writing fade. */
+  /* The torn-paper mask is always attached but oversized, so its ragged ring
+     sits outside the box and full-bleed layers render untouched; a .card
+     layer shrinks it to 100% and the tear appears. */
+  -webkit-mask-image: url(/static/images/deckle-mask.png);
+  mask-image: url(/static/images/deckle-mask.png);
+  -webkit-mask-size: 118% 124%;
+  mask-size: 118% 124%;
+  -webkit-mask-position: center center;
+  mask-position: center center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
   transition: opacity var(--banner-fade-ms) ease,
-              transform 1200ms cubic-bezier(0.2, 0.6, 0.2, 1);
+              -webkit-mask-size var(--banner-fade-ms) ease,
+              mask-size var(--banner-fade-ms) ease,
+              -webkit-mask-position var(--banner-fade-ms) ease,
+              mask-position var(--banner-fade-ms) ease;
+}
+
+/* The home<->writing gesture is a CROP, not a zoom: layer boxes never
+   animate (cover would rescale the image with them). Instead the torn mask
+   is the moving window — .cropped shrinks a full-bleed layer's mask to
+   exactly the card rect. Outgoing photo gains it (window closes in around
+   the pinned figure while the drawing resolves inside); an incoming photo
+   is born with it and sheds it as it fades in (window opens back up). */
+.banner-media.cropped {
+  -webkit-mask-size: calc(100% - var(--page-pad) * 2) calc(100% - var(--banner-bar) - 18px);
+  mask-size: calc(100% - var(--page-pad) * 2) calc(100% - var(--banner-bar) - 18px);
+  -webkit-mask-position: var(--page-pad) var(--banner-bar);
+  mask-position: var(--page-pad) var(--banner-bar);
+}
+
+/* Mask pushed past the frame with per-edge overhang PROPORTIONAL to that
+   edge's card inset (x1.7: top 102 / bottom 31 / sides 48px — also clears
+   the ~26px tear). Interpolating between this and .cropped is pure px per
+   edge, so during a travel all four edges cross the frame boundary at the
+   same moment (t=0.63 closing, t=0.37 opening) — tears sweep in or out
+   together, never popping in at the boundary or parking on it. */
+.banner-media.beyond {
+  -webkit-mask-size: calc(100% + 96px) calc(100% + 133px);
+  mask-size: calc(100% + 96px) calc(100% + 133px);
+  -webkit-mask-position: -48px -102px;
+  mask-position: -48px -102px;
+}
+
+.banner-media.card {
+  bottom: 18px;
+  left: var(--page-pad);
+  width: calc(100% - var(--page-pad) * 2);
+  height: calc(100% - var(--banner-bar) - 18px);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 .banner-media.active {
   opacity: 1;
-  transform: scale(1);
 }
 
 .banner-scrim {
@@ -425,6 +494,39 @@ body.no-top-fade .top-fade {
     rgba(8, 12, 18, 0.38) 60px,
     rgba(8, 12, 18, 0) 140px
   );
+  opacity: 0;
+  transition: opacity var(--banner-fade-ms) ease;
+}
+
+/* Only over an actual photo — on the bare page-colored banner (first beat
+   before the image paints) a dark gradient would be its own flash. */
+.banner-media.active ~ .banner-scrim {
+  opacity: 1;
+}
+
+/* Same rule as the panel shadow: no scrim until the photo owns the frame —
+   a gradient over the still-opening window outlines the empty box. */
+.banner:has(.banner-media.active.card) .banner-scrim,
+.banner:has(.banner-media.active.cropped) .banner-scrim,
+.banner:has(.banner-media.active.beyond) .banner-scrim,
+.banner:has(.banner-media.active.travelling) .banner-scrim {
+  opacity: 0;
+}
+
+.banner.drawn .banner-scrim {
+  opacity: 0;
+}
+
+/* Hover head start: pointing at a link into a drawn view begins dropping the
+   scrim and text-shadow early, so the click transition never shows the
+   shadow's outline moving. Hover away and they settle back. */
+.banner.unshadow .banner-scrim {
+  opacity: 0;
+  transition-duration: 400ms;
+}
+
+.banner.unshadow .banner-header {
+  text-shadow: none;
 }
 
 .banner-header {
@@ -440,6 +542,21 @@ body.no-top-fade .top-fade {
   padding: 0 20px;
   color: #fff;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  /* The text is ONE component: it only ever changes appearance while faded
+     out (.swapping), so color/padding never animate on screen. text-shadow
+     is the exception — the hover head start (.unshadow) fades it in place. */
+  transition: opacity var(--chrome-ms) ease,
+              text-shadow 400ms ease;
+}
+
+.banner-header.swapping {
+  opacity: 0;
+}
+
+.banner.ink .banner-header {
+  padding: 0 var(--page-pad);
+  color: var(--fg);
+  text-shadow: none;
 }
 
 /* Breadcrumb */
@@ -455,12 +572,58 @@ body.no-top-fade .top-fade {
 }
 
 .breadcrumb .crumb-name {
+  position: relative;
+  z-index: 1;
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 500;
   color: #fff;
   cursor: pointer;
   transition: opacity 0.25s ease;
+}
+
+/* The tail (/ section / page) is the only part rebuilt on navigation; it
+   slides out rightward from behind the persistent name. */
+.crumb-tail {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@keyframes crumbTailIn {
+  from { opacity: 0; transform: translateX(-14px); }
+}
+
+/* Each crumb is its own segment: staying segments never move, a removed one
+   slides back underneath its predecessor, an added one slides out from
+   behind it. z-index steps down along the path so earlier crumbs occlude
+   later ones during the overlap. */
+.crumb-seg {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.crumb-seg.seg-in {
+  animation: crumbTailIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+@keyframes crumbSegOut {
+  to { opacity: 0; transform: translateX(-14px); }
+}
+
+.crumb-seg.seg-out {
+  animation: crumbSegOut 350ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crumb-seg.seg-in { animation: none; }
+  .crumb-seg.seg-out { animation: none; opacity: 0; }
 }
 
 .breadcrumb .crumb-sep {
@@ -480,11 +643,20 @@ body.no-top-fade .top-fade {
   text-overflow: ellipsis;
 }
 
+.banner.ink .crumb-name,
+.banner.ink .crumb-link {
+  color: var(--fg);
+}
+
+.banner.ink .crumb-sep,
+.banner.ink .crumb-current {
+  color: var(--fg-muted);
+}
+
 @media (hover: hover) {
   .breadcrumb .crumb-name:hover,
   .breadcrumb .crumb-link:hover {
     opacity: 0.6;
-    color: #fff;
   }
 }
 
@@ -505,11 +677,15 @@ body.no-top-fade .top-fade {
   justify-content: center;
   border-radius: 7px;
   color: #fff;
+  transition: opacity 0.25s ease;
+}
+
+.banner.ink .social a {
+  color: var(--fg);
 }
 
 @media (hover: hover) {
   .social a:hover {
-    color: #fff;
     opacity: 0.6;
   }
 }
@@ -1060,18 +1236,6 @@ body.no-top-fade .top-fade {
 @media (hover: hover) {
   .solaces-item a:hover {
     color: var(--fg);
-    opacity: 0.6;
-  }
-}
-
-.solaces-item-hero {
-  cursor: pointer;
-  border-bottom: 1px solid var(--border);
-  transition: opacity 0.25s ease;
-}
-
-@media (hover: hover) {
-  .solaces-item-hero:hover {
     opacity: 0.6;
   }
 }

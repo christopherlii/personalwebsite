@@ -24,10 +24,11 @@ class Site {
   // BANNER
   // ========================================
   //
-  // One sticky banner sits above every view. On home and article pages it
-  // opens to --banner-height and shrinks with the scroll; everywhere else it
-  // stays a --banner-bar strip. Articles show their own cover, everything
-  // else shows the home photo.
+  // One sticky banner sits above every view. It opens to --banner-height and
+  // shrinks with the scroll, so the height tracks how far you have read rather
+  // than which view you are on. Stats is the exception — a dense data page,
+  // not something you read or browse, so it stays a --banner-bar strip.
+  // Articles show their own cover in the same card frame; home is the photo.
 
   setupBanner() {
     this.mobileMq = window.matchMedia('(max-width: 640px)');
@@ -42,9 +43,7 @@ class Site {
 
     this.updateBanner = () => {
       if (!this.banner) return;
-      const target = this.view === 'home' || this.view === 'thought' || this.view === 'solaces'
-        ? this.bannerFull
-        : this.bannerBar;
+      const target = this.view === 'stats' ? this.bannerBar : this.bannerFull;
 
       // Phones: the banner never condenses — it stays a full hero on every
       // view (scrolling away natively), so navigation never animates height;
@@ -57,17 +56,23 @@ class Site {
         return;
       }
 
+      // Articles: the cover does not condense — the banner rides away at
+      // full height with the scroll, like any other content, and long posts
+      // get the full column back.
+      if (this.view === 'thought') {
+        this.banner.style.height = `${target}px`;
+        this.banner.classList.remove('condensed');
+        if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
+        this.banner.style.top = `${this.bannerTop - window.scrollY}px`;
+        return;
+      }
+
       const h = Math.max(this.bannerBar, target - window.scrollY);
 
       this.banner.style.height = `${h}px`;
       this.banner.classList.toggle('condensed', h <= this.bannerBar + 1);
       if (this.bannerSpacer) this.bannerSpacer.style.height = `${target - h}px`;
-
-      // On an article the bar slides away once it has finished collapsing,
-      // so long posts get the full column back.
-      const past = Math.max(0, window.scrollY - (target - this.bannerBar));
-      const top = this.view === 'thought' ? this.bannerTop - past : this.bannerTop;
-      this.banner.style.top = `${top}px`;
+      this.banner.style.top = `${this.bannerTop}px`;
     };
 
     this.onBannerResize = () => {
@@ -77,6 +82,20 @@ class Site {
 
     window.addEventListener('scroll', this.updateBanner, { passive: true });
     window.addEventListener('resize', this.onBannerResize);
+
+    // Hovering a link into a drawn view drops the photo chrome's shadows
+    // early — a head start, so the navigation itself has less to change.
+    const drawnHashes = new Set(['#thoughts', '#projects', '#reading']);
+    const linkOf = e => e.target.closest && e.target.closest('a[href^="#"]');
+    document.addEventListener('mouseover', e => {
+      const a = linkOf(e);
+      if (!a || !this.banner || this.banner.classList.contains('drawn')) return;
+      if (drawnHashes.has(a.getAttribute('href'))) this.banner.classList.add('unshadow');
+    });
+    document.addEventListener('mouseout', e => {
+      if (linkOf(e) && this.banner) this.banner.classList.remove('unshadow');
+    });
+
     this.updateBanner();
   }
 
@@ -114,33 +133,125 @@ class Site {
     this.bannerBar = parseInt(s.getPropertyValue('--banner-bar'), 10) || 60;
     this.bannerTop = parseInt(s.getPropertyValue('--banner-top'), 10) || 44;
     this.bannerMs = parseInt(s.getPropertyValue('--banner-ms'), 10) || 650;
+    this.bannerFadeMs = parseInt(s.getPropertyValue('--banner-fade-ms'), 10) || 500;
+    this.chromeMs = parseInt(s.getPropertyValue('--chrome-ms'), 10) || 300;
   }
 
   // Two stacked layers so a photo change cross-fades instead of cutting.
   // The swap waits for the image to decode, so the incoming layer never
   // fades in as the bare navy background while the photo downloads.
-  setBannerPhoto(src, position) {
+  // frame: 'full' (photo, full-bleed) | 'window' (the drawn hero twin,
+  // full-bleed behind the travelling torn window) | 'card' (article covers,
+  // boxed card). Determines layer geometry and which transition runs.
+  setBannerPhoto(src, position, frame) {
     if (!this.bannerLayers || this.bannerLayers.length < 2) return;
     const pos = position || 'center';
-    if (this.bannerPhoto && this.bannerPhoto.src === src && this.bannerPhoto.position === pos) {
+    if (this.bannerPhoto && this.bannerPhoto.src === src && this.bannerPhoto.position === pos &&
+        (frame || 'full') === this.bannerFrame) {
+      this.applyBannerMode();
       return;
     }
     this.bannerPhoto = { src, position: pos };
+    this.bannerFrame = frame || 'full';
 
     const swap = () => {
       // A later request may have superseded this one while it decoded.
       if (this.bannerPhoto.src !== src || this.bannerPhoto.position !== pos) return;
 
+      const stale = () => this.bannerPhoto.src !== src || this.bannerPhoto.position !== pos;
+      const wasDrawn = this.banner && this.banner.classList.contains('drawn');
+      const drawn = this.bannerMode === 'drawn';
       const current = this.bannerLayers[this.activeLayer];
       const next = this.bannerLayers[1 - this.activeLayer];
+      const showing = !!current.style.backgroundImage;
+      const frame = this.bannerFrame || (drawn ? 'window' : 'full');
+      const curFrame = current.classList.contains('card') ? 'card'
+        : current.classList.contains('cropped') ? 'window' : 'full';
+      // ONE travelling window, shared by both layers, with the dissolve
+      // happening inside it — two windows moving separately shows two torn
+      // outlines at once.
+      const travelIn = drawn && !wasDrawn && showing && frame === 'window';
+      const travelOut = !drawn && wasDrawn && showing;
 
-      next.style.backgroundImage = `url("${src}")`;
-      next.style.backgroundPosition = pos;
-      next.offsetHeight; // commit the new image before flipping opacity
-      next.classList.add('active');
-      current.classList.remove('active');
+      const run = () => {
+        if (stale()) return;
+        clearTimeout(this._bannerSettleT);
 
-      this.activeLayer = 1 - this.activeLayer;
+        // Hard-reset the incoming layer while invisible — kills any state left
+        // by rapid navigation before it can flash.
+        next.style.transition = 'none';
+        next.classList.remove('active');
+        next.classList.remove('travelling');
+        next.classList.toggle('card', frame === 'card');
+        // Start states: travelling-in windows begin beyond the frame;
+        // travelling-out photos begin behind the closed window; resting
+        // window frames sit at the closed window permanently.
+        next.classList.toggle('beyond', travelIn);
+        next.classList.toggle('cropped', travelOut || (frame === 'window' && !travelIn));
+        next.style.backgroundImage = `url("${src}")`;
+        next.style.backgroundPosition = pos;
+        next.style.zIndex = '1';
+        current.style.zIndex = '0';
+        next.offsetHeight; // commit image and start state
+        next.style.transition = '';
+
+        // The photo component changes as one beat: image, window, scrim,
+        // and panel shadow all ride .drawn from this same frame.
+        this.applyBannerMode();
+        next.classList.add('active');
+        if (travelIn) {
+          // Both layers' windows sweep in from beyond the frame in lockstep —
+          // identical masks every frame, one tear, with the photo dissolving
+          // into its aligned twin inside it.
+          current.style.transition = 'none';
+          current.classList.add('beyond');
+          current.offsetHeight;
+          current.style.transition = '';
+          current.classList.remove('beyond');
+          current.classList.add('cropped');
+          next.classList.remove('beyond');
+          next.classList.add('cropped');
+        }
+        if (travelOut) {
+          // Both windows open from the card rect straight PAST the frame to
+          // the oversized rest mask — one motion. Stopping at the boundary
+          // parks a complete torn ring just inside the frame (the visible
+          // "outline"). 'travelling' is a pure marker keeping the scrim and
+          // panel shadow gated until the photo owns the frame.
+          next.classList.remove('cropped');
+          next.classList.add('beyond');
+          next.classList.add('travelling');
+          if (curFrame === 'window') {
+            current.classList.remove('cropped');
+            current.classList.add('beyond');
+          }
+        }
+
+        // Retire the covered layer once the fade has fully occluded it —
+        // instantly and with transitions off, so the mask reset can't ghost
+        // into the margins.
+        this._bannerSettleT = setTimeout(() => {
+          if (stale()) return;
+          // Photo owns the frame — release the dressing gate. .beyond and
+          // the rest mask are both fully off-frame, so this swap is invisible.
+          next.style.transition = 'none';
+          next.classList.remove('beyond');
+          next.classList.remove('travelling');
+          next.offsetHeight;
+          next.style.transition = '';
+          current.style.transition = 'none';
+          current.classList.remove('active');
+          current.classList.remove('cropped');
+          current.classList.remove('beyond');
+          current.classList.remove('travelling');
+          current.offsetHeight;
+          current.style.transition = '';
+        }, this.bannerFadeMs + 60);
+
+        this.activeLayer = 1 - this.activeLayer;
+      };
+
+      run();
     };
 
     // Gate on the load event only — decode() looks tempting but never
@@ -184,44 +295,38 @@ class Site {
   // on the home page itself, where it opens the stats page.
   renderBreadcrumb(section, detail) {
     if (!this.breadcrumbEl) return;
-    const parts = ['<span class="crumb-name" data-nav="name">Christopher Li</span>'];
+    // The name node persists across navigations so its color change rides
+    // the same 350ms transition as the social icons — a rebuilt node would
+    // snap to the new color. Only the tail is replaced.
+    if (!this.crumbTailEl) {
+      this.breadcrumbEl.innerHTML =
+        '<span class="crumb-name">Christopher Li</span><span class="crumb-tail"></span>';
+      this.breadcrumbEl.querySelector('.crumb-name').addEventListener('click', () => {
+        if (this.view === 'home') this.showStats();
+        else this.showHome();
+      });
+      this.crumbTailEl = this.breadcrumbEl.querySelector('.crumb-tail');
+      this._crumbSegs = [];
+    }
+    const segs = [];
     if (section) {
-      parts.push('<span class="crumb-sep">/</span>');
-      parts.push(`<a class="crumb-link" href="#${section.hash}">${section.label}</a>`);
+      segs.push({
+        key: 'section:' + section.hash,
+        html: `<span class="crumb-sep">/</span><a class="crumb-link" href="#${section.hash}">${section.label}</a>`
+      });
     }
     if (detail) {
-      parts.push('<span class="crumb-sep">/</span>');
-      parts.push(`<span class="crumb-current">${detail}</span>`);
-    }
-    this.breadcrumbEl.innerHTML = parts.join('');
-
-    // Hovering the name previews the home photo, same sticky fade as the
-    // writing-list rows — but only on fixed-frame pages where the banner sits
-    // condensed to the bar. Expanded heroes, articles, and any page that
-    // scrolls are left alone.
-    const nameEl = this.breadcrumbEl.querySelector('.crumb-name');
-    if (nameEl) {
-      nameEl.addEventListener('mouseenter', () => {
-        const condensed = this.banner && this.banner.offsetHeight <= this.bannerBar + 2;
-        const fixedFrame = document.documentElement.classList.contains('no-scroll');
-        if (condensed && fixedFrame) {
-          const photo = this.homePhoto();
-          this.setBannerPhoto(photo.src, photo.position);
-        }
+      segs.push({
+        key: 'detail:' + detail,
+        html: `<span class="crumb-sep">/</span><span class="crumb-current">${detail}</span>`
       });
     }
-
-    this.breadcrumbEl.querySelectorAll('[data-nav]').forEach(el => {
-      el.addEventListener('click', () => {
-        const nav = el.dataset.nav;
-        if (nav === 'name') {
-          if (this.view === 'home') this.showStats();
-          else this.showHome();
-        } else {
-          window.location.hash = nav;
-        }
-      });
-    });
+    if (this._chromeSwapping) {
+      // A text swap is in flight — the tail lands inside it, invisibly.
+      this._pendingTailSegs = segs;
+      return;
+    }
+    this.applyTailSegs(segs, true);
   }
 
   // ========================================
@@ -451,28 +556,130 @@ class Site {
     return { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
   }
 
-  // Bar-only views don't pick a photo — the condensed bar keeps showing
-  // whatever hero you just came from, so the collapse reads as that photo
-  // condensing. The held photo is also what hover previews restore to.
-  holdBannerPhoto() {
-    if (!this.bannerPhoto) {
-      const photo = this.homePhoto();
-      this.setBannerPhoto(photo.src, photo.position);
+  // 'photo' is the original full-bleed hero (home, article covers); 'drawn'
+  // insets the image below the chrome as a torn-paper card. Only records the
+  // request — the chrome class and the incoming layer's geometry are applied
+  // inside the photo swap, so chrome colors, frame, and image all change on
+  // the same frame, however long the image takes to decode.
+  setBannerMode(mode) {
+    const boundary = this.banner && this.bannerPhoto &&
+      (mode === 'drawn') !== this.banner.classList.contains('drawn');
+    this.bannerMode = mode;
+    if (boundary) {
+      // Crossing the photo/drawn boundary, the text runs as its own single
+      // component: out in the old outfit, restyle invisibly, back in the
+      // new one. Going home it holds until the photo has mostly arrived.
+      const hold = mode === 'drawn'
+        ? 0
+        : Math.max(0, Math.round(this.bannerFadeMs * 0.65) - this.chromeMs);
+      this.swapChrome(hold);
     }
-    this.heldPhoto = { ...this.bannerPhoto };
+  }
+
+  applyBannerMode() {
+    if (!this.banner) return;
+    this.banner.classList.remove('unshadow'); // the head start is over either way
+    this.banner.classList.toggle('drawn', this.bannerMode === 'drawn');
+    // Outside a text swap (cold loads, same-image mode syncs), the text
+    // outfit just follows the mode.
+    if (!this._chromeSwapping) {
+      this.banner.classList.toggle('ink', this.bannerMode === 'drawn');
+    }
+  }
+
+  // The whole header (name, tail, icons) fades out, changes outfit and tail
+  // while invisible, and fades back in with the tail sliding from behind the
+  // name. All text change lives in this one gesture.
+  swapChrome(holdMs) {
+    const header = this.banner && this.banner.querySelector('.banner-header');
+    if (!header) return;
+    clearTimeout(this._chromeOutT);
+    clearTimeout(this._chromeInT);
+    this._chromeSwapping = true;
+    header.classList.add('swapping');
+    this._chromeOutT = setTimeout(() => {
+      this.banner.classList.toggle('ink', this.bannerMode === 'drawn');
+      if (this._pendingTailSegs) {
+        this.applyTailSegs(this._pendingTailSegs, false);
+        this._pendingTailSegs = null;
+      }
+      this._chromeInT = setTimeout(() => {
+        this._chromeSwapping = false;
+        header.classList.remove('swapping');
+        // The rebuilt tail slides out as one piece with the header's return.
+        (this._crumbSegs || []).forEach(seg => {
+          seg.el.classList.remove('seg-in');
+          void seg.el.offsetWidth;
+          seg.el.classList.add('seg-in');
+        });
+      }, holdMs);
+    }, this.chromeMs);
+  }
+
+  // The tail changes incrementally: segments already in place stay put; a
+  // removed segment slides back underneath what precedes it; an added one
+  // slides out from behind it. Only the differing suffix ever moves.
+  applyTailSegs(segs, animate) {
+    const cur = this._crumbSegs || [];
+    let k = 0;
+    while (k < cur.length && k < segs.length && cur[k].key === segs[k].key) k++;
+    if (k === cur.length && k === segs.length) return;
+    for (let i = cur.length - 1; i >= k; i--) {
+      const el = cur[i].el;
+      if (animate) {
+        // Freeze it out of the flow so a replacement takes its spot at once,
+        // then let it slide under its predecessor and fade.
+        el.style.left = `${el.offsetLeft}px`;
+        el.style.top = `${el.offsetTop}px`;
+        el.style.position = 'absolute';
+        el.classList.add('seg-out');
+        setTimeout(() => el.remove(), 400);
+      } else {
+        el.remove();
+      }
+    }
+    const next = cur.slice(0, k);
+    for (let i = k; i < segs.length; i++) {
+      const el = document.createElement('span');
+      el.className = 'crumb-seg';
+      el.style.zIndex = String(30 - i); // earlier crumbs occlude later ones
+      el.innerHTML = segs[i].html;
+      this.crumbTailEl.appendChild(el);
+      if (animate) el.classList.add('seg-in');
+      next.push({ key: segs[i].key, el });
+    }
+    this._crumbSegs = next;
+  }
+
+  // The painting as rock.jpg's TWIN (baked by .context/bake_hero_card.py):
+  // same aspect and anchor, so under identical cover math the two images
+  // align at every window width. Shown behind the travelling torn window
+  // (.cropped), never as a separate box.
+  drawnPhoto() {
+    return { src: '/static/images/hero/rock-drawn-hero.jpg', position: 'center 74%' };
+  }
+
+  // Home is the photograph, full-bleed. Every other view without a cover of
+  // its own is the drawing, as a card.
+  showDrawnHero() {
+    this.setBannerMode('drawn');
+    const photo = this.drawnPhoto();
+    this.setBannerPhoto(photo.src, photo.position, 'window');
   }
 
   async showHome() {
     await this.fadeToView('home-view', 'home');
     const photo = this.homePhoto();
-    this.setBannerPhoto(photo.src, photo.position);
+    this.setBannerMode('photo');
+    this.setBannerPhoto(photo.src, photo.position, 'full');
+    this.preloadImages([this.drawnPhoto().src]);
     this.renderBreadcrumb(null, null);
     this.syncUrl('/');
   }
 
   async showThoughtsList() {
     await this.fadeToView('thoughts-view', 'thoughts');
-    this.holdBannerPhoto();
+    this.showDrawnHero();
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null);
 
     const list = document.getElementById('thoughts-full-list');
@@ -484,18 +691,6 @@ class Site {
     `).join('') || '<p class="empty-note">no thoughts yet.</p>';
 
     this.preloadImages(this.posts.map(p => p.cover));
-
-    list.querySelectorAll('.thought-row').forEach(item => {
-      // Hovering a row fades the bar to that post's cover — and it sticks,
-      // so clicking expands the photo already showing. No restore on leave;
-      // the bar just keeps the last cover you previewed.
-      item.addEventListener('mouseenter', () => {
-        const post = this.posts.find(p => p.filename === item.dataset.post);
-        if (post && post.cover) {
-          this.setBannerPhoto(post.cover, post.coverPosition || 'center');
-        }
-      });
-    });
 
     this.syncUrl('#thoughts');
   }
@@ -515,9 +710,11 @@ class Site {
     this.slug = postId;
 
     if (post.cover) {
-      this.setBannerPhoto(post.cover, post.coverPosition);
+      // Covers use the same card frame as the writing page.
+      this.setBannerMode('drawn');
+      this.setBannerPhoto(post.cover, post.coverPosition, 'card');
     } else {
-      this.holdBannerPhoto();
+      this.showDrawnHero();
     }
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
 
@@ -567,7 +764,7 @@ class Site {
 
   async showProjectsList() {
     await this.fadeToView('projects-view', 'projects');
-    this.holdBannerPhoto();
+    this.showDrawnHero();
     this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
 
     const grid = document.getElementById('projects-full-list');
@@ -593,7 +790,7 @@ class Site {
     if (!project) return this.showProjectsList();
 
     await this.fadeToView('project-view', 'project');
-    this.holdBannerPhoto();
+    this.showDrawnHero();
     this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, project.name);
 
     let bodyHtml = '';
@@ -643,7 +840,7 @@ class Site {
 
   async showReadingList() {
     await this.fadeToView('reading-view', 'reading');
-    this.holdBannerPhoto();
+    this.showDrawnHero();
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, 'reading');
 
     const list = document.getElementById('reading-list');
@@ -665,7 +862,12 @@ class Site {
 
   async showSolacesList() {
     await this.fadeToView('solaces-view', 'solaces');
-    this.holdBannerPhoto();
+    // Favorites keeps the photograph — no drawn treatment here.
+    this.setBannerMode('photo');
+    {
+      const photo = this.homePhoto();
+      this.setBannerPhoto(photo.src, photo.position);
+    }
     this.renderBreadcrumb({ label: 'favorites', hash: 'favorites' }, null);
 
     const container = document.getElementById('solaces-list');
@@ -679,24 +881,11 @@ class Site {
             if (item.url) {
               return `<span class="solaces-item"><a href="${item.url}" target="_blank" rel="noopener">${item.name}</a></span>`;
             }
-            if (item.previewImage) {
-              return `<span class="solaces-item"><span class="solaces-item-hero" data-preview-img="${item.previewImage}">${item.name}</span></span>`;
-            }
             return `<span class="solaces-item">${item.name}</span>`;
           }).join('')}
         </div>
       </div>
     `).join('') || '<p class="empty-note">nothing here yet.</p>';
-
-    this.preloadImages(this.solaces.flatMap(c => c.items.map(i => i.previewImage)));
-
-    // Clicking a favorite fades its image into the expanded hero, and it
-    // stays until another one is picked.
-    container.querySelectorAll('.solaces-item-hero').forEach(el => {
-      el.addEventListener('click', () => {
-        this.setBannerPhoto(el.dataset.previewImg, 'center');
-      });
-    });
 
     this.syncUrl('#favorites');
   }
@@ -707,7 +896,13 @@ class Site {
 
   async showStats() {
     await this.fadeToView('youre-already-here-view', 'stats');
-    this.holdBannerPhoto();
+    // Stats is a 60px bar — no room for the card, so it keeps the condensed
+    // photo strip.
+    this.setBannerMode('photo');
+    {
+      const photo = this.homePhoto();
+      this.setBannerPhoto(photo.src, photo.position);
+    }
     this.renderBreadcrumb(null, 'stats');
     this.startAgeCounter();
     this.updateJsLines();
@@ -821,6 +1016,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     site.loadReading(),
     site.loadSolaces()
   ]);
+
+  // Warm every banner image up front — swaps gate on load, so anything not
+  // already in cache would give the transition a visible loading beat.
+  site.preloadImages(site.posts.map(p => p.cover));
 
   await site.handleRoute();
 

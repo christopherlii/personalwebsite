@@ -3,8 +3,8 @@ title: "solaces"
 date: "2026-05-10"
 tags: ["random"]
 description: "My feelings on leaving college, SF, and my many solaces."
-cover: "/static/images/blogs/solaces/grad.jpg"
-coverPosition: "center 72%"
+cover: "/static/images/blogs/solaces/grad-drawn.jpg"
+coverPosition: "center 60%"
 ---
 
 ## 1.
