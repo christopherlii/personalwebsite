@@ -7,8 +7,8 @@
       "random"
     ],
     "description": "My feelings on leaving college, SF, and my many solaces.",
-    "cover": "/static/images/blogs/solaces/grad.jpg",
-    "coverPosition": "center 72%",
+    "cover": "/static/images/blogs/solaces/grad-drawn.jpg",
+    "coverPosition": "center 60%",
     "words": 1218
   },
   {
@@ -19,8 +19,8 @@
       "updates"
     ],
     "description": "A letter on poker, autopilot, and folding too often in 2025",
-    "cover": "/static/images/blogs/2025_q4/sunset_with_sam.jpg",
-    "coverPosition": "",
-    "words": 1598
+    "cover": "/static/images/blogs/2025_q4/sunset_with_sam-drawn.jpg",
+    "coverPosition": "center 45%",
+    "words": 1592
   }
 ]
