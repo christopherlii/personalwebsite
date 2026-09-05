@@ -28,7 +28,12 @@
   --banner-top: 44px;
   --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
   --banner-ms: 650ms;
-  --banner-fade-ms: 700ms;
+  --banner-fade-ms: 650ms;
+  /* Opening back to home runs on its own, snappier clock with plain ease. */
+  --banner-open-ms: 500ms;
+  /* Travel decelerates hard: tears cover most of their distance early and
+     glide into place — the gesture lasts longer but feels finished sooner. */
+  --banner-travel-ease: cubic-bezier(0.16, 0.9, 0.25, 1);
   --chrome-ms: 300ms;
 
   --code-bg: rgba(0, 0, 0, 0.06);
@@ -436,10 +441,20 @@ body.no-top-fade .top-fade {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   transition: opacity var(--banner-fade-ms) ease,
-              -webkit-mask-size var(--banner-fade-ms) ease,
-              mask-size var(--banner-fade-ms) ease,
-              -webkit-mask-position var(--banner-fade-ms) ease,
-              mask-position var(--banner-fade-ms) ease;
+              -webkit-mask-size var(--banner-fade-ms) var(--banner-travel-ease),
+              mask-size var(--banner-fade-ms) var(--banner-travel-ease),
+              -webkit-mask-position var(--banner-fade-ms) var(--banner-travel-ease),
+              mask-position var(--banner-fade-ms) var(--banner-travel-ease);
+}
+
+/* Opening back to the photo (drawn -> photo travel): the previous feel —
+   shorter clock, plain symmetric ease, no deceleration glide. */
+.banner-media.opening {
+  transition: opacity var(--banner-open-ms) ease,
+              -webkit-mask-size var(--banner-open-ms) ease,
+              mask-size var(--banner-open-ms) ease,
+              -webkit-mask-position var(--banner-open-ms) ease,
+              mask-position var(--banner-open-ms) ease;
 }
 
 /* The home<->writing gesture is a CROP, not a zoom: layer boxes never

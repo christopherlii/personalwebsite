@@ -135,6 +135,7 @@ class Site {
     this.bannerMs = parseInt(s.getPropertyValue('--banner-ms'), 10) || 650;
     this.bannerFadeMs = parseInt(s.getPropertyValue('--banner-fade-ms'), 10) || 500;
     this.chromeMs = parseInt(s.getPropertyValue('--chrome-ms'), 10) || 300;
+    this.bannerOpenMs = parseInt(s.getPropertyValue('--banner-open-ms'), 10) || 500;
   }
 
   // Two stacked layers so a photo change cross-fades instead of cutting.
@@ -182,6 +183,7 @@ class Site {
         next.style.transition = 'none';
         next.classList.remove('active');
         next.classList.remove('travelling');
+        next.classList.remove('opening');
         next.classList.toggle('card', frame === 'card');
         // Start states: travelling-in windows begin beyond the frame;
         // travelling-out photos begin behind the closed window; resting
@@ -221,9 +223,11 @@ class Site {
           next.classList.remove('cropped');
           next.classList.add('beyond');
           next.classList.add('travelling');
+          next.classList.add('opening');
           if (curFrame === 'window') {
             current.classList.remove('cropped');
             current.classList.add('beyond');
+            current.classList.add('opening');
           }
         }
 
@@ -232,6 +236,7 @@ class Site {
         // into the margins.
         this._bannerSettleT = setTimeout(() => {
           if (stale()) return;
+          next.classList.remove('opening');
           // Photo owns the frame — release the dressing gate. .beyond and
           // the rest mask are both fully off-frame, so this swap is invisible.
           next.style.transition = 'none';
@@ -244,9 +249,10 @@ class Site {
           current.classList.remove('cropped');
           current.classList.remove('beyond');
           current.classList.remove('travelling');
+          current.classList.remove('opening');
           current.offsetHeight;
           current.style.transition = '';
-        }, this.bannerFadeMs + 60);
+        }, (travelOut ? this.bannerOpenMs : this.bannerFadeMs) + 60);
 
         this.activeLayer = 1 - this.activeLayer;
       };
@@ -571,7 +577,7 @@ class Site {
       // new one. Going home it holds until the photo has mostly arrived.
       const hold = mode === 'drawn'
         ? 0
-        : Math.max(0, Math.round(this.bannerFadeMs * 0.65) - this.chromeMs);
+        : Math.max(0, Math.round(this.bannerOpenMs * 0.65) - this.chromeMs);
       this.swapChrome(hold);
     }
   }
