@@ -211,10 +211,14 @@ class Site {
     if (this.bannerPhoto && this.bannerPhoto.src === src && this.bannerPhoto.position === pos &&
         (frame || 'full') === this.bannerFrame) {
       this.applyBannerMode();
+      this.releasePhoto();
       return;
     }
     this.bannerPhoto = { src, position: pos };
     this.bannerFrame = frame || 'full';
+    // Anything riding the photo's beat (the chrome's outfit change) waits
+    // here until the image is actually on screen.
+    this._photoPending = true;
 
     const swap = () => {
       // A later request may have superseded this one while it decoded.
@@ -261,6 +265,7 @@ class Site {
         // The photo component changes as one beat: image, window, scrim,
         // and panel shadow all ride .drawn from this same frame.
         this.applyBannerMode();
+        this.releasePhoto();
         next.classList.add('active');
         if (travelIn) {
           // Both layers' windows sweep in from beyond the frame in lockstep —
@@ -375,6 +380,29 @@ class Site {
     img.src = src;
     if (img.complete && img.naturalWidth) onReady();
     else img.addEventListener('load', onReady, { once: true });
+  }
+
+  // The incoming photo has landed — let anything held for its beat go.
+  releasePhoto() {
+    this._photoPending = false;
+    const waiting = this._photoWaiters || [];
+    this._photoWaiters = [];
+    waiting.forEach(fn => fn());
+  }
+
+  // Resolves when the pending photo swap runs, or after capMs — a download
+  // that never finishes must not leave the header stuck mid-change.
+  photoSettled(capMs) {
+    if (!this._photoPending) return Promise.resolve();
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timer); resolve(); };
+      const timer = setTimeout(() => {
+        this._photoWaiters = (this._photoWaiters || []).filter(fn => fn !== done);
+        resolve();
+      }, capMs);
+      this._photoWaiters = this._photoWaiters || [];
+      this._photoWaiters.push(done);
+    });
   }
 
   // Warm the covers a view is about to offer, so the cross-fade is instant.
@@ -1052,9 +1080,16 @@ class Site {
     if (!header) return;
     clearTimeout(this._chromeOutT);
     clearTimeout(this._chromeInT);
+    const token = (this._chromeToken = (this._chromeToken || 0) + 1);
     this._chromeSwapping = true;
     header.classList.add('swapping');
-    this._chromeOutT = setTimeout(() => {
+    this._chromeOutT = setTimeout(async () => {
+      // The outfit belongs to the photo's beat, not to a clock started at the
+      // click: on a cold open the drawing can be a second behind, and
+      // restyling on time lands ink text on the photograph still full-bleed
+      // underneath it. Faded out, the wait costs nothing to look at.
+      await this.photoSettled(1500);
+      if (token !== this._chromeToken) return;
       this.banner.classList.toggle('ink', this.chromeIsInk(this.bannerMode));
       if (this._pendingTailSegs) {
         this.applyTailSegs(this._pendingTailSegs, false);
