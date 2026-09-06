@@ -1291,7 +1291,7 @@ class Site {
       const photo = this.homePhoto();
       this.setBannerPhoto(photo.src, photo.position);
     }
-    this.renderBreadcrumb(null, 'stats');
+    this.renderBreadcrumb(null, 'info');
     this.startAgeCounter();
     this.syncUrl('#stats');
   }
