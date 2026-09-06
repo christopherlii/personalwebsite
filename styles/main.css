@@ -375,24 +375,39 @@ body.no-top-fade .top-fade {
    of a full-bleed photo behind it. Home stays full-bleed. */
 .banner.drawn {
   box-shadow: none;
+  /* Off instantly, on gently: a shadow fading out around an emptying box
+     reads as an outline; its return can afford the full fade. */
+  transition-duration: 0s;
+}
+
+
+/* Trial: hovering a drawn-view link lifts the panel shadow quickly. */
+.banner.unshadow {
+  box-shadow: none;
+  transition-duration: 200ms;
 }
 
 /* The panel shadow belongs to a full-bleed photo owning the frame. While the
    active layer is a card or is still behind a travelling window, a full-box
    shadow would outline an empty rectangle that the photo is only part-way
    through filling. */
+.banner.travel-pending,
 .banner:has(.banner-media.active.card),
 .banner:has(.banner-media.active.cropped),
 .banner:has(.banner-media.active.beyond),
 .banner:has(.banner-media.active.travelling) {
   box-shadow: none;
+  transition-duration: 0s;
 }
 
 /* Only while navigating — during a scroll the height tracks scrollY directly. */
 .banner.animating {
+  /* No box-shadow here: during navigation the shadow must be able to drop
+     instantly (a fading shadow ring around an emptying box reads as an
+     outline). Its gentle return runs on the base transition, after the
+     animating window has passed. */
   transition: height var(--banner-ms) var(--banner-ease),
-              top var(--banner-ms) var(--banner-ease),
-              box-shadow var(--banner-fade-ms) ease;
+              top var(--banner-ms) var(--banner-ease);
 }
 
 /* Condensed to a bar, the photo gets a touch more tint under the breadcrumb. */
@@ -497,6 +512,8 @@ body.no-top-fade .top-fade {
 }
 
 .banner-scrim {
+  display: none; /* retired: legibility comes from deep glyph shadows now */
+  z-index: 2; /* above the media layers' inline 0/1, below the header */
   position: absolute;
   left: 0;
   right: 0;
@@ -505,8 +522,8 @@ body.no-top-fade .top-fade {
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgba(8, 12, 18, 0.52) 0px,
-    rgba(8, 12, 18, 0.38) 60px,
+    rgba(8, 12, 18, 0.28) 0px,
+    rgba(8, 12, 18, 0.18) 60px,
     rgba(8, 12, 18, 0) 140px
   );
   opacity: 0;
@@ -526,30 +543,21 @@ body.no-top-fade .top-fade {
 .banner:has(.banner-media.active.beyond) .banner-scrim,
 .banner:has(.banner-media.active.travelling) .banner-scrim {
   opacity: 0;
+  transition-duration: 550ms;
 }
 
 .banner.drawn .banner-scrim {
   opacity: 0;
+  transition-duration: 550ms;
 }
 
-/* Hover head start: pointing at a link into a drawn view begins dropping the
-   scrim and text-shadow early, so the click transition never shows the
-   shadow's outline moving. Hover away and they settle back. */
-.banner.unshadow .banner-scrim {
-  opacity: 0;
-  transition-duration: 400ms;
-}
-
-.banner.unshadow .banner-header {
-  text-shadow: none;
-}
 
 .banner-header {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1; /* above the condensed tint */
+  z-index: 3; /* above media layers and scrim */
   height: var(--banner-bar);
   display: flex;
   align-items: center;
@@ -558,10 +566,8 @@ body.no-top-fade .top-fade {
   color: #fff;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
   /* The text is ONE component: it only ever changes appearance while faded
-     out (.swapping), so color/padding never animate on screen. text-shadow
-     is the exception — the hover head start (.unshadow) fades it in place. */
-  transition: opacity var(--chrome-ms) ease,
-              text-shadow 400ms ease;
+     out (.swapping), so color/shadow/padding never animate on screen. */
+  transition: opacity var(--chrome-ms) ease;
 }
 
 .banner-header.swapping {
@@ -578,7 +584,7 @@ body.no-top-fade .top-fade {
 
 .breadcrumb {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 9px;
   min-width: 0;
   white-space: nowrap;
@@ -597,13 +603,14 @@ body.no-top-fade .top-fade {
   transition: opacity 0.25s ease;
 }
 
+
 /* The tail (/ section / page) is the only part rebuilt on navigation; it
    slides out rightward from behind the persistent name. */
 .crumb-tail {
   position: relative;
   z-index: 0;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 9px;
   min-width: 0;
   overflow: hidden;
@@ -620,7 +627,7 @@ body.no-top-fade .top-fade {
 .crumb-seg {
   position: relative;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 9px;
 }
 
@@ -628,12 +635,21 @@ body.no-top-fade .top-fade {
   animation: crumbTailIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
 }
 
-@keyframes crumbSegOut {
-  to { opacity: 0; transform: translateX(-14px); }
+/* The exit is the entrance played backwards: same keyframes, same clock;
+   animation-direction: reverse also mirrors the timing curve, so the crumb
+   stays opaque while it travels and fades only as it tucks under. */
+.crumb-seg.seg-out {
+  animation: crumbTailIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1) reverse forwards;
 }
 
-.crumb-seg.seg-out {
-  animation: crumbSegOut 350ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+/* The leading "/" reaches the predecessor first — it fades ahead of the
+   label so nothing ever visibly overlaps the crumb that stays. */
+@keyframes crumbSepOut {
+  to { opacity: 0; }
+}
+
+.crumb-seg.seg-out .crumb-sep {
+  animation: crumbSepOut 160ms ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -694,6 +710,7 @@ body.no-top-fade .top-fade {
   color: #fff;
   transition: opacity 0.25s ease;
 }
+
 
 .banner.ink .social a {
   color: var(--fg);
