@@ -80,36 +80,40 @@ class Site {
       this.updateBanner();
     };
 
-    // Favorites hero: the flat collage jpg is what transitions dissolve to;
-    // this grid renders the same six images on top for per-cell hover once
-    // the view has landed. Keep in sync with .context/make_collage.py.
-    // Cells 1 and 3 sit under the name / social icons — keep those dark.
-    // Personal-forward like every deal: at most one media tile.
-    this.collageMix = [
-      { src: '/static/images/favs/friends/zedd-in-the-park-1.jpg', label: 'zedd in the park!' },
-      { src: '/static/images/favs/side-quests/guatemala-1.jpg', label: 'guatemala' },
-      { src: '/static/images/favs/side-quests/seoul-1.jpg', label: 'seoul' },
-      { src: '/static/images/favs/side-quests/italy-1.jpg', label: 'italy' },
-      { src: '/static/images/films/interstellar.jpg', label: 'interstellar' },
-      { src: '/static/images/favs/side-quests/takachiho-1.jpg', label: 'takachiho' },
-    ];
     const grid = document.getElementById('banner-collage');
     if (grid) {
       grid.innerHTML = '<div class="collage-cell"></div>'.repeat(6);
-      // Clicking a tile flips it to another photo of the same thing.
+      // Tapping a tile: a thing with more photos cycles through them; a
+      // single-photo memory JOGS — it summons a different memory from the
+      // same category (one not already on screen) into its tile.
       grid.addEventListener('click', e => {
         const cell = e.target.closest('.collage-cell');
         if (!cell) return;
         const img = cell.querySelector('.cell-layer:last-child img');
         if (!img) return;
         const thing = this.thingByLabel(img.getAttribute('alt'));
-        if (!thing || thing.photos.length < 2) return;
-        const cur = img.getAttribute('src');
-        const next = thing.photos[(thing.photos.indexOf(cur) + 1) % thing.photos.length];
-        this.popLayer(cell, { src: next, label: thing.label });
+        if (!thing) return;
+        if (thing.photos.length > 1) {
+          const cur = img.getAttribute('src');
+          const next = thing.photos[(thing.photos.indexOf(cur) + 1) % thing.photos.length];
+          this.popLayer(cell, { src: next, label: thing.label });
+          return;
+        }
+        const onScreen = new Set([...grid.querySelectorAll('.cell-layer img')]
+          .map(i => i.getAttribute('alt')));
+        const pool = this.allThings().filter(t =>
+          t.cat === thing.cat && !onScreen.has(t.label));
+        if (!pool.length) return;
+        const jog = pool[Math.floor(Math.random() * pool.length)];
+        const cellIndex = [...grid.querySelectorAll('.collage-cell')].indexOf(cell);
+        this._slotMemory = this._slotMemory || {};
+        this._slotMemory[jog.label] = cellIndex;
+        this.popLayer(cell, {
+          src: jog.photos[Math.floor(Math.random() * jog.photos.length)],
+          label: jog.label
+        });
       });
     }
-    this.renderCollage(this.collageMix);
 
     window.addEventListener('scroll', this.updateBanner, { passive: true });
     window.addEventListener('resize', this.onBannerResize);
@@ -123,7 +127,10 @@ class Site {
     // click even happens; hover away and it returns.
     document.addEventListener('mouseover', e => {
       const a = linkOf(e);
-      if (!a || !this.banner || this.banner.classList.contains('drawn')) return;
+      if (!a) return;
+      // hovering toward favs starts warming its photo pool early
+      if (a.getAttribute('href') === '#favorites') this.warmFavsPhotos();
+      if (!this.banner || this.banner.classList.contains('drawn')) return;
       if (drawnHashes.has(a.getAttribute('href'))) this.banner.classList.add('unshadow');
     });
     document.addEventListener('mouseout', e => {
@@ -586,6 +593,7 @@ class Site {
     }
 
     this.view = viewName;
+    this._collageView = viewName === 'solaces';
 
     // Articles let the bar scroll away, so they don't need the top fade;
     // every other view keeps it floating and needs the strip above covered.
@@ -650,47 +658,125 @@ class Site {
       six.forEach((t, i) => { if (t) this._slotMemory[t.label] = i; });
     }
     const layerHtml = c => c
-      ? `<img src="${c.src}" alt="${c.label}" loading="lazy"><figcaption>${c.label}</figcaption>`
+      ? `<img src="${c.src}" alt="${c.label}"><figcaption>${c.label}</figcaption>`
       : '';
+    const seq = this._collageSeq = (this._collageSeq || 0) + 1;
+    const layers = [];
+    const decoding = [];
     grid.querySelectorAll('.collage-cell').forEach((cell, i) => {
       // settle any previous swap: keep only the newest layer
       while (cell.children.length > 1) cell.firstChild.remove();
       const layer = document.createElement('figure');
       layer.className = 'cell-layer' + (six[i] ? '' : ' empty');
       layer.innerHTML = layerHtml(six[i]);
-      const t = six[i] && this.thingByLabel(six[i].label);
-      cell.classList.toggle('cyclable', !!(t && t.photos.length > 1));
+      // every non-empty tile responds to a tap (cycle or jog)
+      cell.classList.toggle('cyclable', !!six[i]);
       if (!fade) {
         cell.replaceChildren(layer);
         return;
       }
       layer.classList.add('incoming');
       cell.appendChild(layer);
+      layers.push(layer);
+      const img = layer.querySelector('img');
+      if (img && img.decode) decoding.push(img.decode().catch(() => {}));
     });
-    // Intentionally random stagger: six jittered slots with a guaranteed
-    // minimum gap, dealt to the tiles in shuffled order — no two photos can
-    // ever land on the same beat.
-    const slots = [0, 1, 2, 3, 4, 5].map(i => Math.round(i * 110 + Math.random() * 70));
-    for (let i = slots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [slots[i], slots[j]] = [slots[j], slots[i]];
-    }
-    grid.querySelectorAll('.cell-layer.incoming:not(.shown)').forEach((layer, i) => {
-      layer.style.transitionDelay = `${slots[i]}ms`;
-      layer.offsetHeight; // commit the hidden start before revealing
-      layer.classList.add('shown');
-    });
-    clearTimeout(this._collageSwapT);
-    this._collageSwapT = setTimeout(() => {
-      grid.querySelectorAll('.collage-cell').forEach(cell => {
-        while (cell.children.length > 1) cell.firstChild.remove();
-        const last = cell.lastElementChild;
-        if (last) {
-          last.classList.remove('incoming', 'shown');
-          last.style.transitionDelay = '';
-        }
+    if (!fade) return;
+    // A deal never pops half-loaded pixels: the reveal waits (bounded)
+    // until every incoming image has decoded, then runs the stagger —
+    // six jittered slots with a guaranteed minimum gap, shuffled, so no
+    // two photos ever land on the same beat.
+    Promise.race([
+      Promise.allSettled(decoding),
+      new Promise(r => setTimeout(r, 1500))
+    ]).then(() => {
+      if (seq !== this._collageSeq) return;
+      if (this.banner) this.banner.classList.add('dealt'); // the hand is landing
+      const slots = [0, 1, 2, 3, 4, 5].map(i => Math.round(i * 110 + Math.random() * 70));
+      for (let i = slots.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [slots[i], slots[j]] = [slots[j], slots[i]];
+      }
+      layers.forEach((layer, i) => {
+        layer.style.transitionDelay = `${slots[i]}ms`;
+        layer.offsetHeight; // commit the hidden start before revealing
+        layer.classList.add('shown');
       });
-    }, 1300);
+      clearTimeout(this._collageSwapT);
+      this._collageSwapT = setTimeout(() => {
+        if (seq !== this._collageSeq) return;
+        grid.querySelectorAll('.collage-cell').forEach(cell => {
+          while (cell.children.length > 1) cell.firstChild.remove();
+          const last = cell.lastElementChild;
+          if (last) {
+            last.classList.remove('incoming', 'shown');
+            last.style.transitionDelay = '';
+          }
+        });
+      }, 1300);
+    });
+  }
+
+  // Leaving favs for home: each tile pops to ITS slice of the home photo
+  // (cover center 74% math, cut 3x2), staggered like a deal — the hero
+  // assembles square by square, and the grid then drops over identical
+  // pixels, invisibly. Resolves when the assembly has settled.
+  renderCollagePieces() {
+    const grid = document.getElementById('banner-collage');
+    if (!grid) return Promise.resolve();
+    const W = grid.clientWidth, H = grid.clientHeight;
+    const scale = W / 1142;                       // rock.jpg cover, width-bound
+    const bgH = 1600 * scale;
+    const offY = (bgH - H) * 0.74;
+    const seq = this._collageSeq = (this._collageSeq || 0) + 1;
+    const layers = [];
+    grid.querySelectorAll('.collage-cell').forEach((cell, i) => {
+      while (cell.children.length > 1) cell.firstChild.remove();
+      const col = i % 3, row = (i / 3) | 0;
+      const layer = document.createElement('div');
+      layer.className = 'cell-layer incoming piece';
+      layer.style.backgroundImage = "url('/static/images/hero/rock.jpg')";
+      layer.style.backgroundSize = `${W}px ${Math.round(bgH)}px`;
+      layer.style.backgroundPosition =
+        `-${Math.round(col * W / 3)}px -${Math.round(offY + row * H / 2)}px`;
+      cell.appendChild(layer);
+      cell.classList.remove('cyclable');
+      layers.push(layer);
+    });
+    const img = new Image();
+    img.src = '/static/images/hero/rock.jpg';
+    const ready = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+    return ready.then(() => new Promise(done => {
+      if (seq !== this._collageSeq) { done(); return; }
+      const slots = [0, 1, 2, 3, 4, 5].map(i => Math.round(i * 90 + Math.random() * 55));
+      for (let i = slots.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [slots[i], slots[j]] = [slots[j], slots[i]];
+      }
+      layers.forEach((layer, i) => {
+        layer.style.transitionDelay = `${slots[i]}ms`;
+        layer.offsetHeight;
+        layer.classList.add('shown');
+      });
+      setTimeout(done, 505 + 480 + 80);
+    }));
+  }
+
+  // Quietly fetch every favs photo in a few gentle lanes, so deals after
+  // the first moments on the page never wait on the network.
+  warmFavsPhotos() {
+    if (this._favsWarmed || !this.solaces.length) return;
+    this._favsWarmed = true;
+    const srcs = this.allThings().flatMap(t => t.photos);
+    let i = 0;
+    const next = () => {
+      if (i >= srcs.length) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = img.onerror = () => setTimeout(next, 25);
+      img.src = srcs[i++];
+    };
+    for (let lane = 0; lane < 4; lane++) setTimeout(next, 500 + lane * 150);
   }
 
   allThings() {
@@ -707,10 +793,15 @@ class Site {
     const layer = document.createElement('figure');
     layer.className = 'cell-layer incoming';
     layer.innerHTML =
-      `<img src="${thing.src}" alt="${thing.label}" loading="lazy"><figcaption>${thing.label}</figcaption>`;
+      `<img src="${thing.src}" alt="${thing.label}"><figcaption>${thing.label}</figcaption>`;
     cell.appendChild(layer);
-    layer.offsetHeight;
-    layer.classList.add('shown');
+    const img = layer.querySelector('img');
+    const reveal = () => {
+      layer.offsetHeight;
+      layer.classList.add('shown');
+    };
+    if (img && img.decode) img.decode().catch(() => {}).then(reveal);
+    else reveal();
     clearTimeout(cell._settleT);
     cell._settleT = setTimeout(() => {
       while (cell.children.length > 1) cell.firstChild.remove();
@@ -807,6 +898,7 @@ class Site {
     const grid = document.getElementById('banner-collage');
     if (!grid) return;
     clearTimeout(this._collageSwapT);
+    if (this.banner) this.banner.classList.remove('dealt');
     grid.querySelectorAll('.collage-cell').forEach(cell => cell.replaceChildren());
   }
 
@@ -837,8 +929,7 @@ class Site {
   applyBannerMode() {
     if (!this.banner) return;
     this.banner.classList.remove('travel-pending');
-    this.banner.classList.toggle('collage',
-      !!this.bannerPhoto && this.bannerPhoto.src.includes('favorites-collage'));
+    this.banner.classList.toggle('collage', this._holdCollage || this._collageView);
     this.banner.classList.toggle('drawn', this.bannerMode === 'drawn');
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
@@ -930,8 +1021,21 @@ class Site {
   async showHome() {
     await this.fadeToView('home-view', 'home');
     const photo = this.homePhoto();
+    const viaCollage = this.banner && this.banner.classList.contains('collage');
     this.setBannerMode('photo');
-    this.setBannerPhoto(photo.src, photo.position, 'full');
+    if (viaCollage) {
+      // the tiles assemble the home photo square by square, over the
+      // dissolving backdrop; the grid then drops over identical pixels
+      this._holdCollage = true;
+      this.setBannerPhoto(photo.src, photo.position, 'full');
+      this.renderCollagePieces().then(() => {
+        this._holdCollage = false;
+        this.applyBannerMode();
+        setTimeout(() => this.clearCollage(), 700);
+      });
+    } else {
+      this.setBannerPhoto(photo.src, photo.position, 'full');
+    }
     this.preloadImages([this.drawnPhoto().src]);
     this.renderBreadcrumb(null, null);
     this.syncUrl('/');
@@ -1122,14 +1226,16 @@ class Site {
 
   async showSolacesList() {
     await this.fadeToView('solaces-view', 'solaces');
-    // Favorites wears its own hero: the collage of favorite things. On
-    // arrival the tiles pop in one by one over the dissolving banner — the
-    // same staggered deal the strip buttons use.
+    // Arriving at favs, the banner image is NOT swapped: the previous hero
+    // stays beneath and the dealt tiles pop in over it — un-popped cells
+    // show pieces of where you came from, never a second set. On a cold
+    // load there is no previous hero, so the hand fills out over nothing
+    // but the page itself.
     this.setBannerMode('photo');
-    this.setBannerPhoto('/static/images/hero/favorites-collage.jpg', 'center', 'full');
+    this.applyBannerMode(); // normalize chrome/gates + turn the grid on
     this.clearCollage();
-    // arrivals get a fresh capped hand too, not a fixed mix
     this.renderCollage(this.randomDeal(), true);
+    this.warmFavsPhotos();
     this.renderBreadcrumb({ label: 'favs', hash: 'favorites' }, null);
 
     const container = document.getElementById('solaces-list');

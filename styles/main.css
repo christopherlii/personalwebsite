@@ -391,6 +391,9 @@ body.no-top-fade .top-fade {
    active layer is a card or is still behind a travelling window, a full-box
    shadow would outline an empty rectangle that the photo is only part-way
    through filling. */
+/* Cold-loading favs: no hero beneath and no hand revealed yet — a panel
+   shadow would outline an empty rectangle. It arrives with the tiles. */
+.banner.collage:not(.dealt):not(:has(.banner-media.active)),
 .banner.travel-pending,
 .banner:has(.banner-media.active.card),
 .banner:has(.banner-media.active.cropped),
@@ -1325,7 +1328,9 @@ body.no-top-fade .top-fade {
   grid-template-rows: repeat(2, 1fr);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 300ms ease;
+  /* leaving favs, the tiles ride the full banner fade (or assemble into
+     the home photo) — the flat mix jpg beneath never peeks through */
+  transition: opacity var(--banner-fade-ms) ease;
 }
 
 /* Stacked layers inside a cell: the incoming one fades and settles in at
@@ -1369,6 +1374,13 @@ body.no-top-fade .top-fade {
 .banner.collage .banner-collage {
   opacity: 1;
   pointer-events: auto;
+  /* entering is quick — the tile pops carry the arrival */
+  transition-duration: 300ms;
+}
+
+/* A tile showing its slice of the home photo (favs -> home assembly). */
+.cell-layer.piece {
+  background-repeat: no-repeat;
 }
 
 .collage-cell {
