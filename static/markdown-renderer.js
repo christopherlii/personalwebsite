@@ -83,10 +83,13 @@ class Site {
     window.addEventListener('scroll', this.updateBanner, { passive: true });
     window.addEventListener('resize', this.onBannerResize);
 
-    // Hovering a link into a drawn view drops the photo chrome's shadows
-    // early — a head start, so the navigation itself has less to change.
+    // The panel shadow dies on the click itself — navigation work (view
+    // exit fade, image decode) runs 150ms+ later, and a shadow fading
+    // around an emptying box reads as an outline.
     const drawnHashes = new Set(['#thoughts', '#projects', '#reading']);
     const linkOf = e => e.target.closest && e.target.closest('a[href^="#"]');
+    // Trial: the shadow leaves on hover (quick, not a slow fade), before the
+    // click even happens; hover away and it returns.
     document.addEventListener('mouseover', e => {
       const a = linkOf(e);
       if (!a || !this.banner || this.banner.classList.contains('drawn')) return;
@@ -94,6 +97,15 @@ class Site {
     });
     document.addEventListener('mouseout', e => {
       if (linkOf(e) && this.banner) this.banner.classList.remove('unshadow');
+    });
+    document.addEventListener('click', e => {
+      const a = linkOf(e);
+      if (a && this.banner && drawnHashes.has(a.getAttribute('href'))) {
+        this.banner.classList.add('travel-pending');
+        this.banner.style.transition = 'none';
+        this.banner.offsetHeight;
+        this.banner.style.transition = '';
+      }
     });
 
     this.updateBanner();
@@ -252,7 +264,7 @@ class Site {
           current.classList.remove('opening');
           current.offsetHeight;
           current.style.transition = '';
-        }, (travelOut ? this.bannerOpenMs : this.bannerFadeMs) + 60);
+        }, (travelOut ? Math.max(this.bannerOpenMs, this.bannerMs) : this.bannerFadeMs) + 60);
 
         this.activeLayer = 1 - this.activeLayer;
       };
@@ -572,6 +584,10 @@ class Site {
       (mode === 'drawn') !== this.banner.classList.contains('drawn');
     this.bannerMode = mode;
     if (boundary) {
+      // The panel shadow must die at CLICK time — the swap (and its gates)
+      // waits for the image, and a shadow fading around an emptying box is
+      // a visible outline.
+      this.banner.classList.add('travel-pending');
       // Crossing the photo/drawn boundary, the text runs as its own single
       // component: out in the old outfit, restyle invisibly, back in the
       // new one. Going home it holds until the photo has mostly arrived.
@@ -584,7 +600,7 @@ class Site {
 
   applyBannerMode() {
     if (!this.banner) return;
-    this.banner.classList.remove('unshadow'); // the head start is over either way
+    this.banner.classList.remove('travel-pending');
     this.banner.classList.toggle('drawn', this.bannerMode === 'drawn');
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
@@ -639,7 +655,7 @@ class Site {
         el.style.top = `${el.offsetTop}px`;
         el.style.position = 'absolute';
         el.classList.add('seg-out');
-        setTimeout(() => el.remove(), 400);
+        setTimeout(() => el.remove(), 450);
       } else {
         el.remove();
       }

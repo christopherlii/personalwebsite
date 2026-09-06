@@ -102,3 +102,5 @@ i hope my time in SF is one worth reminiscing on. one day, i'll arrive at SFO th
 
 i'll be, again, nothing more than a traveler wandering old solaces.
 
+chris
+
