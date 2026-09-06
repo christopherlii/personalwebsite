@@ -5,7 +5,6 @@
 class Site {
   constructor() {
     this.posts = [];
-    this.projects = [];
     this.reading = [];
     this.solaces = [];
     this.view = 'home';
@@ -121,7 +120,7 @@ class Site {
     // The panel shadow dies on the click itself — navigation work (view
     // exit fade, image decode) runs 150ms+ later, and a shadow fading
     // around an emptying box reads as an outline.
-    const drawnHashes = new Set(['#thoughts', '#projects', '#reading']);
+    const drawnHashes = new Set(['#thoughts', '#reading']);
     const linkOf = e => e.target.closest && e.target.closest('a[href^="#"]');
     // Trial: the shadow leaves on hover (quick, not a slow fade), before the
     // click even happens; hover away and it returns.
@@ -151,7 +150,7 @@ class Site {
 
   // Articles and stats always scroll. Everything else is meant to be a fixed
   // frame — but only lock it when the page genuinely fits, otherwise a long
-  // list (favorites and projects on a phone) would be unreachable.
+  // list on a phone would be unreachable.
   setupScrollLock() {
     this.syncScrollLock = () => {
       const root = document.documentElement;
@@ -536,13 +535,6 @@ class Site {
       console.error(e);
       post.content = '<p>this post refused to load. try a refresh?</p>';
     }
-  }
-
-  async loadProjects() {
-    try {
-      const resp = await fetch('/projects/index.json', { cache: 'no-store' });
-      if (resp.ok) this.projects = await resp.json();
-    } catch (e) { console.error(e); }
   }
 
   async loadReading() {
@@ -1111,100 +1103,6 @@ class Site {
   // PROJECTS
   // ========================================
 
-  statusPill(status) {
-    if (!status) return '';
-    const cls = `status-pill status-${String(status).toLowerCase()}`;
-    return `<span class="${cls}">${status}</span>`;
-  }
-
-  getProjectSlug(project) {
-    return project?.slug || project?.name?.toLowerCase().replace(/\s+/g, '-') || '';
-  }
-
-  getProjectIndex(slugOrIndex) {
-    const parsed = parseInt(slugOrIndex, 10);
-    if (!isNaN(parsed) && parsed >= 0 && parsed < this.projects.length) return parsed;
-    const slug = String(slugOrIndex);
-    const idx = this.projects.findIndex(p => this.getProjectSlug(p) === slug);
-    return idx >= 0 ? idx : -1;
-  }
-
-  async showProjectsList() {
-    await this.fadeToView('projects-view', 'projects');
-    this.showDrawnHero();
-    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
-
-    const grid = document.getElementById('projects-full-list');
-    grid.innerHTML = this.projects.map(p => `
-      <a class="project-card" href="#projects/${this.getProjectSlug(p)}">
-        <div class="project-image">
-          ${p.image ? `<img src="${p.image}" alt="${p.name}">` : ''}
-        </div>
-        <div class="project-name">${p.name}</div>
-        <div class="project-meta">
-          ${this.statusPill(p.status)}
-          ${p.year ? `<span>${p.year}</span>` : ''}
-        </div>
-      </a>
-    `).join('') || '<p class="empty-note">no projects yet.</p>';
-
-    this.syncUrl('#projects');
-  }
-
-  async showProjectDetail(slugOrIndex) {
-    const index = this.getProjectIndex(slugOrIndex);
-    const project = index >= 0 ? this.projects[index] : null;
-    if (!project) return this.showProjectsList();
-
-    await this.fadeToView('project-view', 'project');
-    this.showDrawnHero();
-    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, project.name);
-
-    let bodyHtml = '';
-    if (project.content) {
-      try {
-        const resp = await fetch(`/projects/${project.content}`, { cache: 'no-store' });
-        if (resp.ok) {
-          const raw = await resp.text();
-          const { body } = this.parseFrontMatter(raw);
-          bodyHtml = typeof marked !== 'undefined' ? marked.parse(body) : body;
-        }
-      } catch (_) {}
-    }
-
-    const isThisWebsite = project.name.toLowerCase() === 'this website';
-    const linkHtml = isThisWebsite
-      ? '<p class="project-link-row"><a href="#stats">enter the easter egg</a></p>'
-      : project.link
-        ? `<p class="project-link-row"><a href="${project.link}" target="_blank" rel="noopener">visit ↗</a></p>`
-        : '';
-
-    const content = document.getElementById('project-content');
-    content.innerHTML = `
-      <header class="project-header">
-        <h1 class="project-title">${project.name}</h1>
-        <div class="project-detail-meta">
-          ${this.statusPill(project.status)}
-          ${project.year ? `<span>${project.year}</span>` : ''}
-          ${project.tech ? `<span>${project.tech}</span>` : ''}
-        </div>
-      </header>
-      ${project.description ? `<p class="project-desc">${project.description}</p>` : ''}
-      ${linkHtml}
-      ${project.image ? `<figure class="project-shot"><img src="${project.image}" alt="${project.name}"></figure>` : ''}
-      ${bodyHtml ? `<div class="article-body">${bodyHtml}</div>` : ''}
-      <footer class="article-footer"><a href="#projects">← all projects</a></footer>
-    `;
-
-    this.syncScrollLock();
-
-    this.syncUrl(`#projects/${this.getProjectSlug(project)}`);
-  }
-
-  // ========================================
-  // READING
-  // ========================================
-
   async showReadingList() {
     await this.fadeToView('reading-view', 'reading');
     this.showDrawnHero();
@@ -1349,10 +1247,6 @@ class Site {
       await this.showThoughtsList();
     } else if (hash === 'reading') {
       await this.showReadingList();
-    } else if (hash === 'projects') {
-      await this.showProjectsList();
-    } else if (hash.startsWith('projects/')) {
-      await this.showProjectDetail(hash.replace('projects/', ''));
     } else if (hash === 'favorites' || hash === 'solaces') {
       await this.showSolacesList();
     } else if (hash === 'stats' || hash === 'youre-already-here') {
@@ -1384,7 +1278,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await Promise.all([
     site.loadPosts(),
-    site.loadProjects(),
     site.loadReading(),
     site.loadSolaces()
   ]);
