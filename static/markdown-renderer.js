@@ -1305,7 +1305,7 @@ class Site {
     this.clearCollage();
     this.renderCollage(this.randomDeal(), true);
     this.warmFavsPhotos();
-    this.renderBreadcrumb({ label: 'favs', hash: 'favorites' }, null);
+    this.renderBreadcrumb({ label: 'favorites', hash: 'favorites' }, null);
 
     const container = document.getElementById('solaces-list');
     if (!container) return;
