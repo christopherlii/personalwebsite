@@ -156,7 +156,7 @@ class Site {
     this.syncScrollLock = () => {
       const root = document.documentElement;
       root.classList.remove('no-scroll');
-      if (this.view === 'thought' || this.view === 'stats') return;
+      if (this.view === 'thought') return;
 
       // Measure the real content, not the page's trailing padding — that
       // padding only exists to give scrolling views room at the end, and
@@ -344,6 +344,9 @@ class Site {
     clearTimeout(this._bannerAnimT);
     this._bannerAnimT = setTimeout(() => {
       this.banner.classList.remove('animating');
+      // the banner's height animation moves everything below it — only now
+      // is the page's true height measurable (stats locks against scroll)
+      if (this.syncScrollLock) this.syncScrollLock();
     }, this.bannerMs + 60);
   }
 
@@ -1290,24 +1293,7 @@ class Site {
     }
     this.renderBreadcrumb(null, 'stats');
     this.startAgeCounter();
-    this.updateJsLines();
     this.syncUrl('#stats');
-  }
-
-  // Counts the renderer plus whatever inline script index.html carries.
-  async updateJsLines() {
-    const el = document.getElementById('easter-js-lines');
-    if (!el) return;
-    try {
-      const resp = await fetch('/static/markdown-renderer.js', { cache: 'no-store' });
-      if (!resp.ok) { el.textContent = '—'; return; }
-      const external = (await resp.text()).split('\n').length;
-      const inline = Array.from(document.querySelectorAll('script:not([src])'))
-        .reduce((n, tag) => n + tag.textContent.trim().split('\n').length, 0);
-      el.textContent = String(external + inline);
-    } catch (_) {
-      el.textContent = '—';
-    }
   }
 
   startAgeCounter() {

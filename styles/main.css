@@ -1467,18 +1467,18 @@ body.no-top-fade .top-fade {
   font-size: 16px;
   font-weight: 500;
   color: var(--fg);
-  margin: 0 0 12px;
+  margin: 0 0 10px;
 }
 
 .stats-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  margin-bottom: 32px;
+  margin-bottom: 22px;
 }
 
 .stats-table td {
-  padding: 7px 0;
+  padding: 5px 0;
   color: var(--fg-body);
   vertical-align: top;
 }
@@ -1494,11 +1494,11 @@ body.no-top-fade .top-fade {
 }
 
 .stats-list {
-  margin: 0 0 36px;
+  margin: 0 0 24px;
   padding-left: 20px;
   font-size: 13px;
   color: var(--fg-body);
-  line-height: 1.8;
+  line-height: 1.7;
 }
 
 .stats-list li {
