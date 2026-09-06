@@ -80,6 +80,37 @@ class Site {
       this.updateBanner();
     };
 
+    // Favorites hero: the flat collage jpg is what transitions dissolve to;
+    // this grid renders the same six images on top for per-cell hover once
+    // the view has landed. Keep in sync with .context/make_collage.py.
+    // Cells 1 and 3 sit under the name / social icons — keep those dark.
+    // Personal-forward like every deal: at most one media tile.
+    this.collageMix = [
+      { src: '/static/images/favs/friends/zedd-in-the-park-1.jpg', label: 'zedd in the park!' },
+      { src: '/static/images/favs/side-quests/guatemala-1.jpg', label: 'guatemala' },
+      { src: '/static/images/favs/side-quests/seoul-1.jpg', label: 'seoul' },
+      { src: '/static/images/favs/side-quests/italy-1.jpg', label: 'italy' },
+      { src: '/static/images/films/interstellar.jpg', label: 'interstellar' },
+      { src: '/static/images/favs/side-quests/takachiho-1.jpg', label: 'takachiho' },
+    ];
+    const grid = document.getElementById('banner-collage');
+    if (grid) {
+      grid.innerHTML = '<div class="collage-cell"></div>'.repeat(6);
+      // Clicking a tile flips it to another photo of the same thing.
+      grid.addEventListener('click', e => {
+        const cell = e.target.closest('.collage-cell');
+        if (!cell) return;
+        const img = cell.querySelector('.cell-layer:last-child img');
+        if (!img) return;
+        const thing = this.thingByLabel(img.getAttribute('alt'));
+        if (!thing || thing.photos.length < 2) return;
+        const cur = img.getAttribute('src');
+        const next = thing.photos[(thing.photos.indexOf(cur) + 1) % thing.photos.length];
+        this.popLayer(cell, { src: next, label: thing.label });
+      });
+    }
+    this.renderCollage(this.collageMix);
+
     window.addEventListener('scroll', this.updateBanner, { passive: true });
     window.addEventListener('resize', this.onBannerResize);
 
@@ -574,6 +605,195 @@ class Site {
     return { src: '/static/images/hero/rock.jpg', position: 'center 74%' };
   }
 
+  // A thing never lands in the slot where it was last seen — not the slot
+  // it holds right now, and not the one it had in its previous deal even if
+  // the mix showed in between (per-thing slot memory persists). Bounded
+  // repair passes; with six slots a clean arrangement always falls out.
+  placeAvoidingRepeats(tiles, prevLabels) {
+    const mem = this._slotMemory || {};
+    const bad = (t, i) => !!t && (t.label === prevLabels[i] || mem[t.label] === i);
+    const arr = tiles.slice();
+    for (let pass = 0; pass < 10; pass++) {
+      let clean = true;
+      for (let i = 0; i < arr.length; i++) {
+        if (bad(arr[i], i)) {
+          clean = false;
+          const j = arr.findIndex((t, k) => k !== i && !bad(t, i) && !bad(arr[i], k));
+          if (j >= 0) [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
+      if (clean) break;
+    }
+    return arr;
+  }
+
+  // Fill the favorites hero grid: six persistent cells, each holding
+  // stacked layers. On swap every tile crossfades to its new image
+  // independently, at its own small random delay — they pop in one by one
+  // in a different order every time. keepOrder pins the given order (the
+  // at-rest mix must match the flat collage jpg cell for cell).
+  renderCollage(cells, fade, keepOrder) {
+    const grid = document.getElementById('banner-collage');
+    if (!grid) return;
+    let six = cells.slice(0, 6);
+    while (six.length < 6) six.push(null);
+    if (fade && !keepOrder) {
+      const prevLabels = [...grid.querySelectorAll('.collage-cell')].map(cell => {
+        const img = cell.querySelector('.cell-layer:last-child img');
+        return img ? img.getAttribute('alt') : null;
+      });
+      six = this.placeAvoidingRepeats(six, prevLabels);
+      // memory records DEALT arrangements only — the fixed mix is checked
+      // as the currently-visible grid but never remembered, or it would
+      // clobber a thing's true last-deal slot during the interlude
+      this._slotMemory = this._slotMemory || {};
+      six.forEach((t, i) => { if (t) this._slotMemory[t.label] = i; });
+    }
+    const layerHtml = c => c
+      ? `<img src="${c.src}" alt="${c.label}" loading="lazy"><figcaption>${c.label}</figcaption>`
+      : '';
+    grid.querySelectorAll('.collage-cell').forEach((cell, i) => {
+      // settle any previous swap: keep only the newest layer
+      while (cell.children.length > 1) cell.firstChild.remove();
+      const layer = document.createElement('figure');
+      layer.className = 'cell-layer' + (six[i] ? '' : ' empty');
+      layer.innerHTML = layerHtml(six[i]);
+      const t = six[i] && this.thingByLabel(six[i].label);
+      cell.classList.toggle('cyclable', !!(t && t.photos.length > 1));
+      if (!fade) {
+        cell.replaceChildren(layer);
+        return;
+      }
+      layer.classList.add('incoming');
+      cell.appendChild(layer);
+    });
+    // Intentionally random stagger: six jittered slots with a guaranteed
+    // minimum gap, dealt to the tiles in shuffled order — no two photos can
+    // ever land on the same beat.
+    const slots = [0, 1, 2, 3, 4, 5].map(i => Math.round(i * 110 + Math.random() * 70));
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]];
+    }
+    grid.querySelectorAll('.cell-layer.incoming:not(.shown)').forEach((layer, i) => {
+      layer.style.transitionDelay = `${slots[i]}ms`;
+      layer.offsetHeight; // commit the hidden start before revealing
+      layer.classList.add('shown');
+    });
+    clearTimeout(this._collageSwapT);
+    this._collageSwapT = setTimeout(() => {
+      grid.querySelectorAll('.collage-cell').forEach(cell => {
+        while (cell.children.length > 1) cell.firstChild.remove();
+        const last = cell.lastElementChild;
+        if (last) {
+          last.classList.remove('incoming', 'shown');
+          last.style.transitionDelay = '';
+        }
+      });
+    }, 1300);
+  }
+
+  allThings() {
+    return this.solaces.flatMap(c => this.categoryThings(c));
+  }
+
+  thingByLabel(label) {
+    return this.allThings().find(t => t.label === label);
+  }
+
+  // Pop a single new layer into one tile (used by tile clicks); the cell
+  // settles itself down to one layer afterwards.
+  popLayer(cell, thing) {
+    const layer = document.createElement('figure');
+    layer.className = 'cell-layer incoming';
+    layer.innerHTML =
+      `<img src="${thing.src}" alt="${thing.label}" loading="lazy"><figcaption>${thing.label}</figcaption>`;
+    cell.appendChild(layer);
+    layer.offsetHeight;
+    layer.classList.add('shown');
+    clearTimeout(cell._settleT);
+    cell._settleT = setTimeout(() => {
+      while (cell.children.length > 1) cell.firstChild.remove();
+      const last = cell.lastElementChild;
+      if (last) last.classList.remove('incoming', 'shown');
+    }, 700);
+  }
+
+  // A thing and its photos: either a photos[] array or a single previewImage.
+  categoryThings(cat) {
+    return cat.items
+      .map(i => ({ label: i.name, cat: cat.title,
+                   photos: i.photos || (i.previewImage ? [i.previewImage] : []) }))
+      .filter(t => t.photos.length);
+  }
+
+  shuffled(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Deal up to six tiles: shuffle the THINGS, take six, one randomly chosen
+  // photo from each — so no two photos of the same thing ever share a set,
+  // and a thing with several photos shows a different face across deals.
+  dealSix(things) {
+    return this.shuffled(things).slice(0, 6).map(th => ({
+      src: th.photos[Math.floor(Math.random() * th.photos.length)],
+      label: th.label
+    }));
+  }
+
+  // A fresh deal never repeats what is currently on screen when it can
+  // help it: unseen things first, then on-screen things wearing an unseen
+  // photo, then (only to fill out six) anything left. Re-dealing a category
+  // therefore keeps the same six things but flips their stills.
+  dealFresh(things, allow) {
+    const ok = allow || (() => true);
+    const grid = document.getElementById('banner-collage');
+    const current = grid
+      ? [...grid.querySelectorAll('.collage-cell .cell-layer img')]
+          .map(i => ({ label: i.getAttribute('alt'), src: i.getAttribute('src') }))
+      : [];
+    const curLabels = new Set(current.map(c => c.label));
+    const curSrcs = new Set(current.map(c => new URL(c.src, location.href).pathname));
+    const fresh = this.shuffled(things.filter(t => !curLabels.has(t.label)));
+    const alts = this.shuffled(things.filter(t =>
+      curLabels.has(t.label) && t.photos.some(ph => !curSrcs.has(ph))));
+    const picks = [];
+    for (const tier of [fresh, alts, this.shuffled(things)]) {
+      for (const t of tier) {
+        if (picks.length >= 6) break;
+        if (!picks.includes(t) && ok(t, picks)) picks.push(t);
+      }
+    }
+    return picks.map(t => {
+      const unseen = t.photos.filter(ph => !curSrcs.has(ph));
+      const pool = unseen.length ? unseen : t.photos;
+      return { src: pool[Math.floor(Math.random() * pool.length)], label: t.label };
+    });
+  }
+
+  // A randomize-style hand: fresh things, at most ONE media tile (sports or
+  // films combined) — the personal categories carry it. Used by the
+  // randomize button and by every arrival at the favs page.
+  randomDeal() {
+    const isMedia = t => t.cat === 'sports' || t.cat === 'films';
+    const cap = (t, picks) => !isMedia(t) || picks.filter(isMedia).length < 1;
+    return this.dealFresh(this.allThings(), cap);
+  }
+
+  // Empty every tile (fully transparent — not the placeholder block), so an
+  // arrival can pop the images in one by one over the banner beneath.
+  clearCollage() {
+    const grid = document.getElementById('banner-collage');
+    if (!grid) return;
+    clearTimeout(this._collageSwapT);
+    grid.querySelectorAll('.collage-cell').forEach(cell => cell.replaceChildren());
+  }
+
   // 'photo' is the original full-bleed hero (home, article covers); 'drawn'
   // insets the image below the chrome as a torn-paper card. Only records the
   // request — the chrome class and the incoming layer's geometry are applied
@@ -601,6 +821,8 @@ class Site {
   applyBannerMode() {
     if (!this.banner) return;
     this.banner.classList.remove('travel-pending');
+    this.banner.classList.toggle('collage',
+      !!this.bannerPhoto && this.bannerPhoto.src.includes('favorites-collage'));
     this.banner.classList.toggle('drawn', this.bannerMode === 'drawn');
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
@@ -884,30 +1106,49 @@ class Site {
 
   async showSolacesList() {
     await this.fadeToView('solaces-view', 'solaces');
-    // Favorites keeps the photograph — no drawn treatment here.
+    // Favorites wears its own hero: the collage of favorite things. On
+    // arrival the tiles pop in one by one over the dissolving banner — the
+    // same staggered deal the strip buttons use.
     this.setBannerMode('photo');
-    {
-      const photo = this.homePhoto();
-      this.setBannerPhoto(photo.src, photo.position);
-    }
-    this.renderBreadcrumb({ label: 'favorites', hash: 'favorites' }, null);
+    this.setBannerPhoto('/static/images/hero/favorites-collage.jpg', 'center', 'full');
+    this.clearCollage();
+    // arrivals get a fresh capped hand too, not a fixed mix
+    this.renderCollage(this.randomDeal(), true);
+    this.renderBreadcrumb({ label: 'favs', hash: 'favorites' }, null);
 
     const container = document.getElementById('solaces-list');
     if (!container) return;
 
-    container.innerHTML = this.solaces.map(category => `
-      <div class="solaces-category">
-        <div class="solaces-category-title">${category.title}</div>
-        <div class="solaces-category-items">
-          ${category.items.map(item => {
-            if (item.url) {
-              return `<span class="solaces-item"><a href="${item.url}" target="_blank" rel="noopener">${item.name}</a></span>`;
-            }
-            return `<span class="solaces-item">${item.name}</span>`;
-          }).join('')}
-        </div>
-      </div>
-    `).join('') || '<p class="empty-note">nothing here yet.</p>';
+    // Categories whose items carry images render as shelves of torn-edge
+    // photo cards (the banner's deckle language, miniature); the rest stay
+    // quiet text lists.
+    // The page is just the hero and this strip: each word is a button that
+    // fills the hero grid with that category's photos. Categories without
+    // photos yet sit disabled until they're uploaded.
+    container.innerHTML = `<div class="solaces-strip">` +
+      `<button class="strip-btn" data-cat="__random">randomize</button>` +
+      this.solaces.map(c => {
+        const has = this.categoryThings(c).length > 0;
+        return `<button class="strip-btn" data-cat="${c.title}"${has ? '' : ' disabled'}>${c.title}</button>`;
+      }).join('') +
+      `</div>`;
+
+    container.querySelectorAll('.strip-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.strip-btn').forEach(b => b.classList.remove('active'));
+        if (btn.dataset.cat === '__random') {
+          // an action, not a state: a fresh capped hand
+          this.renderCollage(this.randomDeal(), true);
+          return;
+        }
+        btn.classList.add('active');
+        // a topic stays within itself: dealt from its own things only.
+        // Re-clicking the active topic re-deals it — same things, unseen
+        // stills, reshuffled slots. Only "randomize" leaves the topic.
+        this.renderCollage(
+          this.dealFresh(this.categoryThings(this.solaces.find(c => c.title === btn.dataset.cat))), true);
+      });
+    });
 
     this.syncUrl('#favorites');
   }
@@ -1031,6 +1272,7 @@ class Site {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const site = new Site();
+  window.site = site; // console/debug access
 
   await Promise.all([
     site.loadPosts(),
