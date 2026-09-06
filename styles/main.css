@@ -25,7 +25,15 @@
 
   --banner-height: 380px;
   --banner-bar: 60px;
-  --banner-top: 44px;
+  /* Air above the banner. This is also the strip the lifted chrome stands in
+     on favs, so it has to hold a line of type with room to breathe, not just
+     separate the photo from the edge. */
+  --banner-top: 68px;
+  /* How far the lifted name's centre line rides above the hero's top edge.
+     Deliberately independent of --banner-top: that token sets the air above
+     the page, this one sets how tightly the chrome hugs the hero, so moving
+     one never disturbs the other. */
+  --chrome-rise: 24px;
   --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
   --banner-ms: 650ms;
   --banner-fade-ms: 650ms;
@@ -363,12 +371,23 @@ body.no-top-fade .top-fade {
   height: var(--banner-height);
   margin-top: var(--banner-top);
   border-radius: 0;
-  overflow: hidden;
+  /* The clip moved to .banner-frame. The banner box itself must NOT clip:
+     on a lifted view the chrome leaves it entirely — up into the strip above
+     the hero, out into the gutter beside it. */
+  overflow: visible;
   /* Page-colored backing, so the frame before an image paints — and the
      surround mid-morph — shows nothing rather than flashing a panel color. */
   background: var(--bg);
   box-shadow: 0 6px 20px rgba(10, 20, 30, 0.14);
-  transition: box-shadow var(--banner-fade-ms) ease;
+  transition: box-shadow var(--banner-fade-ms) ease,
+              opacity 260ms ease;
+}
+
+/* Blanked: the frame leaves with the page rather than morphing into the next
+   one. Covers both the image and the chrome — the whole thing goes, and comes
+   back already wearing what comes next. */
+.banner.blank {
+  opacity: 0;
 }
 
 /* Drawn mode: the image is a torn-paper card inset below the chrome instead
@@ -410,7 +429,8 @@ body.no-top-fade .top-fade {
      outline). Its gentle return runs on the base transition, after the
      animating window has passed. */
   transition: height var(--banner-ms) var(--banner-ease),
-              top var(--banner-ms) var(--banner-ease);
+              top var(--banner-ms) var(--banner-ease),
+              opacity 260ms ease;
 }
 
 /* Condensed to a bar, the photo gets a touch more tint under the breadcrumb. */
@@ -427,6 +447,18 @@ body.no-top-fade .top-fade {
 
 .banner.condensed:not(.drawn)::after {
   opacity: 1;
+}
+
+/* The image's own box: exactly the banner rect, and the thing that clips.
+   This matters more than it looks — .banner-media is a fixed 380px tall
+   anchored to the bottom, so a collapsed banner has 320px of photo hanging
+   above its top edge. Unclipped, that would cover the page. */
+.banner-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 0; /* below .banner-header's 3 */
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 .banner-spacer {
@@ -569,6 +601,10 @@ body.no-top-fade .top-fade {
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4),
                0 1px 10px rgba(0, 0, 0, 0.35);
+  /* The bar spans the banner but is mostly empty, and on a lifted view its
+     contents have moved out of it entirely. Only the type itself should take
+     clicks — otherwise the strip eats them on whatever sits beneath. */
+  pointer-events: none;
   /* The text is ONE component: it only ever changes appearance while faded
      out (.swapping), so color/shadow/padding never animate on screen. */
   transition: opacity var(--chrome-ms) ease;
@@ -587,6 +623,7 @@ body.no-top-fade .top-fade {
 /* Breadcrumb */
 
 .breadcrumb {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -695,9 +732,98 @@ body.no-top-fade .top-fade {
   }
 }
 
+/* ---- Lifted chrome: off the image entirely --------------------------------
+   Favs deals a different set of photographs into the hero every time, so no
+   fixed treatment can keep white type legible over it. Rather than fight the
+   backdrop, the chrome leaves it: the name lifts into the strip the banner
+   already holds above itself, and the icons step out into the gutter and
+   stack down the hero's right edge. Home keeps its chrome in the bar, on the
+   photograph.
+
+   Offsets use `translate`, not `transform`: the entrance animation owns
+   `transform` on these two elements, and the two properties compose instead
+   of one clobbering the other.                                              */
+
+/* The slide is a NAVIGATION gesture, so it is armed one frame after the
+   chrome first settles. Without that, a cold load would place the text in the
+   bar and then visibly walk it to its lifted position while the entrance is
+   still playing. */
+.banner.chrome-ready .breadcrumb,
+.banner.chrome-ready .social {
+  transition: translate var(--banner-ms) var(--banner-ease);
+}
+
+/* The name rises out of the bar's centre line to sit just clear of the hero's
+   top edge — close enough to read as its label rather than as page furniture
+   stranded above it. */
+.banner.lifted .breadcrumb {
+  translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+}
+
+/* The cluster steps out past the hero's right edge by its own width, plus the
+   padding it was inset by, plus a little air — then up out of the bar's
+   centring so the first icon caps the hero's top corner. */
+.banner.lifted .social {
+  translate: calc(104px + var(--page-pad) + 6px) calc((var(--banner-bar) - 32px) / -2);
+}
+
+/* ...and inside it each icon walks from its place in the row to its place in
+   the column — one 36px step (32px icon + 4px gap) left for every step down,
+   so the row folds into a column without the pitch ever changing. */
+.banner.chrome-ready .social a {
+  transition: translate var(--banner-ms) var(--banner-ease), opacity 0.25s ease;
+}
+
+.banner.lifted .social a:nth-child(2) {
+  translate: -36px 36px;
+}
+
+.banner.lifted .social a:nth-child(3) {
+  translate: -72px 72px;
+}
+
+/* Info collapses its image away, so there is no hero for the cluster to run
+   down the edge of — it stays a row up in the band, beside the name. */
+.banner.bare .social {
+  translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+}
+
+.banner.bare .social a:nth-child(2),
+.banner.bare .social a:nth-child(3) {
+  translate: 0 0;
+}
+
+/* Nothing to cast it: a shadow around a zero-height box is just a dark line. */
+.banner.bare {
+  box-shadow: none;
+}
+
+/* Under ~760px the gutter runs out (the site box is 640px and the icons need
+   ~52px beyond the hero's edge). The column folds back into a row and rides
+   up beside the name instead — still off the image, which is the point. */
+@media (max-width: 760px) {
+  .banner.lifted .social {
+    translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+  }
+
+  .banner.lifted .social a:nth-child(2),
+  .banner.lifted .social a:nth-child(3) {
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner.chrome-ready .breadcrumb,
+  .banner.chrome-ready .social,
+  .banner.chrome-ready .social a {
+    transition-duration: 0s;
+  }
+}
+
 /* Social */
 
 .social {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -778,6 +904,24 @@ body.no-top-fade .top-fade {
   .contact-email:hover {
     opacity: 0.6;
   }
+}
+
+/* The confirmation lands UNDER the address instead of replacing it — you can
+   still see what you copied while being told that you copied it. Its line is
+   held open whether or not it is speaking, so nothing below it shifts. */
+.copy-note {
+  display: block;
+  min-height: 18px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-faint);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.copy-note.shown {
+  opacity: 1;
 }
 
 /* ========================================
@@ -1322,7 +1466,9 @@ body.no-top-fade .top-fade {
 
 .stats-heading {
   font-family: var(--font-display);
-  font-size: 16px;
+  /* The same 14px as the name in the chrome above: these are labels for
+     groups of facts, not titles competing with it. */
+  font-size: 14px;
   font-weight: 500;
   color: var(--fg);
   margin: 0 0 10px;
@@ -1344,23 +1490,47 @@ body.no-top-fade .top-fade {
 .stats-table td:first-child {
   padding-right: 12px;
   color: var(--fg-muted);
-  width: 55%;
+  /* The widest label needs ~135px; 55% spent 295 on it and left the values
+     barely enough to stay on one line. */
+  width: 40%;
+}
+
+/* Values close on the right instead of drifting, so the column has an edge —
+   and that edge is the icons'. The 8px inset is the padding inside each icon
+   box: aligning to the box would leave the glyphs looking a step short. */
+.stats-table td:last-child {
+  text-align: right;
+  padding-right: 8px;
 }
 
 .stats-table td.tabular {
   font-variant-numeric: tabular-nums;
 }
 
+/* The dreams are sentences, not facts, so they do not take the ledger's two
+   columns — that was tried in #25 and reverted, rightly: splitting each one
+   at its lead-in word put words in the label column that label nothing.
+   What they CAN share is the page's left edge. The bullets and their 20px
+   indent were the only thing pushing them off it; without them each line
+   starts exactly where every heading and label starts, and the section reads
+   as the page's closing stanza rather than a stray list hanging to the left. */
 .stats-list {
-  margin: 0 0 24px;
-  padding-left: 20px;
+  margin: 0 0 18px;
+  padding-left: 0;
+  list-style: none;
   font-size: 13px;
-  color: var(--fg-body);
+  /* Muted rather than body ink: these are wishes, not facts to be looked up.
+     Dropping them a step quieter than the values above sets the section apart
+     as a coda instead of a third table you are meant to read across. */
+  color: var(--fg-muted);
   line-height: 1.7;
 }
 
+/* The gap now does the work the bullets used to. It has to: one dream ("you
+   reaching out. let's connect :D") carries a full stop of its own, so without
+   separation the line after it would read as part of the same thought. */
 .stats-list li {
-  margin-bottom: 6px;
+  margin-bottom: 9px;
 }
 
 .empty-note {
