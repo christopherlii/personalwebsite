@@ -1,21 +1,57 @@
 [
   {
-    "title": "software",
+    "title": "sports",
     "items": [
       {
-        "name": "arc"
+        "name": "barcelona",
+        "photos": [
+          "/static/images/sports/barca.jpg",
+          "/static/images/favs/sports/barcelona-2.jpg",
+          "/static/images/favs/sports/barcelona-3.jpg"
+        ]
       },
       {
-        "name": "cursor"
+        "name": "manchester city",
+        "photos": [
+          "/static/images/sports/mancity.jpg",
+          "/static/images/favs/sports/man-city-2.jpg",
+          "/static/images/favs/sports/man-city-3.jpg"
+        ]
       },
       {
-        "name": "linear"
+        "name": "warriors",
+        "photos": [
+          "/static/images/sports/warriors.jpg",
+          "/static/images/favs/sports/warriors-2.jpg",
+          "/static/images/favs/sports/warriors-3.jpg",
+          "/static/images/favs/sports/warriors-4.jpg"
+        ]
       },
       {
-        "name": "notion"
+        "name": "mclaren f1",
+        "photos": [
+          "/static/images/sports/lando.png",
+          "/static/images/favs/sports/mclaren-2.jpg",
+          "/static/images/favs/sports/mclaren-3.jpg"
+        ]
       },
       {
-        "name": "obsidian"
+        "name": "carlos alcaraz",
+        "photos": [
+          "/static/images/sports/carlito.png",
+          "/static/images/favs/sports/alcaraz-2.jpg",
+          "/static/images/favs/sports/alcaraz-3.jpg",
+          "/static/images/favs/sports/alcaraz-4.jpg"
+        ]
+      },
+      {
+        "name": "my fantasy football team",
+        "photos": [
+          "/static/images/favs/sports/fantasy-football-1.jpg",
+          "/static/images/favs/sports/fantasy-football-2.jpg",
+          "/static/images/favs/sports/fantasy-football-3.jpg",
+          "/static/images/favs/sports/fantasy-football-4.jpg"
+        ]
       }
     ]
   },
@@ -24,99 +60,197 @@
     "items": [
       {
         "name": "good will hunting",
-        "previewImage": "/static/images/films/goodwillhunting.jpg"
+        "photos": [
+          "/static/images/films/goodwillhunting.jpg",
+          "/static/images/favs/films/good-will-hunting-2.jpg",
+          "/static/images/favs/films/good-will-hunting-3.jpg",
+          "/static/images/favs/films/good-will-hunting-4.jpg"
+        ]
       },
       {
         "name": "interstellar",
-        "previewImage": "/static/images/films/interstellar.jpg"
+        "photos": [
+          "/static/images/films/interstellar.jpg",
+          "/static/images/favs/films/interstellar-2.jpg",
+          "/static/images/favs/films/interstellar-3.jpg"
+        ]
       },
       {
         "name": "the social network",
-        "previewImage": "/static/images/films/socialnetwork.jpg"
+        "photos": [
+          "/static/images/films/socialnetwork.jpg",
+          "/static/images/favs/films/social-network-2.jpg",
+          "/static/images/favs/films/social-network-3.jpg",
+          "/static/images/favs/films/social-network-4.jpg"
+        ]
       },
       {
         "name": "suits",
-        "previewImage": "/static/images/films/suits.jpg"
+        "photos": [
+          "/static/images/films/suits.jpg",
+          "/static/images/favs/films/suits-2.jpg",
+          "/static/images/favs/films/suits-3.jpg"
+        ]
       },
       {
         "name": "dune",
-        "previewImage": "/static/images/films/dune.jpg"
+        "photos": [
+          "/static/images/films/dune.jpg",
+          "/static/images/favs/films/dune-2.jpg",
+          "/static/images/favs/films/dune-3.jpg",
+          "/static/images/favs/films/dune-4.jpg",
+          "/static/images/favs/films/dune-5.jpg"
+        ]
       },
       {
         "name": "moneyball",
-        "previewImage": "/static/images/films/moneyball.jpg"
+        "photos": [
+          "/static/images/films/moneyball.jpg",
+          "/static/images/favs/films/moneyball-2.jpg",
+          "/static/images/favs/films/moneyball-3.jpg"
+        ]
       }
     ]
   },
   {
-    "title": "sports",
+    "title": "friends",
     "items": [
       {
-        "name": "barcelona",
-        "previewImage": "/static/images/sports/barca.jpg"
+        "name": "zedd in the park!",
+        "photos": [
+          "/static/images/favs/friends/zedd-in-the-park-1.jpg"
+        ]
       },
       {
-        "name": "manchester city",
-        "previewImage": "/static/images/sports/mancity.jpg"
+        "name": "jack and rose",
+        "photos": [
+          "/static/images/favs/friends/jack-and-rose-1.jpg"
+        ]
       },
       {
-        "name": "warriors",
-        "previewImage": "/static/images/sports/warriors.jpg"
+        "name": "grad!",
+        "photos": [
+          "/static/images/blogs/solaces/grad.jpg"
+        ]
       },
       {
-        "name": "mclaren f1",
-        "previewImage": "/static/images/sports/lando.png"
+        "name": "harvard v yale",
+        "photos": [
+          "/static/images/blogs/2025_q4/harvard_yale_05.jpg"
+        ]
       },
       {
-        "name": "carlos alcaraz",
-        "previewImage": "/static/images/sports/carlito.png"
+        "name": "amazon intern friends",
+        "photos": [
+          "/static/images/blogs/2025_q4/bb_retreat_guys.jpg"
+        ]
+      },
+      {
+        "name": "smores!",
+        "photos": [
+          "/static/images/favs/friends/smores-1.jpg"
+        ]
+      },
+      {
+        "name": "nyc",
+        "photos": [
+          "/static/images/favs/friends/nyc-1.jpg"
+        ]
+      },
+      {
+        "name": "skiing",
+        "photos": [
+          "/static/images/favs/friends/skiing-1.jpg"
+        ]
+      },
+      {
+        "name": "kickback",
+        "photos": [
+          "/static/images/favs/friends/kickback-1.jpg"
+        ]
       }
     ]
   },
   {
-    "title": "nyc food",
+    "title": "side quests",
     "items": [
       {
-        "name": "cho dang gol"
+        "name": "guatemala",
+        "photos": [
+          "/static/images/favs/side-quests/guatemala-1.jpg"
+        ]
       },
       {
-        "name": "uncle ray's chicken rice"
+        "name": "seoul",
+        "photos": [
+          "/static/images/favs/side-quests/seoul-1.jpg"
+        ]
       },
       {
-        "name": "soothr"
+        "name": "fukuoka",
+        "photos": [
+          "/static/images/favs/side-quests/fukuoka-1.jpg"
+        ]
       },
       {
-        "name": "nubiani"
+        "name": "takachiho",
+        "photos": [
+          "/static/images/favs/side-quests/takachiho-1.jpg"
+        ]
       },
       {
-        "name": "dubu haus"
-      }
-    ]
-  },
-  {
-    "title": "cafes",
-    "items": [
-      {
-        "name": "dialogue nyc"
+        "name": "italy",
+        "photos": [
+          "/static/images/favs/side-quests/italy-1.jpg"
+        ]
       },
       {
-        "name": "bibliotheque"
+        "name": "brooklyn",
+        "photos": [
+          "/static/images/blogs/solaces/skyline.jpg"
+        ]
       },
       {
-        "name": "felix roasting"
-      }
-    ]
-  },
-  {
-    "title": "pieces",
-    "items": [
-      {
-        "name": "how to do great work",
-        "url": "https://paulgraham.com/greatwork.html"
+        "name": "central park",
+        "photos": [
+          "/static/images/favs/side-quests/central-park-1.jpg"
+        ]
       },
       {
-        "name": "the mundanity of excellence",
-        "url": "https://academics.hamilton.edu/documents/themundanityofexcellence.pdf"
+        "name": "chengdu",
+        "photos": [
+          "/static/images/favs/side-quests/chengdu-1.jpg"
+        ]
+      },
+      {
+        "name": "washington",
+        "photos": [
+          "/static/images/favs/side-quests/seattle-1.jpg"
+        ]
+      },
+      {
+        "name": "san francisco",
+        "photos": [
+          "/static/images/favs/side-quests/san-francisco-1.jpg"
+        ]
+      },
+      {
+        "name": "ireland",
+        "photos": [
+          "/static/images/favs/side-quests/ireland-1.jpg"
+        ]
+      },
+      {
+        "name": "taipei",
+        "photos": [
+          "/static/images/favs/side-quests/taipei-1.jpg"
+        ]
+      },
+      {
+        "name": "volcan de fuego",
+        "photos": [
+          "/static/images/favs/side-quests/volcan-de-fuego-1.jpg"
+        ]
       }
     ]
   }
