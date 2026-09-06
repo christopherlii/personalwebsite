@@ -1578,6 +1578,15 @@ body.no-top-fade .top-fade {
     padding: 0 14px;
   }
 
+  /* Lifted chrome stands in the band above the banner, and mobile's band is
+     20px — narrower than the type is tall. Favs and info were lifting their
+     name and icons clean off the top of the screen. Those two views borrow
+     the height they need; every other view keeps the tighter band, since
+     nothing of theirs is standing up there. */
+  .banner.lifted {
+    margin-top: calc(var(--banner-top) + 36px);
+  }
+
   .contact {
     padding: 20px 0 40px;
   }
