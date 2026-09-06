@@ -776,13 +776,29 @@ class Site {
     });
   }
 
-  // A randomize-style hand: fresh things, at most ONE media tile (sports or
-  // films combined) — the personal categories carry it. Used by the
-  // randomize button and by every arrival at the favs page.
+  // A randomize-style hand is compositionally balanced, not just capped:
+  // exactly one media tile (sports or films), at least two friends, at
+  // least two side quests, and one flex personal tile — so every hand has
+  // one sports/movie, some group shots, some scenery. Freshness rules
+  // apply within each quota bucket, and the final order is shuffled.
+  // Used by the randomize button and by every arrival at the favs page.
   randomDeal() {
-    const isMedia = t => t.cat === 'sports' || t.cat === 'films';
-    const cap = (t, picks) => !isMedia(t) || picks.filter(isMedia).length < 1;
-    return this.dealFresh(this.allThings(), cap);
+    const quotas = [
+      { cats: ['sports', 'films'], n: 1 },
+      { cats: ['friends'], n: 2 },
+      { cats: ['side quests'], n: 2 },
+      { cats: ['friends', 'side quests'], n: 1 },
+    ];
+    const taken = new Set();
+    const hand = [];
+    for (const q of quotas) {
+      const pool = this.allThings().filter(t => q.cats.includes(t.cat) && !taken.has(t.label));
+      for (const tile of this.dealFresh(pool).slice(0, q.n)) {
+        taken.add(tile.label);
+        hand.push(tile);
+      }
+    }
+    return this.shuffled(hand);
   }
 
   // Empty every tile (fully transparent — not the placeholder block), so an
