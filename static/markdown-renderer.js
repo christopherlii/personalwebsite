@@ -42,7 +42,19 @@ class Site {
 
     this.updateBanner = () => {
       if (!this.banner) return;
-      const target = this.view === 'stats' ? this.bannerBar : this.bannerFull;
+      const target = this.bannerFull;
+
+      // Info is a list of facts, not a view: the photograph collapses away
+      // entirely rather than thinning to a strip, and the chrome rides in the
+      // band above where the image used to be. Checked before the phone case
+      // — there is no hero to keep on any screen.
+      if (this.view === 'stats') {
+        this.banner.style.height = '0px';
+        this.banner.classList.remove('condensed');
+        if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
+        this.banner.style.top = this.mobileMq.matches ? '' : `${this.bannerTop}px`;
+        return;
+      }
 
       // Phones: the banner never condenses — it stays a full hero on every
       // view (scrolling away natively), so navigation never animates height;
@@ -320,6 +332,49 @@ class Site {
     } else {
       img.addEventListener('load', swap, { once: true });
     }
+  }
+
+  // Leaving an article that wore its own cover, the banner goes out WITH the
+  // page instead of morphing into the next one. Scrolling back to the top
+  // otherwise brings that cover back into view at full size, and only then
+  // does it change — you watch the picture you just closed load back in for
+  // the sole purpose of being replaced. Blank the frame, wipe it, and bring
+  // it back with the new image already in it.
+  blankBanner() {
+    if (this.banner) this.banner.classList.add('blank');
+  }
+
+  // Wiped rather than cross-faded: with no outgoing image there is nothing to
+  // travel out of, so the next photo simply arrives.
+  clearBannerPhoto() {
+    (this.bannerLayers || []).forEach(layer => {
+      layer.style.transition = 'none';
+      layer.classList.remove('active', 'card', 'cropped', 'beyond', 'travelling', 'opening');
+      layer.style.backgroundImage = '';
+      layer.offsetHeight;
+      layer.style.transition = '';
+    });
+    this.bannerPhoto = null;
+    this.bannerFrame = null;
+  }
+
+  revealBanner(src) {
+    if (!this.banner) return;
+    const reveal = () => {
+      clearTimeout(this._revealT);
+      this.banner.classList.remove('blank');
+    };
+    // A frame that never un-blanks is worse than one that returns early, and
+    // this backstop must NOT route through rAF — a tab that is never painted
+    // would then never fire it either.
+    clearTimeout(this._revealT);
+    this._revealT = setTimeout(reveal, 1200);
+    // One frame after the image is in hand, so it returns already wearing it.
+    const onReady = () => requestAnimationFrame(reveal);
+    const img = new Image();
+    img.src = src;
+    if (img.complete && img.naturalWidth) onReady();
+    else img.addEventListener('load', onReady, { once: true });
   }
 
   // Warm the covers a view is about to offer, so the cross-fade is instant.
@@ -600,7 +655,12 @@ class Site {
     // Run again once the view's content has actually been rendered.
     setTimeout(this.syncScrollLock, 0);
 
-    this.animateBanner();
+    // The first route has nothing to animate FROM: the page is still hidden
+    // behind route-pending, and that class lifts as soon as routing resolves —
+    // well before a 650ms height transition finishes. Animating here means the
+    // banner is still closing as the site fades in, so landing straight on
+    // info shows a photograph shutting that was never open. Snap instead.
+    if (this._routedOnce) this.animateBanner();
     if (this.updateBanner) this.updateBanner();
   }
 
@@ -897,21 +957,50 @@ class Site {
     grid.querySelectorAll('.collage-cell').forEach(cell => cell.replaceChildren());
   }
 
+  // Views whose chrome is lifted clear of the image: the name into the strip
+  // above it, the icons into the gutter beside it. Favs earns this because it
+  // deals a different set of photographs every time and no fixed treatment
+  // keeps white type legible over all of them. Home keeps its chrome on the
+  // photograph.
+  chromeIsLifted() {
+    return this.view === 'solaces' || this.view === 'stats';
+  }
+
+  // The chrome wears white-on-photo only where it actually sits on a photo.
+  // Drawn views put it on the page, and so does any lifted view.
+  chromeIsInk(mode) {
+    return mode === 'drawn' || this.chromeIsLifted();
+  }
+
   // 'photo' is the original full-bleed hero (home, article covers); 'drawn'
   // insets the image below the chrome as a torn-paper card. Only records the
   // request — the chrome class and the incoming layer's geometry are applied
   // inside the photo swap, so chrome colors, frame, and image all change on
   // the same frame, however long the image takes to decode.
   setBannerMode(mode) {
-    const boundary = this.banner && this.bannerPhoto &&
-      (mode === 'drawn') !== this.banner.classList.contains('drawn');
+    if (!this.banner || !this.bannerPhoto) {
+      // Cold load: there is no photo to wait for, so the outfit lands now
+      // rather than after the first decode — otherwise home paints its white
+      // over-photo chrome for a beat before turning to ink.
+      this.bannerMode = mode;
+      this.applyBannerMode();
+      return;
+    }
+    // Two independent boundaries. The IMAGE travels when it crosses between
+    // full-bleed and card; the TEXT changes outfit when it crosses between
+    // photo and page. They are not the same crossing: favs -> writing keeps
+    // the chrome in ink throughout, so the text slides without ever blinking.
+    const travels = (mode === 'drawn') !== this.banner.classList.contains('drawn');
+    const restyles = this.chromeIsInk(mode) !== this.banner.classList.contains('ink');
     this.bannerMode = mode;
-    if (boundary) {
+    if (travels) {
       // The panel shadow must die at CLICK time — the swap (and its gates)
       // waits for the image, and a shadow fading around an emptying box is
       // a visible outline.
       this.banner.classList.add('travel-pending');
-      // Crossing the photo/drawn boundary, the text runs as its own single
+    }
+    if (restyles) {
+      // Crossing the photo/page boundary, the text runs as its own single
       // component: out in the old outfit, restyle invisibly, back in the
       // new one. Going home it holds until the photo has mostly arrived.
       const hold = mode === 'drawn'
@@ -919,6 +1008,10 @@ class Site {
         : Math.max(0, Math.round(this.bannerOpenMs * 0.65) - this.chromeMs);
       this.swapChrome(hold);
     }
+    // No restyle means nothing to hide, so the header does NOT blink out: it
+    // stays lit and slides between its two homes, and the tail rebuild rides
+    // along on its own animation (renderBreadcrumb applies it immediately
+    // while no swap is in flight).
   }
 
   applyBannerMode() {
@@ -926,10 +1019,28 @@ class Site {
     this.banner.classList.remove('travel-pending');
     this.banner.classList.toggle('collage', this._holdCollage || this._collageView);
     this.banner.classList.toggle('drawn', this.bannerMode === 'drawn');
+    // The lift lands on the same frame as the photo swap, so the name rises
+    // and the icons unfold as the image arrives.
+    this.banner.classList.toggle('lifted', this.chromeIsLifted());
+    // Info collapses the image to nothing, so the banner is a bare band: no
+    // panel shadow around an empty box, and no hero for the icons to run
+    // down the side of.
+    this.banner.classList.toggle('bare', this.view === 'stats');
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
     if (!this._chromeSwapping) {
-      this.banner.classList.toggle('ink', this.bannerMode === 'drawn');
+      this.banner.classList.toggle('ink', this.chromeIsInk(this.bannerMode));
+    }
+    // Arm the slide only after the chrome has been placed once, so first
+    // paint puts it where it belongs instead of animating it there.
+    if (!this._chromeReady) {
+      this._chromeReady = true;
+      // A frame later, so the first placement commits untransitioned. The
+      // timer is a backstop only — a route that settles without ever being
+      // painted would otherwise leave the slide permanently disarmed.
+      const arm = () => this.banner.classList.add('chrome-ready');
+      requestAnimationFrame(arm);
+      setTimeout(arm, 200);
     }
   }
 
@@ -944,7 +1055,7 @@ class Site {
     this._chromeSwapping = true;
     header.classList.add('swapping');
     this._chromeOutT = setTimeout(() => {
-      this.banner.classList.toggle('ink', this.bannerMode === 'drawn');
+      this.banner.classList.toggle('ink', this.chromeIsInk(this.bannerMode));
       if (this._pendingTailSegs) {
         this.applyTailSegs(this._pendingTailSegs, false);
         this._pendingTailSegs = null;
@@ -1037,8 +1148,16 @@ class Site {
   }
 
   async showThoughtsList() {
+    // Only when the image actually has to change. A coverless article is
+    // already wearing the drawing, so returning to it swaps nothing and there
+    // is no flash to prevent — blanking there would be a fade for its own sake.
+    const fromCover = this.view === 'thought' && this.banner &&
+      this.bannerPhoto && this.bannerPhoto.src !== this.drawnPhoto().src;
+    if (fromCover) this.blankBanner();
     await this.fadeToView('thoughts-view', 'thoughts');
+    if (fromCover) this.clearBannerPhoto();
     this.showDrawnHero();
+    if (fromCover) this.revealBanner(this.drawnPhoto().src);
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null);
 
     const list = document.getElementById('thoughts-full-list');
@@ -1126,6 +1245,20 @@ class Site {
   // ========================================
 
   async showSolacesList() {
+    // Clicking the favs crumb while standing on favs is a reshuffle, not an
+    // arrival. Routing it as an arrival clears the grid first, and for the
+    // beat before the new hand lands that bares the hero underneath — the
+    // photo you walked in from, fading up like a page you never asked for.
+    // Deal over the tiles that are already up, exactly as randomize does.
+    // (No hashchange fires for a link to the hash you are on, but the
+    // same-document navigation still reaches the router via popstate.)
+    if (this.view === 'solaces' && this.banner && this.banner.classList.contains('dealt')) {
+      document.querySelectorAll('#solaces-list .strip-btn')
+        .forEach(b => b.classList.remove('active'));
+      this.renderCollage(this.randomDeal(), true);
+      this.syncUrl('#favorites');
+      return;
+    }
     await this.fadeToView('solaces-view', 'solaces');
     // Arriving at favs, the banner image is NOT swapped: the previous hero
     // stays beneath and the dealt tiles pop in over it — un-popped cells
@@ -1220,17 +1353,24 @@ class Site {
   // The email line copies the real address on click and briefly says so.
   setupCopyEmail() {
     const btn = document.getElementById('copy-email');
-    if (!btn) return;
-    const original = btn.textContent;
+    const note = document.getElementById('copy-note');
+    if (!btn || !note) return;
     btn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText('christopherli@nyu.edu');
       } catch (_) {
         return; // no clipboard access — leave the text as the hint it is
       }
-      btn.textContent = 'copied :)';
+      // The address stays put; the confirmation answers underneath it.
+      note.textContent = 'copied :)';
+      note.classList.add('shown');
       clearTimeout(this._copyT);
-      this._copyT = setTimeout(() => { btn.textContent = original; }, 1600);
+      clearTimeout(this._copyClearT);
+      this._copyT = setTimeout(() => {
+        note.classList.remove('shown');
+        // Emptied only once it has faded, so the line never blinks out.
+        this._copyClearT = setTimeout(() => { note.textContent = ''; }, 250);
+      }, 1600);
     });
   }
 

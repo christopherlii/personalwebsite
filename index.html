@@ -31,10 +31,17 @@
   <div class="site">
     <!-- Collapsing banner: full height on home + article, a bar everywhere else -->
     <div class="banner" id="banner">
-      <div class="banner-media" data-layer="0"></div>
-      <div class="banner-media" data-layer="1"></div>
-      <div class="banner-scrim"></div>
-      <div class="banner-collage" id="banner-collage"></div>
+      <!-- The image and everything painted into it live in their own clipping
+           frame, so the banner box itself can let the chrome out: on home the
+           name lifts into the strip above the photo and the icons run down the
+           gutter beside it. The frame is the exact banner rect, so every layer
+           inside keeps the geometry the crop travel is built on. -->
+      <div class="banner-frame">
+        <div class="banner-media" data-layer="0"></div>
+        <div class="banner-media" data-layer="1"></div>
+        <div class="banner-scrim"></div>
+        <div class="banner-collage" id="banner-collage"></div>
+      </div>
       <!-- The page settles top to bottom: chrome drops in first, then the
            content below rises in sequence. -->
       <header class="banner-header">
@@ -63,7 +70,7 @@
           <p class="home-text page-entrance entrance-delay-480">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favs</a>.</p>
         </section>
         <section class="contact">
-          <p class="page-entrance entrance-delay-960"><button type="button" id="copy-email" class="contact-email" title="click to copy">christopherli [at] nyu [dot] edu</button></p>
+          <p class="page-entrance entrance-delay-960"><button type="button" id="copy-email" class="contact-email" title="click to copy">christopherli [at] nyu [dot] edu</button><span class="copy-note" id="copy-note" role="status" aria-live="polite"></span></p>
         </section>
       </main>
     </div>
@@ -116,7 +123,6 @@
           <tbody>
             <tr><td>record soccer juggles</td><td>2412</td></tr>
             <tr><td>energy drinks today</td><td>hopefully 0</td></tr>
-            <tr><td>calories today</td><td>probably too many</td></tr>
             <tr><td>favorite clothing brand</td><td>Lacoste / Ralph Lauren</td></tr>
             <tr><td>favorite song</td><td>Malcolm in the Middle by Malcolm Todd</td></tr>
             <tr><td>favorite artist</td><td>Tame Impala</td></tr>
