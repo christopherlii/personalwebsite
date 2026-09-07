@@ -30,7 +30,7 @@
       {
         "name": "mclaren f1",
         "photos": [
-          "/static/images/sports/lando.png",
+          "/static/images/sports/lando.jpg",
           "/static/images/favs/sports/mclaren-2.jpg",
           "/static/images/favs/sports/mclaren-3.jpg"
         ]
@@ -38,7 +38,7 @@
       {
         "name": "carlos alcaraz",
         "photos": [
-          "/static/images/sports/carlito.png",
+          "/static/images/sports/carlito.jpg",
           "/static/images/favs/sports/alcaraz-2.jpg",
           "/static/images/favs/sports/alcaraz-3.jpg",
           "/static/images/favs/sports/alcaraz-4.jpg"
