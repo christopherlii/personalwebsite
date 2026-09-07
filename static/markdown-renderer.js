@@ -141,6 +141,12 @@ class Site {
       if (!a) return;
       // hovering toward favs starts warming its photo pool early
       if (a.getAttribute('href') === '#favorites') this.warmFavsPhotos();
+      // hovering an article row starts its body downloading
+      const slug = a.dataset && a.dataset.post;
+      if (slug) {
+        const post = this.posts.find(p => p.filename === slug);
+        if (post) this.loadPostBody(post);
+      }
       if (!this.banner || this.banner.classList.contains('drawn')) return;
       if (drawnHashes.has(a.getAttribute('href'))) this.banner.classList.add('unshadow');
     });
@@ -332,10 +338,20 @@ class Site {
     // current photo.
     const img = new Image();
     img.src = src;
+    const decodeThenSwap = () => {
+      if (img.decode) {
+        Promise.race([
+          img.decode().catch(() => {}),
+          new Promise(r => setTimeout(r, 250))
+        ]).then(swap);
+      } else {
+        swap();
+      }
+    };
     if (img.complete && img.naturalWidth) {
-      swap();
+      decodeThenSwap();
     } else {
-      img.addEventListener('load', swap, { once: true });
+      img.addEventListener('load', decodeThenSwap, { once: true });
     }
   }
 
@@ -584,7 +600,7 @@ class Site {
     try {
       let entries = [];
       try {
-        const resp = await fetch('/posts/index.json', { cache: 'no-store' });
+        const resp = await fetch('/posts/index.json');
         if (resp.ok) entries = await resp.json();
       } catch (_) {}
 
@@ -606,30 +622,34 @@ class Site {
     } catch (e) { console.error(e); }
   }
 
-  async loadPostBody(post) {
-    if (post.content !== null) return;
-    try {
-      const resp = await fetch(`/posts/${post.filename}.md`, { cache: 'no-store' });
-      const raw = await resp.text();
-      const { body } = this.parseFrontMatter(raw);
-      if (!post.words) post.words = body.split(/\s+/).length;
-      post.content = typeof marked !== 'undefined' ? marked.parse(body) : body;
-    } catch (e) {
-      console.error(e);
-      post.content = '<p>this post refused to load. try a refresh?</p>';
-    }
+  loadPostBody(post) {
+    if (post.content !== null) return Promise.resolve();
+    if (post._loading) return post._loading;
+    post._loading = (async () => {
+      try {
+        const resp = await fetch(`/posts/${post.filename}.md`);
+        const raw = await resp.text();
+        const { body } = this.parseFrontMatter(raw);
+        if (!post.words) post.words = body.split(/\s+/).length;
+        post.content = typeof marked !== 'undefined' ? marked.parse(body) : body;
+      } catch (e) {
+        console.error(e);
+        post.content = '<p>this post refused to load. try a refresh?</p>';
+      }
+    })();
+    return post._loading;
   }
 
   async loadReading() {
     try {
-      const resp = await fetch('/reading/index.json', { cache: 'no-store' });
+      const resp = await fetch('/reading/index.json');
       if (resp.ok) this.reading = await resp.json();
     } catch (e) { console.error(e); }
   }
 
   async loadSolaces() {
     try {
-      const resp = await fetch('/solaces/index.json', { cache: 'no-store' });
+      const resp = await fetch('/solaces/index.json');
       if (resp.ok) this.solaces = await resp.json();
     } catch (e) { console.error(e); }
   }
@@ -1183,6 +1203,7 @@ class Site {
   }
 
   async showThoughtsList() {
+    if (this.data) await this.data.posts;
     // Only when the image actually has to change. A coverless article is
     // already wearing the drawing, so returning to it swaps nothing and there
     // is no flash to prevent — blanking there would be a fade for its own sake.
@@ -1213,6 +1234,7 @@ class Site {
   }
 
   async showThought(postId) {
+    if (this.data) await this.data.posts;
     const post = this.posts.find(p => p.filename === postId);
     if (!post) return this.showThoughtsList();
 
@@ -1258,6 +1280,7 @@ class Site {
   // ========================================
 
   async showReadingList() {
+    if (this.data) await this.data.reading;
     await this.fadeToView('reading-view', 'reading');
     this.showDrawnHero();
     this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, 'reading');
@@ -1280,6 +1303,7 @@ class Site {
   // ========================================
 
   async showSolacesList() {
+    if (this.data) await this.data.solaces;
     // Clicking the favs crumb while standing on favs is a reshuffle, not an
     // arrival. Routing it as an arrival clears the grid first, and for the
     // beat before the new hand lands that bares the hero underneath — the
@@ -1397,7 +1421,7 @@ class Site {
         return; // no clipboard access — leave the text as the hint it is
       }
       // The address stays put; the confirmation answers underneath it.
-      note.textContent = 'copied :)';
+      note.textContent = 'copied!';
       note.classList.add('shown');
       clearTimeout(this._copyT);
       clearTimeout(this._copyClearT);
@@ -1451,17 +1475,52 @@ document.addEventListener('DOMContentLoaded', async () => {
   const site = new Site();
   window.site = site; // console/debug access
 
-  await Promise.all([
-    site.loadPosts(),
-    site.loadReading(),
-    site.loadSolaces()
-  ]);
+  // The three indexes load in parallel but nothing gates on all of them:
+  // home needs none, and each view awaits only the index it reads.
+  site.data = {
+    posts: site.loadPosts(),
+    reading: site.loadReading(),
+    solaces: site.loadSolaces()
+  };
 
   // Warm every banner image up front — swaps gate on load, so anything not
   // already in cache would give the transition a visible loading beat.
-  site.preloadImages(site.posts.map(p => p.cover));
+  site.data.posts.then(() => site.preloadImages(site.posts.map(p => p.cover)));
 
   await site.handleRoute();
 
   document.documentElement.classList.remove('route-pending');
+
+  // With the first view settled, warm every transition still outstanding —
+  // idle time only, cheapest and likeliest first: article bodies (a click
+  // on any row renders instantly), the favs pool (mobile has no hover to
+  // warm it), the images inside articles, then the italic font cuts.
+  // Visitors who asked to save data are left alone.
+  const conn = navigator.connection || {};
+  if (!conn.saveData && !/\b2g/.test(conn.effectiveType || '')) {
+    const idle = fn => 'requestIdleCallback' in window
+      ? requestIdleCallback(fn, { timeout: 4000 })
+      : setTimeout(fn, 1200);
+    idle(async () => {
+      await site.data.posts;
+      await Promise.all(site.posts.map(p => site.loadPostBody(p)));
+      idle(() => {
+        site.data.solaces.then(() => site.warmFavsPhotos());
+        idle(() => {
+          site.preloadImages(site.posts.flatMap(p =>
+            [...(p.content || '').matchAll(/<img[^>]+src="([^"]+)"/g)].map(m => m[1])));
+          if (document.fonts && document.fonts.load) {
+            document.fonts.load('italic 1em Fraunces');
+            document.fonts.load('italic 1em "Instrument Sans"');
+          }
+        });
+      });
+    });
+  }
+
+  // Photos and fonts come back instantly on repeat visits (sw.js); pages,
+  // styles, and data stay on the network so publishing works as before.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
 });
