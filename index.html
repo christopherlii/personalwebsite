@@ -17,8 +17,13 @@
   <!-- The banner photo is a CSS background set by JS, so without this hint it
        wouldn't start downloading until routing has resolved. -->
   <link rel="preload" as="image" href="/static/images/hero/rock.jpg" fetchpriority="high">
-  <link rel="preload" as="image" href="/static/images/hero/rock-drawn-hero.jpg">
+  <link rel="preload" as="image" href="/static/images/hero/rock-drawn-hero.jpg" fetchpriority="low">
+  <!-- The torn-window mask (CSS mask-image on .cropped) is invisible to the
+       preload scanner but needed the instant any drawn view opens. -->
+  <link rel="preload" as="image" href="/static/images/deckle-mask.png" fetchpriority="low">
   <link rel="stylesheet" href="/styles/main.css">
+  <script defer src="/static/vendor/marked.min.js"></script>
+  <script defer src="/static/markdown-renderer.js"></script>
   <script>
     if (window.location.hash && window.location.hash !== '#') {
       document.documentElement.classList.add('route-pending');
@@ -144,7 +149,5 @@
     </div>
   </div>
 
-  <script src="/static/vendor/marked.min.js"></script>
-  <script src="/static/markdown-renderer.js"></script>
 </body>
 </html>
