@@ -304,6 +304,88 @@ html.route-pending .stagger-children > * {
 }
 
 /* ========================================
+   TITLE MORPH
+   ======================================== */
+
+/* Two moves carry their title across the navigation rather than fading one
+   out and another in: a writing row into the article it opens, and an
+   article's "next" link into the article it opens. Both run in reverse. JS
+   lends the name to the one element that is travelling — it has to be unique
+   among rendered elements and the writing list paints every row at once.
+   See morphTitle() in markdown-renderer.js. */
+
+/* The one child of a cascading list that skips its turn: the row (or the
+   article header) carrying the travelling title. It has to be at rest when
+   the new state is captured — a snapshot of something held at opacity 0
+   travels as nothing — and it has to STAY at rest afterwards, or it would
+   blink out and cascade in behind the title that just landed. The class is
+   wiped by the next re-render of the list it sits in. */
+.stagger-children > .morph-anchor {
+  animation: none;
+}
+
+/* Everything else waits. Rendering is suppressed for the length of a
+   transition while the clock keeps running, so an unheld cascade would play
+   out behind the snapshots and pop in fully formed at the end. Same pause the
+   route-pending hold uses, released when the title lands. */
+html.morphing .stagger-children > * {
+  animation-play-state: paused;
+}
+
+/* The frame cross-fades on the site's own out-beat. Both halves keep the
+   default keyframes — and with them plus-lighter, which is what lets the
+   banner stay in this group: it is deliberately doing nothing across a morph
+   (see afterMorph()), so its two snapshots are identical pixels and composite
+   back to exactly themselves instead of ghosting. They must also share a
+   duration, or the pair stops summing to one and the page flashes mid-fade.
+
+   Giving the banner a group of its own was tried and is worse: pulled out of
+   the frame it snaps to the top of the viewport at full opacity while the
+   outgoing page is still there behind it, and a card of photograph hangs over
+   the middle of the article you are leaving. Riding in the cross-fade, it
+   simply arrives with the page it belongs to. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+}
+
+/* The box travels the whole way, on the banner's own easing so the two feel
+   like one hand. */
+::view-transition-group(morph-title) {
+  animation-duration: 360ms;
+  animation-timing-function: var(--banner-ease);
+}
+
+/* The two texts trade places in the first third of that. A 14px row title and
+   a 30px Fraunces headline are too far apart to morph glyph-for-glyph — held
+   at equal weight across the full travel the two runs sit on top of each
+   other and read as a smear. So the box carries the eye and the swap is over
+   early: the old text scales up into the new box and is gone by 150ms, the
+   new one arrives behind it. Written as a plain cross-fade rather than the
+   default pair, which blends plus-lighter and washes dark text on light. */
+::view-transition-image-pair(morph-title) {
+  isolation: auto;
+}
+
+::view-transition-old(morph-title) {
+  animation: morph-text-out 150ms ease-out both;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(morph-title) {
+  animation: morph-text-in 200ms 110ms ease-out both;
+  mix-blend-mode: normal;
+}
+
+@keyframes morph-text-out {
+  to { opacity: 0; }
+}
+
+@keyframes morph-text-in {
+  from { opacity: 0; }
+}
+
+/* ========================================
    LAYOUT
    ======================================== */
 
@@ -982,6 +1064,11 @@ body.no-top-fade .top-fade {
 
 .article-title {
   font-family: var(--font-display);
+  /* The travelling title morphs into this box, so the box has to be the
+     words: a full-column h1 would blow a 14px row title up to the width of
+     the whole column. Left-aligned block text wraps identically either way. */
+  width: fit-content;
+  max-width: 100%;
   font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -1644,5 +1731,23 @@ body.no-top-fade .top-fade {
   .banner-media {
     transform: none;
     transition: opacity var(--banner-fade-ms) ease;
+  }
+
+  /* canMorph() already refuses to start a transition here, and this is the
+     belt to that pair of braces: the View Transitions API runs its own
+     animations off the UA stylesheet and never consults this query itself,
+     so if one is ever started anyway it snaps instead of moving. */
+  ::view-transition-group(root),
+  ::view-transition-group(morph-title),
+  ::view-transition-new(root),
+  ::view-transition-new(morph-title) {
+    animation: none !important;
+  }
+
+  /* The outgoing snapshot has to leave rather than sit under the new one at
+     full opacity — with no animation there is nothing to fade it out. */
+  ::view-transition-old(root),
+  ::view-transition-old(morph-title) {
+    display: none;
   }
 }

@@ -2,6 +2,10 @@
 // SITE RENDERER
 // ========================================
 
+// The one name a travelling title wears. Lent to a single element for the
+// length of a view transition — see morphTitle().
+const MORPH_NAME = 'morph-title';
+
 class Site {
   constructor() {
     this.posts = [];
@@ -42,6 +46,13 @@ class Site {
 
     this.updateBanner = () => {
       if (!this.banner) return;
+      // A title morph hands the real DOM over to snapshots and leaves the
+      // clock running, so anything the banner starts mid-flight is invisible
+      // while it plays and lands half-finished when the snapshots lift. Hold
+      // the banner exactly where it was; afterMorph() lets it move once the
+      // title has landed. (The flow height of banner + spacer is constant, so
+      // holding it moves nothing below.)
+      if (this._morphing) return;
       const target = this.bannerFull;
 
       // Info is a list of facts, not a view: the photograph collapses away
@@ -671,10 +682,17 @@ class Site {
       // first — which needs a longer hold than the plain fade.
       const reverseExit = currentView.querySelector('.page-entrance') &&
         !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      currentView.classList.add(reverseExit ? 'exiting' : 'fade-out');
-      await new Promise(resolve => setTimeout(resolve, reverseExit ? 320 : 150));
-      currentView.classList.add('hidden');
-      currentView.classList.remove('fade-out', 'exiting');
+      // A title morph already holds the outgoing view as a snapshot and
+      // cross-fades it itself, so fading it here would only be 150ms of
+      // stopped screen before the title is allowed to move.
+      if (this._morphing) {
+        currentView.classList.add('hidden');
+      } else {
+        currentView.classList.add(reverseExit ? 'exiting' : 'fade-out');
+        await new Promise(resolve => setTimeout(resolve, reverseExit ? 320 : 150));
+        currentView.classList.add('hidden');
+        currentView.classList.remove('fade-out', 'exiting');
+      }
     }
 
     if (targetView) {
@@ -686,7 +704,11 @@ class Site {
       if (page) {
         page.style.animation = 'none';
         page.offsetHeight;
-        page.style.animation = '';
+        // In a title morph the transition IS the page's entrance. A 650ms
+        // rise underneath it would be captured at its start, frozen there for
+        // the length of the morph, and would land the title 10px above where
+        // it belongs. The next navigation re-arms it.
+        page.style.animation = this._morphing ? 'none' : '';
       }
     }
 
@@ -698,7 +720,14 @@ class Site {
     document.body.classList.toggle('no-top-fade', viewName === 'thought');
 
     document.documentElement.classList.remove('no-scroll');
-    window.scrollTo(0, 0);
+    // The site scrolls smoothly (html { scroll-behavior: smooth }), but a
+    // title morph holds the page as a snapshot while the scroll animation
+    // runs on behind it — the trip is invisible and the page jumps wherever
+    // it got to when the snapshots lift. Leaving an article from its footer
+    // is the whole distance of the post. Go straight to the top instead and
+    // let the transition be the movement.
+    if (this._morphing) window.scrollTo({ top: 0, behavior: 'instant' });
+    else window.scrollTo(0, 0);
     this.syncScrollLock();
     // Run again once the view's content has actually been rendered.
     setTimeout(this.syncScrollLock, 0);
@@ -708,8 +737,143 @@ class Site {
     // well before a 650ms height transition finishes. Animating here means the
     // banner is still closing as the site fades in, so landing straight on
     // info shows a photograph shutting that was never open. Snap instead.
-    if (this._routedOnce) this.animateBanner();
-    if (this.updateBanner) this.updateBanner();
+    this.afterMorph(() => {
+      if (this._routedOnce) this.animateBanner();
+      if (this.updateBanner) this.updateBanner();
+    });
+  }
+
+  // ========================================
+  // TITLE MORPH
+  // ========================================
+  //
+  // Two moves carry their title across the navigation instead of fading one
+  // out and a different one in: a writing row into the article it opens, and
+  // an article's "next" link into the article it opens. The decision is made
+  // in the router rather than on the click, so both run in reverse for free —
+  // the "all writing" link and the back button included.
+
+  // The View Transitions API does not consult prefers-reduced-motion on its
+  // own, so we do. Anything without the API falls straight through to the
+  // plain fade, which is also what a reduced-motion visitor keeps.
+  canMorph() {
+    return typeof document.startViewTransition === 'function' &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  // Work the banner does with its own hand-rolled CSS — the height and top
+  // transitions, the two-layer photo cross-fade, the chrome's outfit change,
+  // the blank-and-reveal on the way out of a cover. All of it runs on the
+  // real DOM, and a view transition replaces the real DOM with snapshots
+  // while the clock keeps ticking: anything started inside the morph plays
+  // invisibly and reappears half-finished. So the banner is not part of the
+  // morph at all. It holds absolutely still while the title flies, and then
+  // does its own thing, at its own full length, from a clean start.
+  // Outside a morph this is just a call, in the same order as before.
+  afterMorph(fn) {
+    if (!this._morphing) return fn();
+    this._morphQueue.push(fn);
+  }
+
+  // The element whose title should travel into `hash`, or null for every
+  // other move.
+  morphSource(hash) {
+    if (!this.canMorph()) return null;
+    const slug = hash.startsWith('thought/') ? hash.slice('thought/'.length) : null;
+
+    // A writing row into the article it opens.
+    if (slug && this.view === 'thoughts') {
+      const row = Array.from(document.querySelectorAll('.thought-row'))
+        .find(r => r.dataset.post === slug);
+      return row ? row.querySelector('.thought-title') : null;
+    }
+    // An article into the one its footer points at. Walking backward through
+    // history has nothing on screen to travel from — "next" only ever points
+    // deeper into the archive — so that keeps the plain fade.
+    if (slug && this.view === 'thought') {
+      return document.querySelector(`.article-footer a[href="#thought/${slug}"] .next-title`);
+    }
+    // And the article back into its own row.
+    if ((hash === 'thoughts' || hash.startsWith('thoughts/')) && this.view === 'thought') {
+      return document.querySelector('#thought-content .article-title');
+    }
+    return null;
+  }
+
+  // Where the travelling title lands, once the new view has rendered.
+  // `slug` is the article being left, so the reverse move can find its row.
+  morphTarget(slug) {
+    if (this.view === 'thought') {
+      return document.querySelector('#thought-content .article-title');
+    }
+    if (this.view === 'thoughts' && slug) {
+      const row = Array.from(document.querySelectorAll('.thought-row'))
+        .find(r => r.dataset.post === slug);
+      return row ? row.querySelector('.thought-title') : null;
+    }
+    return null;
+  }
+
+  // Runs `nav` inside a view transition with `from`'s text named as the
+  // travelling element, and hands the name to whatever it becomes.
+  async morphTitle(from, nav) {
+    // A second click mid-morph routes plainly rather than fighting the
+    // transition already in flight; its banner work still rides the queue.
+    if (!from || !this.canMorph() || this._morphing) return nav();
+
+    const slug = this.slug;
+    const named = [];
+    // The name has to be unique among rendered elements, and the writing list
+    // paints every row at once — so it is lent to the one element that is
+    // travelling and taken back the moment the transition settles.
+    const lend = el => {
+      if (!el) return;
+      el.style.viewTransitionName = MORPH_NAME;
+      named.push(el);
+      // The row (or the article header) carrying it has to be at rest when
+      // the new state is captured: a snapshot of something the stagger is
+      // still holding at opacity 0 travels as nothing. Only that one child
+      // steps out of the cascade — its siblings still fall in around it.
+      const anchor = el.closest('.stagger-children > *');
+      if (anchor) anchor.classList.add('morph-anchor');
+    };
+
+    this._morphing = true;
+    this._morphQueue = [];
+    document.documentElement.classList.add('morphing');
+    lend(from);
+
+    const settle = () => {
+      document.documentElement.classList.remove('morphing');
+      named.forEach(el => { el.style.viewTransitionName = ''; });
+      this._morphing = false;
+      const queued = this._morphQueue;
+      this._morphQueue = [];
+      queued.forEach(fn => fn());
+    };
+
+    let transition;
+    try {
+      transition = document.startViewTransition(async () => {
+        await nav();
+        lend(this.morphTarget(slug));
+      });
+    } catch (e) {
+      // Never leave the site un-navigated because the pretty version failed.
+      settle();
+      return nav();
+    }
+    // .finished rejects if the callback threw; the queue must drain either way,
+    // and it must drain even if the transition never reports back at all —
+    // the banner's whole swap is sitting in it and the cascade is held paused.
+    try {
+      await Promise.race([
+        transition.finished.catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
+    } finally {
+      settle();
+    }
   }
 
   homePhoto() {
@@ -1209,12 +1373,22 @@ class Site {
     // is no flash to prevent — blanking there would be a fade for its own sake.
     const fromCover = this.view === 'thought' && this.banner &&
       this.bannerPhoto && this.bannerPhoto.src !== this.drawnPhoto().src;
-    if (fromCover) this.blankBanner();
+    // The wipe has to hide inside the blank, so it waits a beat — the beat
+    // the view's exit fade used to lend it by running alongside. Spelt out
+    // here so the whole swap can ride afterMorph() as one piece: outside a
+    // morph the ordering and timing are exactly as they were.
+    this.afterMorph(async () => {
+      if (fromCover) {
+        this.blankBanner();
+        await new Promise(resolve => setTimeout(resolve, 150));
+        this.clearBannerPhoto();
+      }
+      this.showDrawnHero();
+      if (fromCover) this.revealBanner(this.drawnPhoto().src);
+    });
     await this.fadeToView('thoughts-view', 'thoughts');
-    if (fromCover) this.clearBannerPhoto();
-    this.showDrawnHero();
-    if (fromCover) this.revealBanner(this.drawnPhoto().src);
-    this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null);
+    this.afterMorph(() =>
+      this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, null));
 
     const list = document.getElementById('thoughts-full-list');
     list.innerHTML = this.posts.map(post => `
@@ -1244,14 +1418,16 @@ class Site {
     ]);
     this.slug = postId;
 
-    if (post.cover) {
-      // Covers use the same card frame as the writing page.
-      this.setBannerMode('drawn');
-      this.setBannerPhoto(post.cover, post.coverPosition, 'card');
-    } else {
-      this.showDrawnHero();
-    }
-    this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
+    this.afterMorph(() => {
+      if (post.cover) {
+        // Covers use the same card frame as the writing page.
+        this.setBannerMode('drawn');
+        this.setBannerPhoto(post.cover, post.coverPosition, 'card');
+      } else {
+        this.showDrawnHero();
+      }
+      this.renderBreadcrumb({ label: 'writing', hash: 'thoughts' }, post.title);
+    });
 
     // "next" walks backward in time, like flipping deeper into an archive.
     const older = this.posts[this.posts.indexOf(post) + 1];
@@ -1264,13 +1440,13 @@ class Site {
       <div class="article-body">${post.content}</div>
       <footer class="article-footer">
         <a href="#thoughts">← all writing</a>
-        ${older ? `<a href="#thought/${older.filename}">next: ${older.title} →</a>` : ''}
+        ${older ? `<a href="#thought/${older.filename}">next: <span class="next-title">${older.title}</span> →</a>` : ''}
       </footer>
     `;
 
     this.enhanceArticleImages(document.getElementById('thought-content'));
     this.setupPhotoShuffle();
-    this.updateBanner();
+    this.afterMorph(() => this.updateBanner());
 
     this.syncUrl(`#thought/${postId}`);
   }
@@ -1439,7 +1615,26 @@ class Site {
 
   async handleRoute() {
     const hash = window.location.hash.replace('#', '');
+    // Decided here rather than on the click, so the back button and the
+    // "all writing" link morph the same way a row does.
+    const from = this.morphSource(hash);
+    // A transition callback runs behind a stopped screen, so anything it
+    // waits on is time the page spends frozen. Fetch the body first.
+    if (from) await this.warmRoute(hash);
+    await this.morphTitle(from, () => this.routeTo(hash));
+    this._routedOnce = true;
+  }
 
+  // Everything a morphing route would have awaited inside the transition,
+  // awaited outside it instead.
+  async warmRoute(hash) {
+    if (!hash.startsWith('thought/')) return;
+    if (this.data) await this.data.posts;
+    const post = this.posts.find(p => p.filename === hash.slice('thought/'.length));
+    if (post) await this.loadPostBody(post);
+  }
+
+  async routeTo(hash) {
     if (!hash || hash === '/') {
       await this.showHome();
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
@@ -1462,8 +1657,6 @@ class Site {
     } else {
       await this.showHome();
     }
-
-    this._routedOnce = true;
   }
 }
 
