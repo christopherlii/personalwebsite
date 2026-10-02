@@ -7,6 +7,7 @@ class Site {
     this.posts = [];
     this.reading = [];
     this.solaces = [];
+    this.projects = [];
     this.view = 'home';
     this.slug = null;
     this.init();
@@ -651,6 +652,13 @@ class Site {
     try {
       const resp = await fetch('/solaces/index.json');
       if (resp.ok) this.solaces = await resp.json();
+    } catch (e) { console.error(e); }
+  }
+
+  async loadProjects() {
+    try {
+      const resp = await fetch('/projects/index.json');
+      if (resp.ok) this.projects = await resp.json();
     } catch (e) { console.error(e); }
   }
 
@@ -1307,6 +1315,48 @@ class Site {
   }
 
   // ========================================
+  // PROJECTS
+  // ========================================
+
+  async showProjects() {
+    if (this.data) await this.data.projects;
+    await this.fadeToView('projects-view', 'projects');
+    this.showDrawnHero();
+    // Projects is its own section, not a leaf under writing — reading nests
+    // there because it is writing by other people; this is not.
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
+
+    const pile = document.getElementById('projects-pile');
+    if (!pile) return;
+
+    // Angles come from the data when they are set, so a card can be aimed
+    // deliberately. Otherwise they fall out of the index: a fixed sweep that
+    // alternates sides, which keeps the fan even however many cards there are
+    // and — unlike a random tilt — deals the same hand on every visit.
+    const tiltFor = (p, i) => typeof p.tilt === 'number'
+      ? p.tilt
+      : (i % 2 ? 1 : -1) * (4 + (i % 3) * 3);
+
+    pile.innerHTML = this.projects.map((p, i) => {
+      let host = '';
+      try { host = new URL(p.url).hostname.replace(/^www\./, ''); } catch (e) {}
+      return `
+        <a class="project-card" href="${p.url}" target="_blank" rel="noopener"
+           style="--tilt: ${tiltFor(p, i)}deg">
+          <h2 class="project-title">${p.title}</h2>
+          <p class="project-blurb">${p.blurb || ''}</p>
+          <div class="project-meta">
+            <span class="project-host">${host}</span>
+            <span class="project-year">${p.year || ''}</span>
+          </div>
+        </a>
+      `;
+    }).join('') || '<p class="empty-note">no projects yet.</p>';
+
+    this.syncUrl('#projects');
+  }
+
+  // ========================================
   // FAVORITES
   // ========================================
 
@@ -1456,6 +1506,8 @@ class Site {
       await this.showHome();
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
       await this.showThoughtsList();
+    } else if (hash === 'projects') {
+      await this.showProjects();
     } else if (hash === 'reading') {
       await this.showReadingList();
     } else if (hash === 'favorites' || hash === 'solaces') {
@@ -1490,7 +1542,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   site.data = {
     posts: site.loadPosts(),
     reading: site.loadReading(),
-    solaces: site.loadSolaces()
+    solaces: site.loadSolaces(),
+    projects: site.loadProjects()
   };
 
   // Warm every banner image up front — swaps gate on load, so anything not

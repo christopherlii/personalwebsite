@@ -44,6 +44,17 @@
   --banner-travel-ease: cubic-bezier(0.16, 0.9, 0.25, 1);
   --chrome-ms: 300ms;
 
+  /* A damped spring sampled into a linear() easing. Interfaces that feel
+     "smooth" are almost never using a cubic-bezier — they are using spring
+     physics, which overshoots a hair and settles, the way a real object with
+     mass does. A bezier eases toward its end and stops dead; a spring arrives.
+     Generated from damping 18 / stiffness 220 / mass 1; the duration below is
+     that spring's own settle time, so the curve and the clock agree. */
+  --spring: linear(0, 0.092, 0.2962, 0.5292, 0.7393, 0.9012, 1.0088, 1.0679,
+    1.0897, 1.0869, 1.0707, 1.0498, 1.0296, 1.0133, 1.0019, 0.9952, 0.9922,
+    0.9918, 0.993, 0.9948, 0.9967, 0.9983, 0.9995, 1.0003, 1.0007);
+  --spring-ms: 520ms;
+
   --code-bg: rgba(0, 0, 0, 0.06);
   --card-bg: var(--bg);
   --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
@@ -301,6 +312,176 @@ img {
 html.route-pending .page-entrance,
 html.route-pending .stagger-children > * {
   animation-play-state: paused;
+}
+
+/* ========================================
+   PROJECTS
+   ======================================== */
+
+/* A fanned pile of cards rather than a list: the projects page deals the same
+   hand favs does, so the two read as the same gesture in different rooms.
+   Cards overlap by a negative margin and each sits at its own angle, so the
+   set looks set down rather than laid out. Hovering lifts one clear of the
+   pile; the rest hold still. */
+
+.projects-pile {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  /* The fan needs more room than the reading column, but not the whole page —
+     wide enough that three cards overlap without crowding the gutters. The
+     site clamps everything to --col, so the pile has to step outside it: it
+     takes its own width and pulls itself back by half the difference, which
+     keeps it centred on the viewport at any size without a transform (one
+     here would make this a containing block for the cards above it). */
+  --pile-w: min(760px, 100vw - 32px);
+  width: var(--pile-w);
+  margin-left: calc(50% - var(--pile-w) / 2);
+  padding: 24px 0 64px;
+}
+
+.project-card {
+  position: relative;
+  display: block;
+  width: 250px;
+  /* Cards tuck under their neighbours. The lifted one pulls its own z-index
+     up, so the overlap never traps a card underneath while it is raised.
+     The tuck is deliberately shallow: these cards are text, not artwork, so
+     anything a neighbour covers is a word someone cannot read. */
+  margin: 18px -14px;
+  /* Extra right padding keeps the copy clear of the strip the next card sits
+     over — the tucked zone stays empty by construction rather than by luck.
+     It has to clear more than the bare overlap: the neighbour is rotated, so
+     its bottom corner swings further left than its layout box suggests, and
+     that corner is exactly where the year sits. */
+  padding: 22px 42px 20px 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  /* Every animated property here is transform or opacity — the compositor
+     handles both without touching layout or paint, which is the whole reason
+     the lift feels weightless instead of merely fast. */
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform var(--spring-ms) var(--spring);
+  will-change: transform;
+  z-index: 1;
+}
+
+/* The shadow is painted on a pseudo-element and cross-faded by opacity.
+   Animating box-shadow directly would repaint the card on every frame; this
+   way the deepening shadow costs the compositor nothing. */
+.project-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--card-shadow-hover);
+  opacity: 0;
+  transition: opacity var(--spring-ms) var(--spring);
+  pointer-events: none;
+}
+
+.project-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--card-shadow);
+  transition: opacity var(--spring-ms) var(--spring);
+  pointer-events: none;
+}
+
+/* Lift: straighten toward level, rise, and grow a little. Straightening is
+   what sells it as picking the card up off the pile rather than scaling a
+   rectangle in place. */
+.project-card:hover,
+.project-card:focus-visible {
+  transform: rotate(calc(var(--tilt, 0deg) * 0.35)) translateY(-10px) scale(1.035);
+  z-index: 5;
+}
+
+.project-card:hover::before,
+.project-card:focus-visible::before { opacity: 1; }
+.project-card:hover::after,
+.project-card:focus-visible::after { opacity: 0; }
+
+.project-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Pressing pushes the card back down — the return half of the same gesture. */
+.project-card:active {
+  transform: rotate(calc(var(--tilt, 0deg) * 0.35)) translateY(-4px) scale(1.01);
+  transition-duration: 120ms;
+}
+
+.project-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  /* The card is an anchor, so the base a:hover rule would tint it on hover as
+     a side effect of specificity. Said out loud instead: the title is what
+     tells you the whole card is the link, and it should not depend on which
+     selector happens to win. */
+  color: var(--fg);
+  transition: color 0.25s ease;
+}
+
+.project-card:hover .project-title,
+.project-card:focus-visible .project-title {
+  color: var(--accent);
+}
+
+.project-blurb {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-body);
+  margin: 0 0 14px;
+}
+
+.project-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+.project-host {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Under 760px the fan runs out of room: overlapping cards on a phone are just
+   cards covering each other up. Stack them square and let the page scroll. */
+@media (max-width: 760px) {
+  .projects-pile {
+    /* Back inside the column — the breakout only exists to give the fan room
+       it cannot use here anyway. */
+    width: 100%;
+    margin-left: 0;
+    padding: 8px 0 48px;
+  }
+  .project-card {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 0 16px;
+    transform: none;
+  }
+  .project-card:hover,
+  .project-card:focus-visible,
+  .project-card:active {
+    transform: translateY(-4px);
+  }
 }
 
 /* ========================================
@@ -1633,6 +1814,21 @@ body.no-top-fade .top-fade {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  /* The pile keeps its angles — those are layout, not motion, and a fan of
+     cards sitting still is not something anyone asked to be spared. What goes
+     is the spring: the lift becomes an instant state change, so the shadow
+     and the raise still tell you which card you are on. */
+  .project-card,
+  .project-card::before,
+  .project-card::after {
+    transition: none;
+  }
+
+  .project-card:hover,
+  .project-card:focus-visible {
+    transform: rotate(var(--tilt, 0deg));
   }
 
   .page,

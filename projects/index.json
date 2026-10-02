@@ -1,0 +1,23 @@
+[
+  {
+    "title": "this site",
+    "blurb": "a static site with no framework — html, css, and vanilla js, hand-rolled transitions and all.",
+    "url": "https://github.com/christopherlii/christopherlii.github.io",
+    "year": "2026",
+    "tilt": -5
+  },
+  {
+    "title": "replace me",
+    "blurb": "a one-line description of what it is and why you built it. keep it to a sentence.",
+    "url": "https://example.com",
+    "year": "2025",
+    "tilt": 3
+  },
+  {
+    "title": "replace me too",
+    "blurb": "cards fan out in the order they appear here, so put the one you want read first at the top.",
+    "url": "https://example.com",
+    "year": "2025",
+    "tilt": 6
+  }
+]
