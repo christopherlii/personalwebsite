@@ -10,17 +10,5 @@
     "cover": "/static/images/blogs/solaces/grad-drawn.jpg",
     "coverPosition": "center 60%",
     "words": 1219
-  },
-  {
-    "file": "2025_q4.md",
-    "title": "all in",
-    "date": "2025-12-27",
-    "tags": [
-      "updates"
-    ],
-    "description": "A letter on poker, autopilot, and folding too often in 2025",
-    "cover": "/static/images/blogs/2025_q4/sunset_with_sam-drawn.jpg",
-    "coverPosition": "center 45%",
-    "words": 1592
   }
 ]
