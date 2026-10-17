@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Christopher Li - Software Engineer">
+  <title>Christopher Li</title>
+  <meta name="theme-color" content="#fafafa">
+  <link rel="alternate" type="application/rss+xml" title="christopher li — writing" href="/feed.xml">
+  <link rel="icon" type="image/png" href="/logos/CL.png">
+  <link rel="apple-touch-icon" href="/logos/apple-touch-icon.png">
+  <!-- Fonts are self-hosted (see main.css); preload the two regular latin
+       files every page uses. Fonts always fetch CORS-mode, so crossorigin is
+       required even same-origin. -->
+  <link rel="preload" as="font" type="font/woff2" href="/static/fonts/fraunces-latin.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/static/fonts/instrument-sans-latin.woff2" crossorigin>
+  <!-- The banner photo is a CSS background set by JS, so without this hint it
+       wouldn't start downloading until routing has resolved. -->
+  <link rel="preload" as="image" href="/static/images/hero/rock.jpg" fetchpriority="high">
+  <link rel="preload" as="image" href="/static/images/hero/rock-drawn-hero.jpg" fetchpriority="low">
+  <!-- The torn-window mask (CSS mask-image on .cropped) is invisible to the
+       preload scanner but needed the instant any drawn view opens. -->
+  <link rel="preload" as="image" href="/static/images/deckle-mask.png" fetchpriority="low">
+  <link rel="stylesheet" href="/styles/main.css">
+  <script defer src="/static/vendor/marked.min.js"></script>
+  <script defer src="/static/markdown-renderer.js"></script>
+  <script>
+    if (window.location.hash && window.location.hash !== '#') {
+      document.documentElement.classList.add('route-pending');
+    }
+  </script>
+</head>
+<body>
+  <div class="top-fade"></div>
+
+  <div class="site">
+    <!-- Collapsing banner: full height on home + article, a bar everywhere else -->
+    <div class="banner" id="banner">
+      <!-- The image and everything painted into it live in their own clipping
+           frame, so the banner box itself can let the chrome out: on home the
+           name lifts into the strip above the photo and the icons run down the
+           gutter beside it. The frame is the exact banner rect, so every layer
+           inside keeps the geometry the crop travel is built on. -->
+      <div class="banner-frame">
+        <div class="banner-media" data-layer="0"></div>
+        <div class="banner-media" data-layer="1"></div>
+        <div class="banner-scrim"></div>
+        <div class="banner-collage" id="banner-collage"></div>
+      </div>
+      <!-- The page settles top to bottom: chrome drops in first, then the
+           content below rises in sequence. -->
+      <header class="banner-header">
+        <nav class="breadcrumb page-entrance entrance-delay-240 entrance-duration-400 entrance-distance-neg-12" id="breadcrumb"><span class="crumb-name">Christopher Li</span></nav>
+        <div class="social page-entrance entrance-delay-240 entrance-duration-400 entrance-distance-neg-12">
+          <a href="https://www.instagram.com/christopherrli/" target="_blank" rel="noopener" title="instagram" aria-label="instagram">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+          </a>
+          <a href="https://x.com/christopherrli" target="_blank" rel="noopener" title="x (twitter)" aria-label="x (twitter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+          </a>
+          <a href="https://www.linkedin.com/in/christopherrli/" target="_blank" rel="noopener" title="linkedin" aria-label="linkedin">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4V8h4v2"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+          </a>
+        </div>
+      </header>
+    </div>
+    <div class="banner-spacer" id="banner-spacer"></div>
+
+    <!-- Home -->
+    <div id="home-view" class="view">
+      <main class="page page-home">
+        <section>
+          <p class="home-title page-entrance entrance-delay-240">hi, i'm chris :)</p>
+          <p class="home-text page-entrance entrance-delay-360">i'm currently working on long-horizon environments at <a href="https://generalcontextlabs.com/" target="_blank" rel="noopener" class="inline-link">General Context Labs</a>, starting with <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
+          <p class="home-text page-entrance entrance-delay-480">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
+        </section>
+        <section class="contact">
+          <p class="page-entrance entrance-delay-960"><button type="button" id="copy-email" class="contact-email" title="click to copy">christopherli [at] nyu [dot] edu</button><span class="copy-note" id="copy-note" role="status" aria-live="polite"></span></p>
+        </section>
+      </main>
+    </div>
+
+    <!-- Writing list -->
+    <div id="thoughts-view" class="view hidden">
+      <div class="page page-stagger">
+        <div id="thoughts-full-list" class="thoughts-list stagger-children"></div>
+      </div>
+    </div>
+
+    <!-- Article -->
+    <div id="thought-view" class="view hidden">
+      <div class="page page-stagger">
+        <article id="thought-content" class="article stagger-children"></article>
+      </div>
+    </div>
+
+    <!-- Reading list -->
+    <div id="reading-view" class="view hidden">
+      <div class="page page-stagger">
+        <p class="page-blurb">writings by others that moved me — words i wish i'd found myself.</p>
+        <div id="reading-list" class="reading-list stagger-children"></div>
+      </div>
+    </div>
+
+    <!-- Favorites -->
+    <div id="solaces-view" class="view hidden">
+      <div class="page page-stagger">
+        <div id="solaces-list" class="solaces-masonry stagger-children"></div>
+      </div>
+    </div>
+
+    <!-- Stats (reached by clicking the name on the home page) -->
+    <div id="youre-already-here-view" class="view hidden">
+      <div class="page page-stagger stagger-children">
+        <h2 class="stats-heading">about me</h2>
+        <table class="stats-table">
+          <tbody>
+            <tr><td>current age</td><td class="tabular"><span id="easter-age">—</span></td></tr>
+            <tr><td>countries visited</td><td>15</td></tr>
+            <tr><td>current city</td><td>San Francisco, CA</td></tr>
+            <tr><td>currently reading</td><td>The Three-Body Problem</td></tr>
+            <tr><td>last updated</td><td>aug 20, 2026</td></tr>
+          </tbody>
+        </table>
+
+        <h2 class="stats-heading">random</h2>
+        <table class="stats-table">
+          <tbody>
+            <tr><td>record soccer juggles</td><td>2412</td></tr>
+            <tr><td>energy drinks today</td><td>hopefully 0</td></tr>
+            <tr><td>favorite clothing brand</td><td>Lacoste / Ralph Lauren</td></tr>
+            <tr><td>favorite song</td><td>Malcolm in the Middle by Malcolm Todd</td></tr>
+            <tr><td>favorite artist</td><td>Tame Impala</td></tr>
+            <tr><td>favorite restaurant</td><td>Dubu Haus</td></tr>
+            <tr><td>favorite city</td><td>New York City</td></tr>
+          </tbody>
+        </table>
+
+        <h2 class="stats-heading">i dream of</h2>
+        <ul class="stats-list">
+          <li>building something that outlives me.</li>
+          <li>treating everybody with genuine kindness.</li>
+          <li>more "worlds colliding" moments.</li>
+          <li>staying forever curious.</li>
+          <li>making Mom and Dad proud.</li>
+          <li>you reaching out. let's connect :D</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

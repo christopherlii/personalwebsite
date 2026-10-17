@@ -1,0 +1,39 @@
+# Content lives in the private christopherlii/site-content repo. This joins it
+# with the code here and publishes the result, so the public history only ever
+# shows code. Publish new content with:
+#   gh workflow run deploy.yml -R christopherlii/personalwebsite
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: christopherlii/site-content
+          ssh-key: ${{ secrets.CONTENT_DEPLOY_KEY }}
+          path: content
+      - run: python3 build.py --site _site > /dev/null
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

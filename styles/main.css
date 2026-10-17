@@ -1,0 +1,1646 @@
+/* ========================================
+   DESIGN SYSTEM
+   ======================================== */
+
+:root {
+  --bg: #fafafa;
+  --bg-alt: #f5f5f5;
+  --fg: #1a1a1a;
+  --fg-body: #333333;
+  --fg-quote: #404040;
+  --fg-muted: #737373;
+  --fg-faint: #999999;
+  --border: #e5e5e5;
+  --accent: #0b243e;
+  --accent-hover: #163a5c;
+  --accent-rule: rgba(11, 36, 62, 0.55);
+
+  --font-display: 'Fraunces', 'Fraunces Fallback', Georgia, serif;
+  --font-body: 'Instrument Sans', 'Instrument Sans Fallback', 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Monaco, monospace;
+
+  --col: 640px;
+  --col-pad: 24px;
+  --page-pad: 28px;
+
+  --banner-height: 380px;
+  --banner-bar: 60px;
+  /* Air above the banner. This is also the strip the lifted chrome stands in
+     on favs, so it has to hold a line of type with room to breathe, not just
+     separate the photo from the edge. */
+  --banner-top: 68px;
+  /* How far the lifted name's centre line rides above the hero's top edge.
+     Deliberately independent of --banner-top: that token sets the air above
+     the page, this one sets how tightly the chrome hugs the hero, so moving
+     one never disturbs the other. */
+  --chrome-rise: 24px;
+  --banner-ease: cubic-bezier(0.3, 0.85, 0.3, 1);
+  --banner-ms: 650ms;
+  --banner-fade-ms: 650ms;
+  /* Opening back to home runs on its own, snappier clock with plain ease. */
+  --banner-open-ms: 500ms;
+  /* Travel decelerates hard: tears cover most of their distance early and
+     glide into place — the gesture lasts longer but feels finished sooner. */
+  --banner-travel-ease: cubic-bezier(0.16, 0.9, 0.25, 1);
+  --chrome-ms: 300ms;
+
+  --code-bg: rgba(0, 0, 0, 0.06);
+  --card-bg: var(--bg);
+  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --card-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.12);
+  --pill-blue: #1d4ed8;
+  --pill-green: #15803d;
+  --pill-yellow: #a16207;
+
+  color-scheme: light;
+}
+
+/* ========================================
+   FONTS
+   ======================================== */
+
+/* Self-hosted (variable, latin + latin-ext subsets) — no third-party
+   round-trip, and the two regular latin files are preloaded from index.html. */
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/static/fonts/fraunces-italic-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/static/fonts/fraunces-italic-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/static/fonts/fraunces-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/static/fonts/fraunces-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/static/fonts/instrument-sans-italic-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/static/fonts/instrument-sans-italic-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/static/fonts/instrument-sans-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/static/fonts/instrument-sans-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Local fallbacks metric-matched to the webfonts (size-adjust computed from
+   frequency-weighted glyph advances), so the font-display swap doesn't reflow
+   the page. Android has neither Georgia nor Arial and falls through to the
+   stack's generic — same as before, just without the fix. */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Georgia');
+  size-adjust: 116.863%;
+  ascent-override: 83.688%;
+  descent-override: 21.82%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Instrument Sans Fallback';
+  src: local('Arial');
+  size-adjust: 103.241%;
+  ascent-override: 93.955%;
+  descent-override: 24.215%;
+  line-gap-override: 0%;
+}
+
+/* ========================================
+   RESET & BASE
+   ======================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+/* Only articles and the stats page scroll; every other view is a fixed frame. */
+html.no-scroll,
+html.no-scroll body {
+  overflow: hidden;
+}
+
+/* Prevent a flash of home when reloading with a hash */
+html.route-pending .site,
+html.route-pending .top-fade {
+  opacity: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.25s ease, opacity 0.25s ease;
+}
+
+@media (hover: hover) {
+  a:hover {
+    color: var(--accent-hover);
+  }
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes viewFade {
+  from { opacity: 0; }
+}
+
+/* ========================================
+   ENTRANCE CHOREOGRAPHY
+   ======================================== */
+
+/* Elements enter one at a time, top of the page first. A from-only
+   keyframe with backwards fill means the element holds its start state
+   through the delay, then lands on plain CSS — so hover transitions on
+   opacity/transform keep working once the entrance is done. */
+
+@keyframes entranceIn {
+  from { opacity: 0; transform: translateY(var(--entrance-distance, 12px)); }
+}
+
+.page-entrance {
+  animation: entranceIn var(--entrance-duration, 0.5s) ease-out backwards;
+  animation-delay: var(--entrance-delay, 0s);
+}
+
+.entrance-delay-120 { --entrance-delay: 120ms; }
+.entrance-delay-240 { --entrance-delay: 240ms; }
+.entrance-delay-360 { --entrance-delay: 360ms; }
+.entrance-delay-480 { --entrance-delay: 480ms; }
+.entrance-delay-960 { --entrance-delay: 960ms; }
+.entrance-duration-400 { --entrance-duration: 400ms; }
+.entrance-distance-neg-12 { --entrance-distance: -12px; }
+
+/* Leaving a choreographed view, elements exit in reverse — last in, first
+   out — sinking back the way they came. JS holds the view for ~320ms. */
+
+@keyframes entranceOut {
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+.view.exiting .page-entrance {
+  animation: entranceOut 150ms ease-in forwards;
+  animation-delay: calc((960ms - var(--entrance-delay, 0s)) / 6);
+}
+
+/* List rows cascade in, each child 50ms behind the last. Re-runs whenever a
+   view is re-shown or a list re-renders, because both reset the animation. */
+
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+.stagger-children > * {
+  animation: staggerIn 0.3s ease-out backwards;
+}
+
+.stagger-children > :nth-child(2) { animation-delay: 50ms; }
+.stagger-children > :nth-child(3) { animation-delay: 100ms; }
+.stagger-children > :nth-child(4) { animation-delay: 150ms; }
+.stagger-children > :nth-child(5) { animation-delay: 200ms; }
+.stagger-children > :nth-child(6) { animation-delay: 250ms; }
+.stagger-children > :nth-child(7) { animation-delay: 300ms; }
+.stagger-children > :nth-child(8) { animation-delay: 350ms; }
+.stagger-children > :nth-child(9) { animation-delay: 400ms; }
+.stagger-children > :nth-child(10) { animation-delay: 450ms; }
+.stagger-children > :nth-child(11) { animation-delay: 500ms; }
+.stagger-children > :nth-child(12) { animation-delay: 550ms; }
+.stagger-children > :nth-child(13) { animation-delay: 600ms; }
+.stagger-children > :nth-child(14) { animation-delay: 650ms; }
+.stagger-children > :nth-child(15) { animation-delay: 700ms; }
+.stagger-children > :nth-child(16) { animation-delay: 750ms; }
+.stagger-children > :nth-child(17) { animation-delay: 800ms; }
+.stagger-children > :nth-child(18) { animation-delay: 850ms; }
+.stagger-children > :nth-child(19) { animation-delay: 900ms; }
+.stagger-children > :nth-child(20) { animation-delay: 950ms; }
+.stagger-children > :nth-child(n+21) { animation-delay: 1s; }
+
+/* While a hash route is resolving the site is hidden — hold every entrance
+   at its start so the choreography plays once the view is actually visible. */
+html.route-pending .page-entrance,
+html.route-pending .stagger-children > * {
+  animation-play-state: paused;
+}
+
+/* ========================================
+   LAYOUT
+   ======================================== */
+
+.site {
+  position: relative;
+  max-width: var(--col);
+  margin: 0 auto;
+  padding: 0 var(--col-pad);
+}
+
+.view {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.view.fade-out {
+  opacity: 0;
+}
+
+.view.hidden {
+  display: none !important;
+}
+
+.page {
+  padding: var(--page-pad) var(--page-pad) 120px;
+  animation: viewIn 650ms cubic-bezier(0.3, 0.85, 0.3, 1) both;
+}
+
+.page-home {
+  padding: 32px var(--page-pad) 0;
+  /* Home's title, paragraphs, and email carry their own entrance — a page-level
+     rise underneath them would double the motion. */
+  animation: none;
+}
+
+/* Pages whose rows cascade in only fade as a frame, for the same reason. */
+.page-stagger {
+  animation-name: viewFade;
+}
+
+/* Covers the strip of page that scrolls past above the floating banner */
+.top-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 108px;
+  z-index: 50;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg) 38%, transparent);
+}
+
+body.no-top-fade .top-fade {
+  display: none;
+}
+
+/* ========================================
+   BANNER
+   ======================================== */
+
+.banner {
+  position: sticky;
+  top: var(--banner-top);
+  z-index: 60;
+  height: var(--banner-height);
+  margin-top: var(--banner-top);
+  border-radius: 0;
+  /* The clip moved to .banner-frame. The banner box itself must NOT clip:
+     on a lifted view the chrome leaves it entirely — up into the strip above
+     the hero, out into the gutter beside it. */
+  overflow: visible;
+  /* Page-colored backing, so the frame before an image paints — and the
+     surround mid-morph — shows nothing rather than flashing a panel color. */
+  background: var(--bg);
+  box-shadow: 0 6px 20px rgba(10, 20, 30, 0.14);
+  transition: box-shadow var(--banner-fade-ms) ease,
+              opacity 260ms ease;
+}
+
+/* Drawn mode: the image is a torn-paper card inset below the chrome instead
+   of a full-bleed photo behind it. Home stays full-bleed. */
+.banner.drawn {
+  box-shadow: none;
+  /* Off instantly, on gently: a shadow fading out around an emptying box
+     reads as an outline; its return can afford the full fade. */
+  transition-duration: 0s;
+}
+
+
+/* Trial: hovering a drawn-view link lifts the panel shadow quickly. */
+.banner.unshadow {
+  box-shadow: none;
+  transition-duration: 200ms;
+}
+
+/* The panel shadow belongs to a full-bleed photo owning the frame. While the
+   active layer is a card or is still behind a travelling window, a full-box
+   shadow would outline an empty rectangle that the photo is only part-way
+   through filling. */
+/* Cold-loading favs: no hero beneath and no hand revealed yet — a panel
+   shadow would outline an empty rectangle. It arrives with the tiles. */
+.banner.collage:not(.dealt):not(:has(.banner-media.active)),
+.banner.travel-pending,
+.banner:has(.banner-media.active.card),
+.banner:has(.banner-media.active.cropped),
+.banner:has(.banner-media.active.beyond),
+.banner:has(.banner-media.active.travelling) {
+  box-shadow: none;
+  transition-duration: 0s;
+}
+
+/* Only while navigating — during a scroll the height tracks scrollY directly. */
+.banner.animating {
+  /* No box-shadow here: during navigation the shadow must be able to drop
+     instantly (a fading shadow ring around an emptying box reads as an
+     outline). Its gentle return runs on the base transition, after the
+     animating window has passed. */
+  transition: height var(--banner-ms) var(--banner-ease),
+              top var(--banner-ms) var(--banner-ease),
+              opacity 260ms ease;
+}
+
+/* Condensed to a bar, the photo gets a touch more tint under the breadcrumb. */
+.banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(8, 12, 18, 0.18);
+  opacity: 0;
+  transition: opacity var(--banner-fade-ms) ease;
+}
+
+.banner.condensed:not(.drawn)::after {
+  opacity: 1;
+}
+
+/* The image's own box: exactly the banner rect, and the thing that clips.
+   This matters more than it looks — .banner-media is a fixed 380px tall
+   anchored to the bottom, so a collapsed banner has 320px of photo hanging
+   above its top edge. Unclipped, that would cover the page. */
+.banner-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 0; /* below .banner-header's 3 */
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.banner-spacer {
+  height: 0;
+}
+
+.banner-media {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--banner-height);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  /* Swaps are a plain dissolve, shorter than the banner's 650ms open/collapse.
+     No zoom-settle: a scale transform would scale the torn mask edge with it
+     (a paper cutout shouldn't zoom), and would drift the pinned figure during
+     the home<->writing fade. */
+  /* The torn-paper mask is always attached but oversized, so its ragged ring
+     sits outside the box and full-bleed layers render untouched; a .card
+     layer shrinks it to 100% and the tear appears. */
+  -webkit-mask-image: url(/static/images/deckle-mask.png);
+  mask-image: url(/static/images/deckle-mask.png);
+  -webkit-mask-size: 118% 124%;
+  mask-size: 118% 124%;
+  -webkit-mask-position: center center;
+  mask-position: center center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  transition: opacity var(--banner-fade-ms) ease,
+              -webkit-mask-size var(--banner-fade-ms) var(--banner-travel-ease),
+              mask-size var(--banner-fade-ms) var(--banner-travel-ease),
+              -webkit-mask-position var(--banner-fade-ms) var(--banner-travel-ease),
+              mask-position var(--banner-fade-ms) var(--banner-travel-ease);
+}
+
+/* Opening back to the photo (drawn -> photo travel): the previous feel —
+   shorter clock, plain symmetric ease, no deceleration glide. */
+.banner-media.opening {
+  transition: opacity var(--banner-open-ms) ease,
+              -webkit-mask-size var(--banner-open-ms) ease,
+              mask-size var(--banner-open-ms) ease,
+              -webkit-mask-position var(--banner-open-ms) ease,
+              mask-position var(--banner-open-ms) ease;
+}
+
+/* The home<->writing gesture is a CROP, not a zoom: layer boxes never
+   animate (cover would rescale the image with them). Instead the torn mask
+   is the moving window — .cropped shrinks a full-bleed layer's mask to
+   exactly the card rect. Outgoing photo gains it (window closes in around
+   the pinned figure while the drawing resolves inside); an incoming photo
+   is born with it and sheds it as it fades in (window opens back up). */
+.banner-media.cropped {
+  -webkit-mask-size: calc(100% - var(--page-pad) * 2) calc(100% - var(--banner-bar) - 18px);
+  mask-size: calc(100% - var(--page-pad) * 2) calc(100% - var(--banner-bar) - 18px);
+  -webkit-mask-position: var(--page-pad) var(--banner-bar);
+  mask-position: var(--page-pad) var(--banner-bar);
+}
+
+/* Mask pushed past the frame with per-edge overhang PROPORTIONAL to that
+   edge's card inset (x1.7: top 102 / bottom 31 / sides 48px — also clears
+   the ~26px tear). Interpolating between this and .cropped is pure px per
+   edge, so during a travel all four edges cross the frame boundary at the
+   same moment (t=0.63 closing, t=0.37 opening) — tears sweep in or out
+   together, never popping in at the boundary or parking on it. */
+.banner-media.beyond {
+  -webkit-mask-size: calc(100% + 96px) calc(100% + 133px);
+  mask-size: calc(100% + 96px) calc(100% + 133px);
+  -webkit-mask-position: -48px -102px;
+  mask-position: -48px -102px;
+}
+
+.banner-media.card {
+  bottom: 18px;
+  left: var(--page-pad);
+  width: calc(100% - var(--page-pad) * 2);
+  height: calc(100% - var(--banner-bar) - 18px);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.banner-media.active {
+  opacity: 1;
+}
+
+.banner-scrim {
+  display: none; /* retired: legibility comes from deep glyph shadows now */
+  z-index: 2; /* above the media layers' inline 0/1, below the header */
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 140px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(8, 12, 18, 0.28) 0px,
+    rgba(8, 12, 18, 0.18) 60px,
+    rgba(8, 12, 18, 0) 140px
+  );
+  opacity: 0;
+  transition: opacity var(--banner-fade-ms) ease;
+}
+
+/* Only over an actual photo — on the bare page-colored banner (first beat
+   before the image paints) a dark gradient would be its own flash. */
+.banner-media.active ~ .banner-scrim {
+  opacity: 1;
+}
+
+/* Same rule as the panel shadow: no scrim until the photo owns the frame —
+   a gradient over the still-opening window outlines the empty box. */
+.banner:has(.banner-media.active.card) .banner-scrim,
+.banner:has(.banner-media.active.cropped) .banner-scrim,
+.banner:has(.banner-media.active.beyond) .banner-scrim,
+.banner:has(.banner-media.active.travelling) .banner-scrim {
+  opacity: 0;
+  transition-duration: 550ms;
+}
+
+.banner.drawn .banner-scrim {
+  opacity: 0;
+  transition-duration: 550ms;
+}
+
+
+.banner-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3; /* above media layers and scrim */
+  height: var(--banner-bar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4),
+               0 1px 10px rgba(0, 0, 0, 0.35);
+  /* The bar spans the banner but is mostly empty, and on a lifted view its
+     contents have moved out of it entirely. Only the type itself should take
+     clicks — otherwise the strip eats them on whatever sits beneath. */
+  pointer-events: none;
+  /* The text is ONE component: it only ever changes appearance while faded
+     out (.swapping), so color/shadow/padding never animate on screen. */
+  transition: opacity var(--chrome-ms) ease;
+}
+
+.banner-header.swapping {
+  opacity: 0;
+}
+
+.banner.ink .banner-header {
+  padding: 0 var(--page-pad);
+  color: var(--fg);
+  text-shadow: none;
+}
+
+/* Breadcrumb */
+
+.breadcrumb {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.breadcrumb .crumb-name {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+
+/* The tail (/ section / page) is the only part rebuilt on navigation; it
+   slides out rightward from behind the persistent name. */
+.crumb-tail {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@keyframes crumbTailIn {
+  from { opacity: 0; transform: translateX(-14px); }
+}
+
+/* Each crumb is its own segment: staying segments never move, a removed one
+   slides back underneath its predecessor, an added one slides out from
+   behind it. z-index steps down along the path so earlier crumbs occlude
+   later ones during the overlap. */
+.crumb-seg {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.crumb-seg.seg-in {
+  animation: crumbTailIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* The exit is the entrance played backwards: same keyframes, same clock;
+   animation-direction: reverse also mirrors the timing curve, so the crumb
+   stays opaque while it travels and fades only as it tucks under. */
+.crumb-seg.seg-out {
+  animation: crumbTailIn 420ms cubic-bezier(0.2, 0.7, 0.2, 1) reverse forwards;
+}
+
+/* The leading "/" reaches the predecessor first — it fades ahead of the
+   label so nothing ever visibly overlaps the crumb that stays. */
+@keyframes crumbSepOut {
+  to { opacity: 0; }
+}
+
+.crumb-seg.seg-out .crumb-sep {
+  animation: crumbSepOut 160ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crumb-seg.seg-in { animation: none; }
+  .crumb-seg.seg-out { animation: none; opacity: 0; }
+}
+
+.breadcrumb .crumb-sep {
+  opacity: 0.55;
+  color: #fff;
+}
+
+.breadcrumb .crumb-link {
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+.breadcrumb .crumb-current {
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.banner.ink .crumb-name,
+.banner.ink .crumb-link {
+  color: var(--fg);
+}
+
+.banner.ink .crumb-sep,
+.banner.ink .crumb-current {
+  color: var(--fg-muted);
+}
+
+@media (hover: hover) {
+  .breadcrumb .crumb-name:hover,
+  .breadcrumb .crumb-link:hover {
+    opacity: 0.6;
+  }
+}
+
+/* ---- Lifted chrome: off the image entirely --------------------------------
+   Favs deals a different set of photographs into the hero every time, so no
+   fixed treatment can keep white type legible over it. Rather than fight the
+   backdrop, the chrome leaves it: the name lifts into the strip the banner
+   already holds above itself, and the icons step out into the gutter and
+   stack down the hero's right edge. Home keeps its chrome in the bar, on the
+   photograph.
+
+   Offsets use `translate`, not `transform`: the entrance animation owns
+   `transform` on these two elements, and the two properties compose instead
+   of one clobbering the other.                                              */
+
+/* The slide is a NAVIGATION gesture, so it is armed one frame after the
+   chrome first settles. Without that, a cold load would place the text in the
+   bar and then visibly walk it to its lifted position while the entrance is
+   still playing. */
+.banner.chrome-ready .breadcrumb,
+.banner.chrome-ready .social {
+  transition: translate var(--banner-ms) var(--banner-ease);
+}
+
+/* The name rises out of the bar's centre line to sit just clear of the hero's
+   top edge — close enough to read as its label rather than as page furniture
+   stranded above it. */
+.banner.lifted .breadcrumb {
+  translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+}
+
+/* The cluster steps out past the hero's right edge by its own width, plus the
+   padding it was inset by, plus a little air — then up out of the bar's
+   centring so the first icon caps the hero's top corner. */
+.banner.lifted .social {
+  translate: calc(104px + var(--page-pad) + 6px) calc((var(--banner-bar) - 32px) / -2);
+}
+
+/* ...and inside it each icon walks from its place in the row to its place in
+   the column — one 36px step (32px icon + 4px gap) left for every step down,
+   so the row folds into a column without the pitch ever changing. */
+.banner.chrome-ready .social a {
+  transition: translate var(--banner-ms) var(--banner-ease), opacity 0.25s ease;
+}
+
+.banner.lifted .social a:nth-child(2) {
+  translate: -36px 36px;
+}
+
+.banner.lifted .social a:nth-child(3) {
+  translate: -72px 72px;
+}
+
+/* Info collapses its image away, so there is no hero for the cluster to run
+   down the edge of — it stays a row up in the band, beside the name. */
+.banner.bare .social {
+  translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+}
+
+.banner.bare .social a:nth-child(2),
+.banner.bare .social a:nth-child(3) {
+  translate: 0 0;
+}
+
+/* Nothing to cast it: a shadow around a zero-height box is just a dark line. */
+.banner.bare {
+  box-shadow: none;
+}
+
+/* Under ~760px the gutter runs out (the site box is 640px and the icons need
+   ~52px beyond the hero's edge). The column folds back into a row and rides
+   up beside the name instead — still off the image, which is the point. */
+@media (max-width: 760px) {
+  .banner.lifted .social {
+    translate: 0 calc((var(--banner-bar) / 2 + var(--chrome-rise)) * -1);
+  }
+
+  .banner.lifted .social a:nth-child(2),
+  .banner.lifted .social a:nth-child(3) {
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner.chrome-ready .breadcrumb,
+  .banner.chrome-ready .social,
+  .banner.chrome-ready .social a {
+    transition-duration: 0s;
+  }
+}
+
+/* Social */
+
+.social {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.social a {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #fff;
+  transition: opacity 0.25s ease;
+}
+
+
+.banner.ink .social a {
+  color: var(--fg);
+}
+
+@media (hover: hover) {
+  .social a:hover {
+    opacity: 0.6;
+  }
+}
+
+/* ========================================
+   HOME
+   ======================================== */
+
+.home-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  line-height: 1.3;
+  margin: 0 0 18px;
+}
+
+.home-text {
+  font-size: 14px;
+  color: var(--fg-body);
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.inline-link {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent-rule);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .inline-link:hover {
+    opacity: 0.6;
+  }
+}
+
+.contact {
+  padding: 20px 0 80px;
+}
+
+.contact-email {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg-muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+@media (hover: hover) {
+  .contact-email:hover {
+    opacity: 0.6;
+  }
+}
+
+/* The confirmation lands UNDER the address instead of replacing it — you can
+   still see what you copied while being told that you copied it. Its line is
+   held open whether or not it is speaking, so nothing below it shifts. */
+.copy-note {
+  display: block;
+  min-height: 18px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-faint);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.copy-note.shown {
+  opacity: 1;
+}
+
+/* ========================================
+   PAGE BLURB
+   ======================================== */
+
+.page-blurb {
+  font-size: 14px;
+  color: var(--fg-muted);
+  margin: 0 0 20px;
+}
+
+/* ========================================
+   WRITING LIST
+   ======================================== */
+
+.thoughts-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.thought-row {
+  color: inherit;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+@media (hover: hover) {
+  .thought-row:hover {
+    opacity: 0.6;
+  }
+}
+
+.thought-title {
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.thought-date {
+  font-size: 13px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  margin-left: 24px;
+}
+
+/* ========================================
+   ARTICLE
+   ======================================== */
+
+.article-header {
+  margin-bottom: 40px;
+  padding-top: 12px;
+}
+
+.article-title {
+  font-family: var(--font-display);
+  /* The travelling title morphs into this box, so the box has to be the
+     words: a full-column h1 would blow a 14px row title up to the width of
+     the whole column. Left-aligned block text wraps identically either way. */
+  width: fit-content;
+  max-width: 100%;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0 0 10px;
+}
+
+.article-date {
+  display: block;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.article-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--fg);
+}
+
+.article-body p {
+  margin: 0 0 24px;
+}
+
+.article-body a {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent-rule);
+}
+
+@media (hover: hover) {
+  .article-body a:hover {
+    opacity: 0.6;
+  }
+}
+
+.article-body h1,
+.article-body h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  margin: 44px 0 14px;
+}
+
+.article-body > h1:first-child,
+.article-body > h2:first-child {
+  margin-top: 0;
+}
+
+.article-body h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  margin: 32px 0 10px;
+}
+
+.article-body ul,
+.article-body ol {
+  margin: 0 0 24px;
+  padding-left: 24px;
+}
+
+.article-body li {
+  margin-bottom: 8px;
+}
+
+.article-body li > ul,
+.article-body li > ol {
+  margin: 8px 0 0;
+}
+
+.article-body img {
+  border-radius: 0;
+}
+
+.article-body figure {
+  margin: 32px 0;
+}
+
+.article-body figcaption {
+  font-size: 14px;
+  color: var(--fg-muted);
+  margin-top: 8px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.article-body blockquote {
+  margin: 40px 0;
+  padding: 0 26px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--fg-quote);
+}
+
+.article-body blockquote p {
+  margin: 0 0 12px;
+}
+
+.article-body blockquote p:last-of-type {
+  margin: 0;
+}
+
+.article-body blockquote cite {
+  display: block;
+  margin-top: 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-style: normal;
+  color: var(--fg-faint);
+}
+
+.article-body blockquote cite::before {
+  content: '— ';
+}
+
+.article-body blockquote cite a {
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--fg-muted);
+}
+
+@media (hover: hover) {
+  .article-body blockquote cite a:hover {
+    color: var(--accent);
+  }
+}
+
+.article-body code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.article-body pre {
+  background: var(--code-bg);
+  padding: 16px 20px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 24px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.article-body pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.article-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 40px 0;
+}
+
+.article-body table {
+  /* Fixed layout so the table honors the text column's width exactly —
+     auto layout lets long headers push it wider than the prose. */
+  table-layout: fixed;
+  width: 100%;
+  margin: 24px 0;
+  border-collapse: collapse;
+  font-size: 15px;
+  border: 1px solid var(--fg-muted);
+}
+
+.article-body th {
+  padding: 6px 10px;
+  text-align: center;
+  border: 1px solid var(--fg-muted);
+  font-weight: 500;
+  background: var(--bg-alt);
+  font-size: 12px;
+}
+
+.article-body td {
+  padding: 6px 10px;
+  text-align: center;
+  border: 1px solid var(--fg-muted);
+}
+
+/* Tap-to-cycle photo figure */
+
+.article-body .photo-shuffle {
+  margin: 32px 0;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+}
+
+.article-body .photo-shuffle-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--bg-alt);
+}
+
+.article-body .photo-shuffle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.article-body .photo-shuffle img.visible {
+  opacity: 1;
+}
+
+/* Side-by-side pair */
+
+.article-body .photo-pair {
+  display: flex;
+  gap: 16px;
+  margin: 32px 0;
+}
+
+.article-body .photo-pair img,
+.article-body .photo-pair figure {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.article-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 48px;
+  padding-top: 24px;
+}
+
+.article-footer a {
+  font-size: 14px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .article-footer a:hover {
+    opacity: 0.6;
+  }
+}
+
+/* ========================================
+   FAVORITES
+   ======================================== */
+
+.solaces-masonry {
+  column-count: 2;
+  column-gap: 40px;
+}
+
+.solaces-category {
+  break-inside: avoid;
+  margin-bottom: 28px;
+}
+
+.solaces-category-title {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--fg-muted);
+  margin-bottom: 8px;
+}
+
+.solaces-category-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.solaces-item {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+}
+
+.solaces-item a {
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+@media (hover: hover) {
+  .solaces-item a:hover {
+    color: var(--fg);
+    opacity: 0.6;
+  }
+}
+
+/* Category words as a quiet button row under the collage hero — each fills
+   the hero grid with that category's photos; empty categories wait,
+   disabled, for their photos. */
+.solaces-strip {
+  column-span: all;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 40px;
+  margin-top: 6px;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+}
+
+.strip-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: color 0.25s ease;
+}
+
+.strip-btn.active {
+  color: var(--fg);
+}
+
+.strip-btn[disabled] {
+  color: var(--fg-faint);
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .strip-btn:not([disabled]):hover {
+    color: var(--fg);
+  }
+}
+
+/* The interactive collage: same six images as the flat hero jpg, cell for
+   cell, shown only while favorites is up. Sits above the media layers,
+   below the header. */
+.banner-collage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  opacity: 0;
+  pointer-events: none;
+  /* leaving favs, the tiles ride the full banner fade (or assemble into
+     the home photo) — the flat mix jpg beneath never peeks through */
+  transition: opacity var(--banner-fade-ms) ease;
+}
+
+/* Stacked layers inside a cell: the incoming one fades and settles in at
+   its own random delay, over whatever the tile showed before. */
+.cell-layer {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+}
+
+.cell-layer.empty {
+  background: var(--bg-alt);
+}
+
+/* Icons are SVG — text-shadow cannot reach them; a quiet drop-shadow can.
+   Ink pages stay clean. */
+.social a svg {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+}
+
+.banner.ink .social a svg {
+  filter: none;
+}
+
+/* Tiles whose thing has more photos invite a click-through. */
+.banner.collage .collage-cell.cyclable {
+  cursor: pointer;
+}
+
+.cell-layer.incoming {
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 460ms ease, transform 580ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.cell-layer.incoming.shown {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.banner.collage .banner-collage {
+  opacity: 1;
+  pointer-events: auto;
+  /* entering is quick — the tile pops carry the arrival */
+  transition-duration: 300ms;
+}
+
+/* A tile showing its slice of the home photo (favs -> home assembly). */
+.cell-layer.piece {
+  background-repeat: no-repeat;
+}
+
+.collage-cell {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+}
+
+.collage-cell img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1);
+  transition: transform 450ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              filter 450ms ease;
+}
+
+.collage-cell figcaption {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  font-size: 13px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7),
+               0 2px 12px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 300ms ease, transform 300ms ease;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .collage-cell:hover img {
+    transform: scale(1.045);
+    filter: brightness(1.06);
+  }
+
+  .collage-cell:hover figcaption {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ========================================
+   READING
+   ======================================== */
+
+.reading-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reading-item-title {
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.reading-item-title a {
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+@media (hover: hover) {
+  .reading-item-title a:hover {
+    color: var(--fg);
+    opacity: 0.6;
+  }
+}
+
+.reading-item-author {
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+/* ========================================
+   STATS
+   ======================================== */
+
+.stats-heading {
+  font-family: var(--font-display);
+  /* The same 14px as the name in the chrome above: these are labels for
+     groups of facts, not titles competing with it. */
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  margin: 0 0 10px;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 22px;
+}
+
+.stats-table td {
+  padding: 5px 0;
+  color: var(--fg-body);
+  vertical-align: top;
+}
+
+.stats-table td:first-child {
+  padding-right: 12px;
+  color: var(--fg-muted);
+  /* The widest label needs ~135px; 55% spent 295 on it and left the values
+     barely enough to stay on one line. */
+  width: 40%;
+}
+
+/* Values close on the right instead of drifting, so the column has an edge —
+   and that edge is the icons'. The 8px inset is the padding inside each icon
+   box: aligning to the box would leave the glyphs looking a step short. */
+.stats-table td:last-child {
+  text-align: right;
+  padding-right: 8px;
+}
+
+.stats-table td.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The dreams are sentences, not facts, so they do not take the ledger's two
+   columns — that was tried in #25 and reverted, rightly: splitting each one
+   at its lead-in word put words in the label column that label nothing.
+   What they CAN share is the page's left edge. The bullets and their 20px
+   indent were the only thing pushing them off it; without them each line
+   starts exactly where every heading and label starts, and the section reads
+   as the page's closing stanza rather than a stray list hanging to the left. */
+.stats-list {
+  margin: 0 0 18px;
+  padding-left: 0;
+  list-style: none;
+  font-size: 13px;
+  /* Muted rather than body ink: these are wishes, not facts to be looked up.
+     Dropping them a step quieter than the values above sets the section apart
+     as a coda instead of a third table you are meant to read across. */
+  color: var(--fg-muted);
+  line-height: 1.7;
+}
+
+/* The gap now does the work the bullets used to. It has to: one dream ("you
+   reaching out. let's connect :D") carries a full stop of its own, so without
+   separation the line after it would read as part of the same thought. */
+.stats-list li {
+  margin-bottom: 9px;
+}
+
+.empty-note {
+  font-size: 14px;
+  color: var(--fg-muted);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 640px) {
+  :root {
+    --banner-height: 300px;
+    --banner-top: 20px;
+    --col-pad: 16px;
+    --page-pad: 20px;
+  }
+
+  /* Touch scrolling is compositor-driven, so a JS-tracked sticky collapse
+     stutters. On phones the banner is a normal in-flow element that scrolls
+     away natively; only the navigation open/collapse still animates. The
+     blur is dropped too — it's expensive and sits over a photo anyway. */
+  .banner {
+    position: relative;
+    top: 0; /* the sticky offset would shift it 20px below its flow slot */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .top-fade {
+    height: 72px;
+  }
+
+  /* More air between the photo and the content, less dead space below. */
+  .page {
+    padding: 44px var(--page-pad) 72px;
+  }
+
+  .page-home {
+    padding: 44px var(--page-pad) 0;
+  }
+
+  .banner-header {
+    padding: 0 14px;
+  }
+
+  /* Lifted chrome stands in the band above the banner, and mobile's band is
+     20px — narrower than the type is tall. Favs and info were lifting their
+     name and icons clean off the top of the screen. Those two views borrow
+     the height they need; every other view keeps the tighter band, since
+     nothing of theirs is standing up there. */
+  .banner.lifted {
+    margin-top: calc(var(--banner-top) + 36px);
+  }
+
+  .contact {
+    padding: 20px 0 40px;
+  }
+
+  .home-title {
+    font-size: 26px;
+  }
+
+  .article-title {
+    font-size: 26px;
+  }
+
+  .article-body th,
+  .article-body td {
+    padding: 5px 4px;
+  }
+
+  .article-body th {
+    font-size: 11px;
+  }
+
+  /* Two tighter columns instead of one sparse mile-long list. */
+  .solaces-masonry {
+    column-count: 2;
+    column-gap: 24px;
+  }
+
+  .solaces-category {
+    margin-bottom: 24px;
+  }
+}
+
+/* ========================================
+   REDUCED MOTION
+   ======================================== */
+
+/* Last so it wins every same-specificity animation above. View opacity fades
+   are kept — it's the translate movement that has to go. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .page,
+  .page-entrance,
+  .stagger-children > *,
+  .view.exiting .page-entrance {
+    animation: none;
+  }
+
+  .banner.animating {
+    transition: none;
+  }
+
+  .banner-media {
+    transform: none;
+    transition: opacity var(--banner-fade-ms) ease;
+  }
+}
