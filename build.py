@@ -137,14 +137,22 @@ def generate_feed(posts):
 
 
 def unpublished_paths():
-    """Drafts and their image folders, relative to content/ — never deployed."""
+    """Drafts and their image folders, relative to content/ — never deployed.
+    Returns (hidden, published_text): an image inside a hidden folder still
+    ships if published content (another post, the favs) points at it."""
     hidden = set()
+    published_text = ''
     for path in (CONTENT / 'posts').glob('*.md'):
-        attributes, _ = parse_front_matter(path.read_text())
+        text = path.read_text()
+        attributes, _ = parse_front_matter(text)
         if str(attributes.get('published', '')).lower() == 'false':
             hidden.add(f'posts/{path.name}')
             hidden.add(f'static/images/blogs/{path.stem}/')
-    return hidden
+        else:
+            published_text += text
+    for path in CONTENT.glob('*/index.json'):
+        published_text += path.read_text()
+    return hidden, published_text
 
 
 def assemble_site(out: Path):
@@ -160,12 +168,14 @@ def assemble_site(out: Path):
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, dest)
 
-    hidden = unpublished_paths()
+    hidden, published_text = unpublished_paths()
     for src in CONTENT.rglob('*'):
         rel = src.relative_to(CONTENT).as_posix()
         if (not src.is_file() or rel.startswith('.git') or rel == 'README.md'
-                or src.name == '.DS_Store'
-                or any(rel == h or rel.startswith(h) for h in hidden)):
+                or src.name == '.DS_Store'):
+            continue
+        if (any(rel == h or rel.startswith(h) for h in hidden)
+                and f'/{rel}' not in published_text):
             continue
         dest = out / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
