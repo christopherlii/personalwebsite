@@ -30,11 +30,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: christopherlii/site-content
-          ssh-key: ${{ secrets.CONTENT_DEPLOY_KEY }}
-          path: content
+      # Cloned quietly rather than with actions/checkout, which logs the
+      # commit it fetched — run logs are public, and a content commit that
+      # changes from one day to the next would date every publish.
+      - run: |
+          key="$RUNNER_TEMP/content_key"
+          printf '%s\n' "$CONTENT_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$RUNNER_TEMP/known_hosts"
+          GIT_SSH_COMMAND="ssh -i $key -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts" \
+            git clone --quiet --depth 1 git@github.com:christopherlii/site-content.git content
+          rm "$key"
+        env:
+          CONTENT_DEPLOY_KEY: ${{ secrets.CONTENT_DEPLOY_KEY }}
       - run: python3 build.py --site _site > /dev/null
       - uses: actions/upload-pages-artifact@v3
         with:
