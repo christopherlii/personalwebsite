@@ -44,9 +44,15 @@ jobs:
         env:
           CONTENT_DEPLOY_KEY: ${{ secrets.CONTENT_DEPLOY_KEY }}
       - run: python3 build.py --site _site > /dev/null
-      - uses: actions/upload-pages-artifact@v3
+      # What actions/upload-pages-artifact does, minus its verbose tar, which
+      # lists every file — a new post's name would show up in the public log.
+      - run: tar --dereference --hard-dereference --directory _site -cf "$RUNNER_TEMP/artifact.tar" .
+      - uses: actions/upload-artifact@v4
         with:
-          path: _site
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
       - id: deployment
         uses: actions/deploy-pages@v4
       # GitHub disables schedules in public repos after 60 days without a
