@@ -1,15 +1,19 @@
 # Content lives in the private christopherlii/site-content repo. This joins it
 # with the code here and publishes the result, so the public history only ever
-# shows code. Publish new content with:
-#   gh workflow run deploy.yml -R christopherlii/personalwebsite
+# shows code. Content goes live at the next daily run — every day deploys
+# whether or not anything changed, so the run list never says when something
+# was published. Avoid manual runs for content; they stand out.
 name: deploy
 
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 9 * * *'
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: read
   pages: write
   id-token: write
@@ -37,3 +41,8 @@ jobs:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
+      # GitHub disables schedules in public repos after 60 days without a
+      # commit; re-enabling on every run keeps the daily deploy alive.
+      - run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/deploy.yml/enable
+        env:
+          GH_TOKEN: ${{ github.token }}

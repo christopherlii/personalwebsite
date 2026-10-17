@@ -24,7 +24,7 @@ All content is data-driven via JSON index files and markdown, and lives in the *
 ## Build
 
 - **`build.py`** — Python script that scans `content/posts/*.md` and regenerates `content/posts/index.json` (post metadata) and `content/feed.xml` (RSS); both are gitignored in the content repo. `--site DIR` also assembles the deployable site: this repo's tracked files with `content/` laid over them, minus `published: false` posts and their `static/images/blogs/<slug>/`.
-- **`.github/workflows/deploy.yml`** — deploys to GitHub Pages: checks out `site-content` (via the `CONTENT_DEPLOY_KEY` secret, a read-only deploy key), runs `build.py --site _site`, publishes it. Runs on push to main; after pushing content, run `gh workflow run deploy.yml -R christopherlii/personalwebsite`.
+- **`.github/workflows/deploy.yml`** — deploys to GitHub Pages: checks out `site-content` (via the `CONTENT_DEPLOY_KEY` secret, a read-only deploy key), runs `build.py --site _site`, publishes it. Runs on push to main and daily at 09:17 UTC, changed or not, so the public run list never reveals when content was published — pushed content goes live at the next daily run. Avoid manual `workflow_dispatch` runs for content; they stand out.
 - **`server.py`** — local dev server on port 8001 with markdown content-type support; falls back to `content/` for paths missing at the root. Run with `python3 server.py`.
 - `marked` is vendored at `static/vendor/marked.min.js` (no CDN); the site makes no third-party requests.
 
@@ -42,7 +42,7 @@ All content is data-driven via JSON index files and markdown, and lives in the *
    ---
    ```
 2. Run `python3 build.py` to regenerate `index.json` and `feed.xml` for local preview
-3. Commit and push in `content/`, then `gh workflow run deploy.yml -R christopherlii/personalwebsite`
+3. Commit and push in `content/`; it goes live at the next daily deploy (09:17 UTC)
 
 ## Style Notes
 
