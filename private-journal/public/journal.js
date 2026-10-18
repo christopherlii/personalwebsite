@@ -1,7 +1,7 @@
 import { searchTerms } from './search-terms.js';
 
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, active: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -167,6 +167,7 @@ function bodyContent(body, query) {
 
 function renderEntry(entry) {
   const article = document.createElement('article'); article.className = 'thought'; article.tabIndex = 0; article.dataset.id = entry.id;
+  article.classList.toggle('is-active', state.active === entry.id);
   const header = document.createElement('header'); header.className = 'thought-header';
   const time = document.createElement('time'); time.dateTime = entry.created_at;
   const date = new Date(entry.created_at);
@@ -186,6 +187,7 @@ function renderEntry(entry) {
   text.classList.toggle('collapsed', !state.expanded.has(entry.id));
   text.append(bodyContent(entry.body, state.query)); article.append(text);
   const footer = document.createElement('div'); footer.className = 'entry-footer';
+  footer.append(button('copy', 'copy', entry));
   const expand = button(state.expanded.has(entry.id) ? 'close' : 'open', 'expand', entry);
   expand.className = 'expand-thought'; expand.hidden = !state.expanded.has(entry.id);
   expand.setAttribute('aria-expanded', String(state.expanded.has(entry.id)));
@@ -196,7 +198,7 @@ function renderEntry(entry) {
   const menu = document.createElement('div'); menu.className = 'entry-menu';
   const bookmark = button(entry.bookmarked ? 'bookmarked' : 'bookmark', 'bookmark', entry);
   bookmark.setAttribute('aria-pressed', String(Boolean(entry.bookmarked)));
-  menu.append(bookmark, button('edit', 'edit', entry), button('copy', 'copy', entry), button('public draft', 'public', entry), button('delete', 'delete', entry));
+  menu.append(bookmark, button('edit', 'edit', entry), button('public draft', 'public', entry), button('delete', 'delete', entry));
   details.append(summary, menu); actions.append(details); footer.append(actions); article.append(footer);
   const observer = new ResizeObserver(() => { expand.hidden = !state.expanded.has(entry.id) && text.scrollHeight <= text.clientHeight + 2; });
   observer.observe(text); state.observers.push(observer);
@@ -335,6 +337,13 @@ document.addEventListener('keydown', event => {
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
 for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => $(`#${item.dataset.close}`).close());
 
+document.addEventListener('pointerdown', event => {
+  if (!['touch', 'pen'].includes(event.pointerType)) return;
+  const thought = event.target.closest('.thought');
+  state.active = thought?.dataset.id || null;
+  for (const article of document.querySelectorAll('.thought')) article.classList.toggle('is-active', article.dataset.id === state.active);
+});
+
 $('#feed').addEventListener('click', async event => {
   const target = event.target.closest('button[data-action]');
   if (!target) return;
@@ -345,16 +354,27 @@ $('#feed').addEventListener('click', async event => {
   state.selected = entry;
   try {
     if (action === 'expand') {
+      const focused = document.activeElement === target;
       if (state.expanded.has(entry.id)) state.expanded.delete(entry.id); else state.expanded.add(entry.id);
-      target.closest('article').replaceWith(renderEntry(entry));
+      const replacement = renderEntry(entry);
+      target.closest('article').replaceWith(replacement);
+      if (focused) {
+        const control = replacement.querySelector('[data-action=expand]');
+        control.hidden = false;
+        replacement.focus({ preventScroll: true });
+        control.focus({ preventScroll: true });
+      }
     } else if (action === 'bookmark') {
       target.disabled = true;
       const data = await api(`thoughts/${entry.id}`, { method: 'PATCH', body: JSON.stringify({ bookmarked: !entry.bookmarked }) });
       state.entries.set(entry.id, { ...entry, ...data.entry });
       if (state.view === 'saved' && !data.entry.bookmarked) await loadFeed();
       else target.closest('article').replaceWith(renderEntry({ ...entry, ...data.entry }));
-    } else if (action === 'copy') { await navigator.clipboard.writeText(entryText(entry)); notice('copied.'); }
-    else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
+    } else if (action === 'copy') {
+      await navigator.clipboard.writeText(entryText(entry));
+      target.textContent = 'copied';
+      setTimeout(() => { target.textContent = 'copy'; }, 1200);
+    } else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
     else if (action === 'public') { $('#public-thought-title').value = entry.title || ''; $('#public-body').value = entry.body; $('#public-status').textContent = ''; $('#public-dialog').showModal(); }
   } catch (error) { target.disabled = false; notice(error.message); }
@@ -396,7 +416,7 @@ $('#logout').addEventListener('click', async () => {
     await saveDraft();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
     await api('logout', { method: 'POST', body: '{}' });
-    state.entries.clear(); state.selected = null; state.pendingPost = null;
+    state.entries.clear(); state.selected = null; state.pendingPost = null; state.active = null;
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     for (const input of document.querySelectorAll('.title-input')) input.value = '';

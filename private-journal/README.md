@@ -116,6 +116,10 @@ on the new deployment because every session is bound to the current hash.
   and both are included in search, copying, exports, and separate public drafts.
   Posting saves privately in this journal. Public-draft actions still require
   an explicit copy/download; posting does not send to another service.
+- Dates, times, and entry controls appear on hover, keyboard focus, or touch.
+  Copy is available directly below each note; open/close appears when its body
+  needs truncation. Touch selection persists through expansion, keyboard focus
+  stays on the open/close control, and revealing controls does not move notes.
 - Drafts autosave after 650ms and are shared between devices. A revision check
   prevents one device from silently overwriting another. A conflicting draft
   stays in the editor; it can still be copied or posted as a separate thought.

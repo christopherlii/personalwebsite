@@ -51,6 +51,12 @@ try {
   const root = (await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries[0]; ids.push(root.id);
   const article = page.locator(`article[data-id="${root.id}"]`);
 
+  await page.mouse.move(0, 0);
+  assert.equal(await article.locator('.thought-header').isVisible(), false, 'date is hidden before interacting with a note');
+  await article.hover();
+  assert.equal(await article.locator('.thought-header').isVisible(), true, 'hover reveals the date');
+  await article.locator('[data-action=copy]').click();
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `a day of building\n\n${first}`, 'direct copy includes title and full body');
   await article.locator('[data-action=expand]').waitFor({state:'visible'});
   assert.equal(await article.locator('.thought-body').evaluate(element => element.scrollHeight > element.clientHeight), true);
   await article.locator('[data-action=expand]').click();
