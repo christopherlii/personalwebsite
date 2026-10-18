@@ -33,7 +33,7 @@ Generate a local password hash without putting a password in a command argument,
 shell history, or chat. In zsh:
 
 ```sh
-read -rs 'journal_password?Journal password (16+ characters): '
+read -rs 'journal_password?Journal password (8+ characters): '
 printf '%s' "$journal_password" | node scripts/password.mjs --local
 unset journal_password
 npm run db:local
@@ -85,7 +85,7 @@ For a new account or deployment:
 3. Install the production password hash without displaying it:
 
    ```sh
-   read -rs 'journal_password?Production journal password (16+ characters): '
+   read -rs 'journal_password?Production journal password (8+ characters): '
    printf '%s' "$journal_password" | node scripts/password.mjs | npx wrangler secret put JOURNAL_PASSWORD_HASH --env production
    unset journal_password
    ```
