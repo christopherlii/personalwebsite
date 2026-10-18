@@ -17,10 +17,12 @@ status stay intact until the full response is ready, including semantic
 indexing; there is no intermediate word-match pass or loading label. Clearing
 restores the timeline. The feed offers copy and open; other actions live on
 the full-page writing view. Open renders Markdown with headings, emphasis,
-lists, quotes, code, tasks, tables, and links. Edit switches to a borderless
-Markdown source editor with preview, save, and cancel. Back saves changes
-before returning; save errors or version conflicts keep the source visible.
-Unsaved source and preview also survive reauthentication in the same tab.
+lists, quotes, code, tasks, tables, and links. Edit opens a borderless CodeMirror
+editor that formats Markdown in place as it is typed. The active line shows
+its syntax in muted text; markers elsewhere recede. There is no source/preview
+toggle. Save, cancel, and back retain their existing behavior. Back saves changes
+before returning; save errors or version conflicts keep the editor visible.
+Unsaved source and editor history also survive reauthentication in the same tab.
 Reload/close warns while edits are unsaved. Publishing stays an explicit,
 separate public draft, and delete still requires confirmation.
 Previews never expand inline.
@@ -36,8 +38,19 @@ Markdown uses the existing site's vendored Marked 15.0.12 lexer (MIT), copied
 unchanged to `public/vendor/marked.min.js`. `public/markdown.js` constructs DOM
 nodes from tokens instead of injecting parsed HTML. Raw HTML remains literal
 text, links allow only HTTP(S)/mailto, and Markdown images become links rather
-than automatic external requests. This is a reading view and source editor,
-not Obsidian's block-level Live Preview editor or its plugin syntax.
+than automatic external requests. The live editor uses the Lezer Markdown tree
+to decorate the exact source, not a conversion through editable HTML. Headings,
+emphasis, lists, quotes, code, links, and tasks format in place. Inactive tables
+render as tables; clicking one reveals that table's Markdown for editing.
+Task checkboxes update the source through normal undoable editor transactions.
+Obsidian-specific plugin syntax and embedded files are not implemented.
+
+`npm run build:editor` bundles the pinned CodeMirror dependencies into
+`public/live-editor.js` and assembles licenses for every bundled dependency.
+Both generated assets are committed and rebuilt before `npm run dev` or
+`npm run deploy`. Runtime code and fonts remain local. Each journal HTML response
+gets a fresh style nonce for CodeMirror's base stylesheet; the CSP continues
+to prohibit arbitrary inline styles, inline scripts, and eval.
 
 The interface and backend live in `personalwebsite`. **Journal text is stored in
 Cloudflare D1, not Git or `site-content`.** `build.py` excludes this entire

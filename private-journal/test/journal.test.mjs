@@ -49,6 +49,21 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('editor styles use a fresh shell nonce while scripts and arbitrary inline styles stay restricted', async () => {
+  const c = client();
+  c.env.ASSETS = { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '1', ETag: 'original' } }) };
+  const first = await c.call('/');
+  const second = await c.call('/journal/');
+  const nonce = first.data.match(/name="editor-style-nonce" content="([a-f0-9]{64})"/)[1];
+  assert.ok(first.headers.get('Content-Security-Policy').includes(`style-src 'self' 'nonce-${nonce}'`));
+  assert.match(first.headers.get('Content-Security-Policy'), /script-src 'self';/);
+  assert.doesNotMatch(first.headers.get('Content-Security-Policy'), /unsafe-inline|unsafe-eval/);
+  assert.ok(!second.data.includes(nonce), 'each HTML response gets a new nonce');
+  assert.equal(first.headers.has('Content-Length'), false);
+  assert.equal(first.headers.has('ETag'), false);
+  assert.doesNotMatch((await c.call('/api/session')).headers.get('Content-Security-Policy'), /nonce-/);
+});
+
 test('individual reading links require authentication and return the complete saved thought', async () => {
   const c = client();
   const input = { ...thought('a long private thought\n\n' + 'full writing. '.repeat(100)), title: '<private title>' };

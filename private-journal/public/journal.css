@@ -364,19 +364,30 @@ textarea::placeholder {
   padding-top:8px;
   border-top:1px solid var(--track)
 }
-#edit-body {
-  display:block;
-  width:100%;
+#live-editor {
   min-height:55svh;
-  max-height:none;
-  field-sizing:content;
-  resize:none;
-  padding:0;
-  border:0;
-  background:transparent;
-  outline:none;
   font:14px/1.7 var(--font-body)
 }
+#live-editor .cm-editor { background:var(--bg); color:var(--body) }
+#live-editor .cm-editor.cm-focused { outline:none }
+#live-editor .cm-scroller { font:inherit; overflow:visible }
+#live-editor .cm-content { padding:0; min-height:55svh; caret-color:var(--fg) }
+#live-editor .cm-line { padding:0 }
+#live-editor .cm-md-heading { font-weight:500; line-height:1.4 }
+#live-editor .cm-md-h1 { font-size:18px }
+#live-editor .cm-md-h2 { font-size:16px }
+#live-editor .cm-md-strong { font-weight:600 }
+#live-editor .cm-md-emphasis { font-style:italic }
+#live-editor .cm-md-strike { text-decoration:line-through }
+#live-editor .cm-md-marker { color:var(--muted); font-weight:400 }
+#live-editor .cm-md-link { color:#0b243e; text-decoration:underline; text-underline-offset:3px }
+#live-editor .cm-md-quote { border-left:1px solid var(--track); padding-left:18px; color:var(--muted) }
+#live-editor .cm-md-code-line { background:#eee; padding:0 12px }
+#live-editor .cm-md-inline-code { background:#eee }
+#live-editor .cm-md-task { margin:0 2px 0 0; vertical-align:middle; accent-color:var(--fg) }
+#live-editor .cm-md-bullet { display:inline-block; min-width:12px }
+#live-editor .cm-md-table { padding:8px 0 }
+#live-editor .cm-md-table .table-scroll { margin-bottom:0 }
 #edit-form .title-input {
   margin-bottom:18px
 }

@@ -28,6 +28,11 @@ const openReader = async article => {
 };
 const readerMenu = async () => { await page.locator('#reader-menu-toggle').click(); };
 const backToFeed = async () => { await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' }); };
+const fillThought = async value => {
+  const editor = page.locator('#live-editor .cm-content');
+  await editor.click(); await editor.press('ControlOrMeta+a'); await page.keyboard.insertText(value);
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value, value);
+};
 const blankDraft = async () => {
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent === '');
   const { status, data } = await api('draft');
@@ -108,7 +113,7 @@ try {
   await openReader(article);
   await page.locator('#reader-edit').click();
   const edited = `${prefix}: soccer and coffee instead. <img src=x onerror=alert(1)>`;
-  await page.locator('#edit-body').fill(edited);
+  await fillThought(edited);
   await page.locator('#edit-thought-title').fill('a different day <img src=x onerror=alert(1)>');
   await page.locator('#reader-save').click();
   await page.locator('#edit-form').waitFor({ state: 'hidden' });
@@ -250,28 +255,42 @@ try {
   await page.screenshot({ path: `${artifacts}/editing-mobile.png`, fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 });
   const unsafeMarkdown = markdownSample + '\n\n**an unsaved idea** [unsafe](javascript:alert%281%29) [encoded](jav&#x61;script:alert%281%29) <img src=x onerror=alert(1)> ![an image](https://example.com/tracker.png)';
-  await page.locator('#edit-body').fill(unsafeMarkdown);
-  await page.locator('#reader-preview').click();
-  assert.equal(await page.locator('#reader .markdown-body strong').last().textContent(), 'an unsaved idea');
-  assert.equal(await page.locator('#reader-content img, #reader-content script, #reader-content a[href^="javascript:"]').count(), 0, 'Markdown cannot execute HTML or create unsafe links or remote image requests');
-  assert.ok((await page.locator('#reader-content').textContent()).includes('<img src=x onerror=alert(1)>'), 'raw HTML remains literal text');
-  assert.equal((await api(`thoughts/${ids[0]}`)).data.entry.body, markdownSample, 'preview does not save changes');
-  await page.locator('#reader-preview').click();
-  assert.equal(await page.locator('#edit-body').inputValue(), unsafeMarkdown, 'source survives preview toggles');
+  await fillThought(unsafeMarkdown);
+  assert.equal(await page.locator('#reader-preview').count(), 0, 'live editing needs no preview toggle');
+  assert.ok(await page.locator('#live-editor .cm-md-strong').count(), 'bold renders while the text is editable');
+  assert.equal(await page.locator('#live-editor img:not(.cm-widgetBuffer), #live-editor script, #live-editor a[href^="javascript:"]').count(), 0, 'live Markdown cannot execute HTML or create unsafe links or remote image requests');
+  assert.equal(await page.locator('#live-editor img[src]').count(), 0, 'editor caret buffers have no image sources');
+  assert.equal((await api(`thoughts/${ids[0]}`)).data.entry.body, markdownSample, 'live formatting does not save changes');
+  await page.locator('#live-editor .cm-md-h2').click();
+  await page.waitForFunction(() => document.querySelector('#live-editor .cm-md-h2').textContent.startsWith('## '));
+  assert.equal(await page.locator('#edit-body').inputValue(), unsafeMarkdown, 'revealing heading syntax preserves source');
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+End');
+  await page.waitForFunction(() => !document.querySelector('#live-editor .cm-md-h2').textContent.startsWith('## '));
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+a');
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+c');
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), unsafeMarkdown, 'copying the editable document preserves all Markdown syntax');
+  await page.locator('#live-editor .cm-content').press('ArrowRight');
+  await page.waitForTimeout(600); // Separate the next typing transaction from the bulk paste in undo history.
+  await page.keyboard.type('x');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value + 'x', unsafeMarkdown);
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+z');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value, unsafeMarkdown);
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+Shift+z');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value + 'x', unsafeMarkdown);
   await page.locator('#reader-cancel').click();
   assert.equal(await page.locator('#reader .markdown-body strong').count(), 1, 'cancel restores saved writing');
   await page.locator('#reader-edit').click();
   const revisedMarkdown = markdownSample + '\n\na saved revision';
-  await page.locator('#edit-body').fill(revisedMarkdown);
+  await fillThought(revisedMarkdown);
   await backToFeed();
   assert.equal((await api(`thoughts/${ids[0]}`)).data.entry.body, revisedMarkdown, 'back saves edited writing before returning');
   await openReader(longSample);
   await page.locator('#reader-edit').click();
-  await page.locator('#edit-body').fill(markdownSample);
+  await fillThought(markdownSample);
   await page.locator('#reader-save').click();
   await page.locator('#edit-form').waitFor({ state: 'hidden' });
   await page.locator('#reader-edit').click();
-  await page.locator('#edit-body').fill(markdownSample + '\n\nmy local change');
+  await fillThought(markdownSample + '\n\nmy local change');
   const currentEntry = (await api(`thoughts/${ids[0]}`)).data.entry;
   await api(`thoughts/${ids[0]}`, 'PATCH', { title: currentEntry.title, body: markdownSample + '\n\nchange from another tab', updated_at: currentEntry.updated_at });
   await page.locator('#reader-save').click();
@@ -435,7 +454,7 @@ try {
   await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'source/preview and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

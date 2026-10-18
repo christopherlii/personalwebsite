@@ -63,7 +63,6 @@
     <header class="reader-toolbar">
       <a id="reader-back" href="#" aria-label="back to timeline">back</a>
       <div class="reader-actions">
-        <button type="button" id="reader-preview" hidden>preview</button>
         <button type="button" id="reader-cancel" hidden>cancel</button>
         <button type="submit" form="edit-form" id="reader-save" hidden>save</button>
         <button type="button" id="reader-edit">edit</button>
@@ -79,8 +78,8 @@
     <form id="edit-form" hidden>
       <label for="edit-thought-title" class="sr-only">title (optional)</label>
       <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
-      <label for="edit-body" class="sr-only">thought</label>
-      <textarea id="edit-body" rows="8" maxlength="20000" required></textarea>
+      <div id="live-editor"></div>
+      <textarea id="edit-body" hidden aria-hidden="true" tabindex="-1"></textarea>
     </form>
     <p id="reader-error" role="status"></p>
   </main>

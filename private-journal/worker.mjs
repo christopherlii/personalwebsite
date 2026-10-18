@@ -220,12 +220,21 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/markdown.js', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/markdown.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
       const expected = error instanceof HttpError || error instanceof PublicationError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
+    }
+    // CodeMirror mounts its base styles at runtime. Authorize only those
+    // styles with a fresh nonce in the static shell, keeping inline scripts blocked.
+    let styleNonce = '';
+    if (request.method === 'GET' && response.ok && ['/', '/index.html'].includes(url.pathname) && response.headers.get('Content-Type')?.startsWith('text/html')) {
+      styleNonce = hex(crypto.getRandomValues(new Uint8Array(32)));
+      const html = (await response.text()).replace('<head>', `<head><meta name="editor-style-nonce" content="${styleNonce}">`);
+      const headers = new Headers(response.headers); headers.delete('Content-Length'); headers.delete('ETag');
+      response = new Response(html, { status: response.status, headers });
     }
     const output = new Response(response.body, response);
     output.headers.set('Cache-Control', 'no-store');
@@ -234,7 +243,7 @@ export default {
     output.headers.set('Referrer-Policy', 'no-referrer');
     output.headers.set('X-Content-Type-Options', 'nosniff');
     output.headers.set('X-Frame-Options', 'DENY');
-    output.headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
+    output.headers.set('Content-Security-Policy', `default-src 'none'; script-src 'self'; style-src 'self'${styleNonce ? ` 'nonce-${styleNonce}'` : ''}; font-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
     return request.method === 'HEAD' ? new Response(null, output) : output;
   }
 };
