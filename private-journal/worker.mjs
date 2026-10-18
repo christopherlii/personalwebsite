@@ -180,7 +180,7 @@ export default {
     try {
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) fail(400, 'HTTPS is required.');
       if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-      else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+      else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
       else fail(404, 'Not found.');
     } catch (error) {
       response = json({ error: error instanceof HttpError ? error.message : 'The journal is unavailable. Try again later.' }, error instanceof HttpError ? error.status : 500);

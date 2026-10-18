@@ -100,6 +100,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
   const fontStatus = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].map(font => ({ family: font.family, status: font.status })); });
   assert.ok(fontStatus.some(font => font.family.includes('Instrument Sans') && font.status === 'loaded'), 'homepage body font loads');
+  assert.ok(fontStatus.some(font => font.family.includes('Fraunces') && font.status === 'loaded'), 'homepage name font loads');
 
   // The same field filters old entries without publishing its contents.
   await page.locator('#body').fill('remember a book');
