@@ -274,7 +274,7 @@ try {
     if (!payload.semantic) return route.continue();
     semanticCalls.push(payload.query);
     if (payload.query === 'older query') await new Promise(resolve => setTimeout(resolve, 1500));
-    await route.fulfill({ json: { entries: [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: null, indexing: false } }).catch(() => {});
+    await route.fulfill({ json: { entries: [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: payload.query === 'a thought about stories' ? 40 : null, indexing: false } }).catch(() => {});
   });
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#body').inputValue(), '', 'semantic checks start with a fully cleared draft');
@@ -287,7 +287,9 @@ try {
   const oldRequest = page.waitForRequest(request => request.url().endsWith('/api/search') && request.postDataJSON().semantic && request.postDataJSON().query === 'older query');
   const retainedFeed = await page.locator('#feed').innerHTML();
   const retainedStatus = await page.locator('#feed-status').textContent();
-  await page.locator('#body').fill('older query'); await oldRequest;
+  await page.locator('#body').fill('older query');
+  await page.locator('#more').click();
+  assert.equal((await oldRequest).postDataJSON().cursor, 0, 'a new query never reuses the previous result page');
   assert.equal(await page.locator('#feed').innerHTML(), retainedFeed, 'pending search preserves the exact displayed list');
   assert.equal(await page.locator('#feed-status').textContent(), retainedStatus, 'pending search shows no loading label');
   assert.equal(await page.locator('.thought').evaluate(article => getComputedStyle(article).animationName), 'none', 'search results never animate while editing');

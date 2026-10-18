@@ -1,7 +1,7 @@
 import { searchTerms } from './search-terms.js';
 
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false, timelineHidden: false, readerGeneration: 0, feedScroll: 0 };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -313,6 +313,7 @@ function searchFromComposer(immediate = false) {
 
 async function loadFeed(append = false, semantic = state.semantic) {
   if (state.timelineHidden) return;
+  clearTimeout(state.searchTimer);
   state.controller?.abort();
   const controller = new AbortController(); state.controller = controller;
   const generation = ++state.generation;
@@ -357,6 +358,7 @@ async function loadFeed(append = false, semantic = state.semantic) {
       state.entries.set(entry.id, entry); $('#feed').append(renderEntry(entry));
     }
     state.semantic = semanticMode;
+    state.renderedQuery = queryText; state.renderedView = saved ? 'saved' : 'all';
     state.cursor = data.next;
     updateView(); notice(message);
     $('#more').hidden = data.next === null;
@@ -416,7 +418,7 @@ $('#composer').addEventListener('submit', async event => {
 $('#clear-input').addEventListener('click', () => {
   $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); $('#body').focus();
 });
-$('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true') loadFeed(state.entries.size > 0 && state.cursor !== null); });
+$('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true' && state.query === state.renderedQuery && state.view === state.renderedView) loadFeed(state.entries.size > 0 && state.cursor !== null); });
 $('#toggle-timeline').addEventListener('click', () => {
   state.timelineHidden = !state.timelineHidden;
   $('#timeline').hidden = state.timelineHidden;
