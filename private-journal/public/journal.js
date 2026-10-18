@@ -588,6 +588,20 @@ $('#toggle-timeline').addEventListener('click', () => {
   try { localStorage.setItem('journal.timelineHidden', String(state.timelineHidden)); } catch {}
   searchFromComposer(true);
 });
+// Two quick taps of Shift lock the journal, same as the lock button. A tap
+// only counts if no other key went down while Shift was held, so typing
+// capitals never adds up to a lock.
+const shiftTap = { clean: false, last: -Infinity };
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Shift') { shiftTap.clean = false; shiftTap.last = -Infinity; }
+  else if (!event.repeat) shiftTap.clean = true;
+});
+document.addEventListener('keyup', event => {
+  if (event.key !== 'Shift' || !shiftTap.clean) return;
+  shiftTap.clean = false;
+  if (event.timeStamp - shiftTap.last < 400 && state.authenticated) { shiftTap.last = -Infinity; $('#logout').click(); }
+  else shiftTap.last = event.timeStamp;
+});
 document.addEventListener('keydown', event => {
   if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (state.readerEditing) readerEditor?.focus(); else composerEditor?.focus(); }
 });
