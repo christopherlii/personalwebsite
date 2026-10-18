@@ -49,6 +49,18 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('individual reading links require authentication and return the complete saved thought', async () => {
+  const c = client();
+  const input = { ...thought('a long private thought\n\n' + 'full writing. '.repeat(100)), title: '<private title>' };
+  assert.equal((await c.call(`/api/thoughts/${input.id}`)).status, 401);
+  await c.login();
+  const created = await c.call('/api/thoughts', 'POST', input);
+  assert.deepEqual((await c.call(`/api/thoughts/${input.id}`)).data.entry, created.data.entry);
+  assert.equal((await c.call(`/api/thoughts/${crypto.randomUUID()}`)).status, 404);
+  await c.call('/api/logout', 'POST', {});
+  assert.equal((await c.call(`/api/thoughts/${input.id}`)).status, 401);
+});
+
 test('the journal runs under its domain path with the same authenticated API and assets', async () => {
   const c = client(undefined, 'https://christopherli.dev');
   c.env.ASSETS = { fetch: async request => new Response(new URL(request.url).pathname) };

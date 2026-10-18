@@ -25,6 +25,7 @@
     <header class="page-header page-entrance">
       <span class="site-name">Christopher Li</span>
       <div class="utilities">
+        <button type="button" id="toggle-timeline" aria-expanded="true" aria-controls="timeline">hide timeline</button>
         <button type="button" id="journal-menu-toggle" data-menu aria-label="journal options" aria-expanded="false" aria-controls="journal-menu">more</button>
       </div>
       <nav id="journal-menu" class="entry-menu journal-menu" aria-label="journal" hidden>
@@ -48,12 +49,19 @@
         </div>
       </form>
     </section>
-    <div class="view-heading"><h1 id="view-title" class="sr-only">thoughts</h1></div>
-    <div class="stream">
-      <p id="notice" class="notice" role="status" hidden></p>
-      <div id="feed" aria-busy="false"></div>
-    </div>
-    <div class="feed-footer"><p id="feed-status" role="status">loading…</p><button type="button" id="more" hidden>load more</button></div>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <section id="timeline" aria-label="timeline">
+      <div class="view-heading"><h1 id="view-title" class="sr-only">thoughts</h1></div>
+      <div class="stream">
+        <div id="feed" aria-busy="false"></div>
+      </div>
+      <div class="feed-footer"><p id="feed-status" role="status"></p><button type="button" id="more" hidden>load more</button></div>
+    </section>
+  </main>
+  <main id="reader" class="reader" hidden>
+    <a id="reader-back" class="icon-control" href="#" aria-label="back to timeline" title="back to timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7M3 12h18"/></svg></a>
+    <article id="reader-content" tabindex="-1"></article>
+    <p id="reader-error" role="status"></p>
   </main>
 
   <dialog id="edit-dialog" aria-labelledby="edit-title">
@@ -100,6 +108,6 @@
       <nav id="public-menu" class="entry-menu" aria-label="public draft actions" hidden><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></nav>
     </footer>
   </dialog>
-  <p id="boot-status" class="boot" role="status">opening journal…</p>
+  <p id="boot-status" class="boot" role="status"></p>
 </body>
 </html>

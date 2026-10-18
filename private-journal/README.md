@@ -6,9 +6,19 @@ has a borderless writing/search field above a faint timeline, and three-line
 thought previews with an open/close control. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
 The header and note options expand into inline text rows without covering the
-feed. Entrance motion rises briefly on load and opening actions, and is disabled
-for reduced-motion preferences. Search updates do not replay entry entrances.
-Typing recalls related past thoughts; clearing restores the timeline. Only an explicit post creates a new
+feed. Header entrances and control fades respect reduced-motion preferences;
+the list never animates. Hover reveals dates and icon actions, and moving away
+fades them out even after a click. Keyboard focus reveals the same controls;
+touch devices show them directly. Hide timeline removes the whole feed while
+leaving writing and autosave available. It is a temporary view choice.
+
+Typing recalls related past thoughts after a pause. The existing list and its
+status stay intact until the full response is ready, including semantic
+indexing; there is no intermediate word-match pass or loading label. Clearing
+restores the timeline. An expand icon opens a private reading link containing
+only the complete writing and a back control. Reading links require the same
+session and work on reload and under `/journal/`.
+Only an explicit post creates a new
 entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
 characters). No analytics, trackers, browser-local thought storage, or external
@@ -63,9 +73,11 @@ An existing Chromium binary can be selected with `CHROMIUM_PATH`. These tests
 cover title/body autosave restoration, posting, bookmarks, accent-insensitive search,
 editing, safe rendering, separate public drafts, desktop/mobile layout,
 font loading, draft conflicts, and server-side session revocation. Shared-field
-checks cover pause-triggered semantic requests, stale response cancellation,
+checks cover retained results without a loading label, pause-triggered semantic requests, stale response cancellation,
 clear-to-restore behavior, and typing without creating entries. Browser semantic
 responses are controlled test fixtures, not live model quality verification.
+The browser workflow also covers hiding/restoring the timeline, fading controls
+after clicks, icon rendering, and complete private reading links on reload.
 
 ## Deploy after connecting a Cloudflare account
 

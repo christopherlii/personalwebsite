@@ -1,7 +1,7 @@
 import { searchTerms } from './search-terms.js';
 
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, active: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false, timelineHidden: false, readerGeneration: 0, feedScroll: 0 };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -36,9 +36,11 @@ function showLogin(message = '') {
   state.controller?.abort();
   clearTimeout(state.draftTimer);
   clearTimeout(state.searchTimer);
-  clearTimeout(state.relatedTimer);
+  state.readerGeneration++;
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('#app').hidden = true;
+  $('#reader').hidden = true;
+  $('#reader-content').replaceChildren();
   $('#login').hidden = false;
   $('#boot-status').hidden = true;
   $('#login-message').textContent = message;
@@ -136,12 +138,13 @@ async function enter() {
   $('#composer-title').hidden = !$('#title').value;
   state.authenticated = true;
   $('#login').hidden = true;
-  $('#app').hidden = false;
+  $('#app').hidden = Boolean(readerId());
   $('#boot-status').hidden = true;
   $('#password').value = '';
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
-  await searchFromComposer(true);
+  if (readerId()) await showRoute();
+  else await searchFromComposer(true);
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
 
@@ -151,6 +154,54 @@ function button(label, action, entry) {
   result.dataset.action = action; result.dataset.id = entry.id;
   return result;
 }
+
+const icons = {
+  copy: '<rect x="8" y="8" width="12" height="13"/><path d="M16 8V3H3v13h5"/>',
+  copied: '<path d="m4 12 5 5L20 6"/>',
+  open: '<path d="m5 9 7 7 7-7"/>',
+  close: '<path d="m5 15 7-7 7 7"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  read: '<path d="M14 3h7v7M21 3l-8 8M10 21H3v-7M3 21l8-8"/>'
+};
+function setIcon(control, icon, label) {
+  control.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[icon]}</svg>`;
+  control.setAttribute('aria-label', label); control.title = label;
+  control.classList.add('icon-control');
+}
+setIcon($('#public-menu-toggle'), 'more', 'public draft options');
+
+function readerId() { return location.hash.match(/^#thought\/([a-f0-9-]{36})$/)?.[1]; }
+async function showRoute() {
+  if (!state.authenticated) return;
+  const generation = ++state.readerGeneration;
+  const id = readerId();
+  if (!id) {
+    const wasReading = !$('#reader').hidden;
+    $('#reader').hidden = true; $('#reader-content').replaceChildren();
+    $('#app').hidden = false; document.title = 'journal';
+    if (!state.entries.size && !state.timelineHidden) await searchFromComposer(true);
+    if (wasReading) window.scrollTo(0, state.feedScroll);
+    return;
+  }
+  try {
+    const { entry } = await api(`thoughts/${id}`);
+    if (generation !== state.readerGeneration || !state.authenticated) return;
+    const content = $('#reader-content'); content.replaceChildren();
+    if (entry.title) {
+      const title = document.createElement('h1'); title.className = 'thought-title'; title.textContent = entry.title; content.append(title);
+    }
+    const body = document.createElement('p'); body.className = 'thought-body'; body.append(bodyContent(entry.body, '')); content.append(body);
+    $('#reader-error').textContent = '';
+    document.title = 'journal';
+  } catch (error) {
+    if (generation !== state.readerGeneration || !state.authenticated) return;
+    $('#reader-content').replaceChildren(); $('#reader-error').textContent = error.message;
+  }
+  if (!$('#app').hidden) state.feedScroll = window.scrollY;
+  closeMenus(); $('#app').hidden = true; $('#reader').hidden = false;
+  window.scrollTo(0, 0); $('#reader-content').focus({ preventScroll: true });
+}
+window.addEventListener('hashchange', showRoute);
 
 function bodyContent(body, query) {
   const fragment = document.createDocumentFragment();
@@ -193,7 +244,6 @@ function bodyContent(body, query) {
 
 function renderEntry(entry) {
   const article = document.createElement('article'); article.className = 'thought'; article.tabIndex = 0; article.dataset.id = entry.id;
-  article.classList.toggle('is-active', state.active === entry.id);
   const header = document.createElement('header'); header.className = 'thought-header';
   const time = document.createElement('time'); time.dateTime = entry.source_date || entry.created_at;
   const date = new Date(entry.source_date ? `${entry.source_date}T12:00:00` : entry.created_at);
@@ -214,19 +264,27 @@ function renderEntry(entry) {
   text.classList.toggle('collapsed', !state.expanded.has(entry.id));
   text.append(bodyContent(entry.body, state.query)); article.append(text);
   const footer = document.createElement('div'); footer.className = 'entry-footer';
-  footer.append(button('copy', 'copy', entry));
+  const copy = button('', 'copy', entry); setIcon(copy, 'copy', 'copy thought'); footer.append(copy);
   const expand = button(state.expanded.has(entry.id) ? 'close' : 'open', 'expand', entry);
   expand.className = 'expand-thought'; expand.hidden = !state.expanded.has(entry.id);
+  setIcon(expand, state.expanded.has(entry.id) ? 'close' : 'open', state.expanded.has(entry.id) ? 'collapse thought' : 'open thought inline');
   expand.setAttribute('aria-expanded', String(state.expanded.has(entry.id)));
   expand.setAttribute('aria-controls', text.id); footer.append(expand);
-  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = '…'; toggle.className = 'thought-actions'; toggle.dataset.menu = '';
+  const read = document.createElement('a'); read.href = `#thought/${entry.id}`; read.dataset.action = 'read'; setIcon(read, 'read', 'expand to reading page'); footer.append(read);
+  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'thought-actions'; toggle.dataset.menu = ''; setIcon(toggle, 'more', 'more actions for thought');
   toggle.setAttribute('aria-label', 'more actions for thought'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `entry-menu-${entry.id}`);
   const menu = document.createElement('nav'); menu.className = 'entry-menu thought-menu'; menu.id = `entry-menu-${entry.id}`; menu.hidden = true; menu.setAttribute('aria-label', 'thought actions');
   const bookmark = button(entry.bookmarked ? 'bookmarked' : 'bookmark', 'bookmark', entry);
   bookmark.setAttribute('aria-pressed', String(Boolean(entry.bookmarked)));
   menu.append(bookmark, button('edit', 'edit', entry), button('public draft', 'public', entry), button('delete', 'delete', entry));
   footer.append(toggle); article.append(footer, menu);
-  const observer = new ResizeObserver(() => { expand.hidden = !state.expanded.has(entry.id) && text.scrollHeight <= text.clientHeight + 2; });
+  article.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'mouse') return;
+    menu.hidden = true; toggle.setAttribute('aria-expanded', 'false');
+  });
+  const observer = new ResizeObserver(() => {
+    if (text.getClientRects().length) expand.hidden = !state.expanded.has(entry.id) && text.scrollHeight <= text.clientHeight + 2;
+  });
   observer.observe(text); state.observers.push(observer);
 
   return article;
@@ -243,72 +301,67 @@ function updateView() {
 
 function searchFromComposer(immediate = false) {
   clearTimeout(state.searchTimer);
-  clearTimeout(state.relatedTimer);
   state.query = entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() }).trim();
-  state.semantic = false;
   state.controller?.abort();
   state.generation++;
-  updateView();
-  if (!state.authenticated || (state.posting && !immediate)) return;
-  notice();
+  $('#feed').setAttribute('aria-busy', 'false');
+  if (!state.authenticated || state.timelineHidden || (state.posting && !immediate)) return;
   if (!state.query || immediate) return loadFeed(false, Boolean(state.query && state.semanticAvailable));
-  // Word matches arrive first; semantic recall runs only after a typing pause.
-  state.searchTimer = setTimeout(() => loadFeed(false, false), 150);
-  if (state.semanticAvailable) state.relatedTimer = setTimeout(() => loadFeed(false, true), 750);
+  // Keep the previous result intact until one complete search is ready.
+  state.searchTimer = setTimeout(() => loadFeed(false, state.semanticAvailable), 750);
 }
 
 async function loadFeed(append = false, semantic = state.semantic) {
-  state.semantic = Boolean(semantic && state.query && state.semanticAvailable);
+  if (state.timelineHidden) return;
   state.controller?.abort();
   const controller = new AbortController(); state.controller = controller;
   const generation = ++state.generation;
-  if (!append) state.cursor = null;
   const queryText = state.query;
   const saved = state.view === 'saved';
-  let cursor = state.cursor || 0;
-  updateView();
-  $('#feed').setAttribute('aria-busy', 'true'); $('#feed-status').textContent = 'loading…'; $('#more').hidden = true;
-  const search = semanticMode => api('search', {
-    method: 'POST', body: JSON.stringify({ query: queryText, saved, cursor, semantic: semanticMode }), signal: controller.signal
+  let cursor = append ? state.cursor || 0 : 0;
+  let semanticMode = Boolean(semantic && queryText && state.semanticAvailable);
+  let message = '';
+  $('#feed').setAttribute('aria-busy', 'true');
+  const search = mode => api('search', {
+    method: 'POST', body: JSON.stringify({ query: queryText, saved, cursor, semantic: mode }), signal: controller.signal
   });
   try {
     let data;
-    if (queryText && state.semantic) {
+    if (queryText && semanticMode) {
       try {
         do { data = await search(true); } while (data.indexing && generation === state.generation);
       } catch (error) {
         if (error.name === 'AbortError') throw error;
         if (generation !== state.generation) return;
-        state.semantic = false; append = false; cursor = 0;
-        notice('showing matching words. related search is unavailable.');
+        semanticMode = false; append = false; cursor = 0;
+        message = 'showing matching words. related search is unavailable.';
         data = await search(false);
       }
     } else if (queryText) data = await search(false);
     else {
       const params = new URLSearchParams();
       if (saved) params.set('saved', '1');
-      if (state.cursor !== null) params.set('cursor', state.cursor);
+      if (append && state.cursor !== null) params.set('cursor', state.cursor);
       data = await api(`thoughts?${params}`, { signal: controller.signal });
     }
     if (generation !== state.generation || !state.authenticated) return;
     if (!append) {
       closeMenus();
       state.observers.forEach(observer => observer.disconnect()); state.observers = [];
-      state.entries.clear(); $('#feed').replaceChildren();
-    }
-    let added = 0;
-    for (const entry of data.entries) {
+      state.entries.clear();
+      const fragment = document.createDocumentFragment();
+      for (const entry of data.entries) { state.entries.set(entry.id, entry); fragment.append(renderEntry(entry)); }
+      $('#feed').replaceChildren(fragment);
+    } else for (const entry of data.entries) {
       if (state.entries.has(entry.id)) continue;
-      const article = renderEntry(entry);
-      if (!queryText) {
-        article.classList.add('is-entering');
-        article.style.setProperty('--entry-delay', `${Math.min(added, 3) * 20 + 10}ms`);
-      }
-      state.entries.set(entry.id, entry); $('#feed').append(article); added++;
+      state.entries.set(entry.id, entry); $('#feed').append(renderEntry(entry));
     }
+    state.semantic = semanticMode;
     state.cursor = data.next;
+    updateView(); notice(message);
     $('#more').hidden = data.next === null;
-    $('#feed-status').textContent = !state.entries.size ? state.query ? 'no thoughts found.' : state.view === 'saved' ? 'no bookmarks yet.' : 'your first thought goes here.' : '';
+    $('#more').textContent = 'load more';
+    $('#feed-status').textContent = !state.entries.size ? queryText ? 'no thoughts found.' : saved ? 'no bookmarks yet.' : 'your first thought goes here.' : '';
   } catch (error) {
     if (error.name !== 'AbortError' && generation === state.generation) {
       $('#feed-status').textContent = error.message;
@@ -343,7 +396,7 @@ $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
   if (state.posting || !$('#body').value.trim()) return;
   state.posting = true; $('#body').disabled = true; $('#title').disabled = true;
-  clearTimeout(state.searchTimer); clearTimeout(state.relatedTimer); state.controller?.abort(); state.generation++;
+  clearTimeout(state.searchTimer); state.controller?.abort(); state.generation++;
   updateComposer(); notice();
   try {
     // If autosave failed, posting still saves the thought. A conflict cannot
@@ -363,19 +416,20 @@ $('#composer').addEventListener('submit', async event => {
 $('#clear-input').addEventListener('click', () => {
   $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); $('#body').focus();
 });
-$('#more').addEventListener('click', () => { $('#more').textContent = 'load more'; loadFeed(state.entries.size > 0 && state.cursor !== null); });
+$('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true') loadFeed(state.entries.size > 0 && state.cursor !== null); });
+$('#toggle-timeline').addEventListener('click', () => {
+  state.timelineHidden = !state.timelineHidden;
+  $('#timeline').hidden = state.timelineHidden;
+  $('#toggle-timeline').textContent = state.timelineHidden ? 'show timeline' : 'hide timeline';
+  $('#toggle-timeline').setAttribute('aria-expanded', String(!state.timelineHidden));
+  searchFromComposer(true);
+});
 document.addEventListener('keydown', event => {
   if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('#body').focus(); }
 });
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
 for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => item.dataset.close === 'public-dialog' ? closePublication() : $(`#${item.dataset.close}`).close());
 
-document.addEventListener('pointerdown', event => {
-  if (!['touch', 'pen'].includes(event.pointerType)) return;
-  const thought = event.target.closest('.thought');
-  state.active = thought?.dataset.id || null;
-  for (const article of document.querySelectorAll('.thought')) article.classList.toggle('is-active', article.dataset.id === state.active);
-});
 
 $('#feed').addEventListener('click', async event => {
   const target = event.target.closest('button[data-action]');
@@ -405,8 +459,8 @@ $('#feed').addEventListener('click', async event => {
       else target.closest('article').replaceWith(renderEntry({ ...entry, ...data.entry }));
     } else if (action === 'copy') {
       await navigator.clipboard.writeText(entryText(entry));
-      target.textContent = 'copied';
-      setTimeout(() => { target.textContent = 'copy'; }, 1200);
+      setIcon(target, 'copied', 'thought copied');
+      setTimeout(() => { setIcon(target, 'copy', 'copy thought'); }, 1200);
     } else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
     else if (action === 'public') { await openPublication(entry); }
@@ -524,7 +578,7 @@ $('#logout').addEventListener('click', async () => {
     if (state.publicDirty) await savePublication();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
     await api('logout', { method: 'POST', body: '{}' });
-    state.entries.clear(); state.selected = null; state.publication = null; state.publicationId = null; state.publicDirty = false; state.pendingPost = null; state.active = null;
+    state.entries.clear(); state.selected = null; state.publication = null; state.publicationId = null; state.publicDirty = false; state.pendingPost = null;
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     for (const input of document.querySelectorAll('.title-input')) input.value = '';

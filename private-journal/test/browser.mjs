@@ -23,7 +23,11 @@ const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method,
 }, { path, method, body });
 const setView = async view => { await page.locator('#journal-menu-toggle').click(); await page.locator(`[data-view=${view}]`).click(); };
 const entryMenu = async article => { await article.hover(); await article.locator('[data-menu]').click(); };
-const blankDraft = () => page.waitForFunction(async () => { const response = await fetch('/api/draft'); const draft = await response.json(); return response.ok && !draft.body && !draft.title; });
+const blankDraft = async () => {
+  await page.waitForFunction(() => document.querySelector('#draft-status').textContent === '');
+  const { status, data } = await api('draft');
+  assert.equal(status, 200); assert.equal(data.body, ''); assert.equal(data.title, '');
+};
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
 const settled = () => page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
 
@@ -58,11 +62,15 @@ try {
   const article = page.locator(`article[data-id="${root.id}"]`);
 
   await page.mouse.move(0, 0);
-  assert.equal(await article.locator('.thought-header').isVisible(), false, 'date is hidden before interacting with a note');
+  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '0', root.id);
   await article.hover();
-  assert.equal(await article.locator('.thought-header').isVisible(), true, 'hover reveals the date');
+  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '1', root.id);
   await article.locator('[data-action=copy]').click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `a day of building\n\n${first}`, 'direct copy includes title and full body');
+  assert.equal(await article.locator('[data-action=copy] svg').count(), 1, 'copy keeps its icon after feedback');
+  await page.mouse.move(0, 0);
+  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .entry-footer`)).opacity === '0', root.id);
+  await article.hover();
   await article.locator('[data-action=expand]').waitFor({state:'visible'});
   assert.equal(await article.locator('.thought-body').evaluate(element => element.scrollHeight > element.clientHeight), true);
   await article.locator('[data-action=expand]').click();
@@ -176,6 +184,26 @@ try {
   assert.equal(await sampleArticle.locator('.thought-menu').isVisible(), false, 'opening a second menu closes the first');
   await page.locator('#body').click();
   assert.equal(await page.locator('#journal-menu').isVisible(), false, 'outside click closes actions');
+  const beforeHide = await page.locator('#feed').innerHTML();
+  await page.locator('#toggle-timeline').click();
+  assert.equal(await page.locator('#timeline').isVisible(), false, 'hide timeline removes the whole feed');
+  await page.screenshot({ path: `${artifacts}/timeline-hidden.png`, fullPage: true });
+  assert.equal(await page.locator('#feed').innerHTML(), beforeHide, 'hiding preserves the existing list');
+  await page.locator('#toggle-timeline').click(); await idle();
+  const longSample = page.locator(`article[data-id="${ids[0]}"]`);
+  await longSample.hover();
+  await longSample.locator('[data-action=read]').click();
+  await page.locator('#reader').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#reader .thought-body').textContent(), samples[0], 'reading page contains all writing');
+  assert.equal(await page.locator('#app').isVisible(), false, 'reading page hides the feed and composer');
+  assert.equal(await page.locator('#reader .thought-header, #reader .entry-footer').count(), 0, 'reading page contains no note chrome');
+  await page.screenshot({ path: `${artifacts}/reader-desktop.png`, fullPage: true });
+  await page.reload(); await page.locator('#reader').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#reader .thought-body').textContent(), samples[0], 'a reading link works after reload');
+  await page.setViewportSize({ width: 320, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'reading page fits a narrow screen');
+  await page.screenshot({ path: `${artifacts}/reader-mobile.png`, fullPage: true });
+  await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' }); await idle();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${artifacts}/mobile.png`, fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
@@ -249,12 +277,20 @@ try {
     await route.fulfill({ json: { entries: [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: null, indexing: false } }).catch(() => {});
   });
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#body').inputValue(), '', 'semantic checks start with a fully cleared draft');
+  const recalled = page.waitForResponse(response => response.url().endsWith('/api/search') && response.request().postDataJSON().query === 'a thought about stories' && response.request().postDataJSON().semantic);
   await page.locator('#body').pressSequentially('a thought about stories', { delay: 10 });
+  await recalled;
   await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
   assert.deepEqual(semanticCalls, ['a thought about stories'], 'semantic recall waits for a typing pause');
   assert.equal(await page.locator('#body').inputValue(), 'a thought about stories');
   const oldRequest = page.waitForRequest(request => request.url().endsWith('/api/search') && request.postDataJSON().semantic && request.postDataJSON().query === 'older query');
+  const retainedFeed = await page.locator('#feed').innerHTML();
+  const retainedStatus = await page.locator('#feed-status').textContent();
   await page.locator('#body').fill('older query'); await oldRequest;
+  assert.equal(await page.locator('#feed').innerHTML(), retainedFeed, 'pending search preserves the exact displayed list');
+  assert.equal(await page.locator('#feed-status').textContent(), retainedStatus, 'pending search shows no loading label');
+  assert.equal(await page.locator('.thought').evaluate(article => getComputedStyle(article).animationName), 'none', 'search results never animate while editing');
   await page.locator('#body').fill('newer query');
   await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
   await page.waitForTimeout(1800);
@@ -310,7 +346,7 @@ try {
   await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'non-sticky icon controls', 'private reading links and reload', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

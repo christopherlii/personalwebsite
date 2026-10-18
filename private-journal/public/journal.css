@@ -116,7 +116,9 @@ h1,h2 {
   color:var(--fg)
 }
 .utilities {
-  justify-self:end
+  justify-self:end;
+  display:flex;
+  gap:20px
 }
 .utilities button {
   color:var(--muted);
@@ -161,7 +163,7 @@ h1,h2 {
 }
 .composer-section {
   margin-left:26px;
-  margin-bottom:40px
+  margin-bottom:16px
 }
 textarea {
   resize:vertical;
@@ -206,6 +208,11 @@ textarea::placeholder {
   align-items:center;
   margin-top:10px;
   gap:16px
+}
+.compose-actions[hidden] {
+  display:flex!important;
+  visibility:hidden;
+  pointer-events:none
 }
 .draft-feedback {
   display:flex;
@@ -283,7 +290,7 @@ textarea::placeholder {
 .entry-footer {
   display:flex;
   align-items:center;
-  gap:20px;
+  gap:12px;
   min-height:0;
   margin-top:8px
 }
@@ -296,6 +303,45 @@ textarea::placeholder {
   font-size:14px;
   line-height:1;
   text-align:left;
+  color:var(--muted)
+}
+.icon-control {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  padding:6px;
+  color:var(--muted);
+  text-decoration:none
+}
+.icon-control:hover {
+  color:var(--fg)
+}
+.icon-control svg {
+  display:block;
+  width:16px;
+  height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.4
+}
+.reader {
+  max-width:640px;
+  margin:64px auto 80px;
+  padding:0 50px
+}
+#reader-back {
+  margin:0 0 32px -6px
+}
+#reader-content:focus {
+  outline:none
+}
+#reader-content .thought-title {
+  margin-bottom:18px
+}
+#reader-error {
+  font-size:12px;
   color:var(--muted)
 }
 details {
@@ -492,15 +538,25 @@ dialog .public-actions {
   white-space:nowrap;
   border:0
 }
-.thought-header,.entry-footer,.thought-actions {
-  visibility:hidden
+.thought-header,.entry-footer {
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 120ms ease-out
 }
-.thought:is(:focus-within,.is-active,:has([data-menu][aria-expanded=true])) :is(.thought-header,.entry-footer,.thought-actions) {
-  visibility:visible
+.thought:has(:focus-visible) :is(.thought-header,.entry-footer),.thought:focus-visible :is(.thought-header,.entry-footer) {
+  opacity:1;
+  pointer-events:auto
 }
 @media(hover:hover) {
-  .thought:hover :is(.thought-header,.entry-footer,.thought-actions) {
-    visibility:visible
+  .thought:hover :is(.thought-header,.entry-footer) {
+    opacity:1;
+    pointer-events:auto
+  }
+}
+@media(hover:none) {
+  .thought-header,.entry-footer {
+    opacity:1;
+    pointer-events:auto
   }
 }
 @media(max-width:900px) {
@@ -536,18 +592,19 @@ dialog .public-actions {
   .login {
     margin-top:12svh
   }
+  .reader {
+    margin-top:34px;
+    padding:0 46px
+  }
 }
 @keyframes rise-in {
   from { opacity:0; transform:translateY(8px) }
 }
-.page-entrance,.login:not([hidden]),.thought.is-entering {
+.page-entrance,.login:not([hidden]) {
   animation:rise-in 180ms ease-out backwards
 }
 .composer-section.page-entrance {
   animation-delay:30ms
-}
-.thought.is-entering {
-  animation-delay:var(--entry-delay,0ms)
 }
 .entry-menu:not([hidden]) {
   animation:rise-in 160ms ease-out backwards
@@ -555,6 +612,7 @@ dialog .public-actions {
 @media(prefers-reduced-motion:reduce) {
   * {
     scroll-behavior:auto!important;
-    animation:none!important
+    animation:none!important;
+    transition:none!important
   }
 }

@@ -153,6 +153,11 @@ async function api(request, env, url, context) {
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
     const id = thought[1];
+    if (request.method === 'GET') {
+      const entry = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(id).first();
+      if (!entry) fail(404, 'Thought not found.');
+      return json({ entry });
+    }
     if (request.method === 'PATCH') {
       const data = await readBody(request);
       let result;
