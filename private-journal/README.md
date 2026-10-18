@@ -202,8 +202,10 @@ Copy/download remain available for Substack, X, or Markdown backups without
 posting to those services. Existing media and reading/favorites stay in Git.
 
 Dictation uses `getUserMedia` and `MediaRecorder`, so it does not depend on the
-browser vendor's `SpeechRecognition` service. The bordered photo and dictate
-buttons are available in both writing fields. Capture starts only on an explicit
+browser vendor's `SpeechRecognition` service. Photo and dictate are quiet text buttons in both writing fields.
+The composer keeps photo, dictate, and add title together with post on the
+same baseline; the full editor places its tools below the writing. A single
+reserved feedback line keeps routine recording states from moving the feed. Capture starts only on an explicit
 click and requires microphone permission. Press stop to transcribe; post, save,
 and back also stop capture and wait for the final transcript. Each transcript
 is one undoable editor insertion. Existing typing, autosave, and conflict

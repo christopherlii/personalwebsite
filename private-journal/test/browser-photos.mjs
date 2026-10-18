@@ -25,7 +25,9 @@ try{
  const source=await page.locator('#body').inputValue();assert.ok(source.startsWith('sample thought: a photo from today. a sentence while uploading.'));
  await editor.press('ControlOrMeta+z');assert.equal((await page.locator('#body').inputValue()).includes('./api/photos/'),false);
  await editor.press('ControlOrMeta+Shift+z');await page.locator('#composer-editor .cm-content .cm-photo img').waitFor();assert.equal(await page.locator('#body').inputValue(),source);
- await page.waitForFunction(async()=>document.querySelector('#composer').dataset.draftState==='saved'&&(await (await fetch('/api/draft')).json()).body===document.querySelector('#body').value);await page.reload();await page.locator('#composer-editor .cm-content .cm-photo img').waitFor();assert.equal(await page.locator('#body').inputValue(),source);
+ await page.waitForFunction(source=>document.querySelector('#composer').dataset.draftState==='saved'&&document.querySelector('#body').value===source,source);
+ assert.equal((await api('draft')).body,source,'reload starts only after the exact photo draft is persisted');
+ await page.reload();await page.locator('#composer-editor .cm-content .cm-photo img').waitFor();assert.equal(await page.locator('#body').inputValue(),source);
  await page.locator('#composer-editor .cm-content .cm-photo img').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('#composer-editor .cm-content .cm-photo img').naturalWidth>0);
  await page.screenshot({path:`${artifacts}/composer-photo-desktop.png`,fullPage:true});
  const post=page.waitForResponse(response=>response.url().endsWith('/api/thoughts')&&response.request().method()==='POST');await page.locator('#post').click();const thought=(await(await post).json()).entry;thoughtId=thought.id;
