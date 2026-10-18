@@ -8,6 +8,8 @@ import { ftsQuery } from '../search.mjs';
 import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic.mjs';
 import { thoughtLink, thoughtLinks, plainThoughtLinks } from '../public/thought-links.js';
 import { readingURL, readingMetadata, fetchReadingMetadata, indexReading, relatedToThought } from '../reading.mjs';
+import { tagNames, markdownTags } from '../public/tags.js';
+import { indexTags } from '../tags.mjs';
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
 const salt = '12'.repeat(16);
@@ -50,6 +52,35 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('tags respect Markdown contexts, Unicode, case, nesting, and exact source positions', () => {
+  const source='# Heading\n\n#Ideas #IDEAS #life/notes #café #1984\n\n> quote #one\n> more #two\n\n- item #three\n\n| a | b |\n|---|---|\n|#four|#five|\n\n`#code` \\#escaped [link #hidden](https://example.com/#url)\n\n```\n#fenced\n```\n\n<div>#html</div>';
+  assert.deepEqual(tagNames(source),['ideas','life/notes','café','one','two','three','four','five']);
+  for(const match of markdownTags(source))assert.equal(source.slice(match.from,match.to),match.text);
+  assert.deepEqual(tagNames(thoughtLink({id:crypto.randomUUID(),title:'#not-a-tag'})),[]);
+});
+
+test('tag filtering is private, exact, paginated, and repairs existing thoughts without stale edits', async () => {
+  const c=client();assert.equal((await c.call('/api/thoughts?tag=ideas')).status,401);await c.login();
+  const input=thought('sample thought #Ideas #ideas #life/notes');
+  const saved=(await c.call('/api/thoughts','POST',input)).data.entry;
+  const other=(await c.call('/api/thoughts','POST',thought('sample thought #ideas-more `#ideas`'))).data.entry;
+  assert.deepEqual((await c.call('/api/thoughts?tag=IDEAS')).data.entries.map(row=>row.id),[saved.id]);
+  assert.equal((await c.call('/api/thoughts?tag=life%2Fnotes')).data.entries[0].id,saved.id);
+  assert.equal((await c.call('/api/thoughts?tag=1984')).status,400);
+  assert.equal((await c.call('/api/thoughts?tag=a%20b')).status,400);
+  await c.call(`/api/thoughts/${saved.id}`,'PATCH',{body:'changed #life',updated_at:saved.updated_at});
+  await indexTags(saved,c.env);
+  assert.equal((await c.call('/api/thoughts?tag=ideas')).data.entries.length,0,'an old indexing job cannot resurrect removed tags');
+  assert.equal((await c.call('/api/thoughts?tag=life')).data.entries.length,1);
+  for(let i=0;i<42;i++)await c.env.JOURNAL_DB.prepare('INSERT INTO thoughts(id,title,body,created_at,updated_at) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),'','legacy #archive',new Date().toISOString(),new Date().toISOString()).run();
+  let page,calls=0;do{page=await c.call('/api/thoughts?tag=archive');calls++;}while(page.data.indexing);
+  assert.ok(calls>1,'legacy indexing is bounded per request');assert.equal(page.data.entries.length,40);
+  const second=await c.call(`/api/thoughts?tag=archive&cursor=${page.data.next}`);assert.equal(second.data.entries.length,2);
+  await c.call(`/api/thoughts/${other.id}`,'DELETE');
+  assert.equal((await c.call('/api/thoughts?tag=ideas-more')).data.entries.length,0);
+  assert.equal((await c.call('/api/thoughts?tag=archive&saved=1')).data.entries.length,0);
+});
 
 test('saved reading stays private, deduplicates URLs, tracks read status, exports, and supplies related reading', async t => {
   const fetched=[];

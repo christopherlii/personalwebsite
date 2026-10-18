@@ -3,6 +3,8 @@ import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
 import { indexEntry, semanticSearch } from './semantic.mjs';
 import { PublicationError, publicationApi, publicWriting } from './publications.mjs';
 import { ReadingError, readingApi, relatedToThought } from './reading.mjs';
+import { indexTags, repairTagIndex } from './tags.mjs';
+import { normalizeTag } from './public/tags.js';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -64,13 +66,14 @@ async function withPublicationState(entries, env) {
   return entries.map(entry => ({ ...entry, published_slug: published.get(entry.id) || null }));
 }
 
-async function listThoughts(env, query, saved, cursor) {
+async function listThoughts(env, query, saved, cursor, tag = null) {
   const terms = ftsQuery(query);
   if (query && !terms) return { entries: [], next: null };
   let sql = `SELECT ${thoughtSelect} FROM thoughts t`;
   const where = [], args = [];
   if (query) { sql += ' JOIN thoughts_fts ON thoughts_fts.rowid = t.seq'; where.push('thoughts_fts MATCH ?'); args.push(terms); }
   if (saved) where.push('t.bookmarked = 1');
+  if (tag) { where.push('EXISTS(SELECT 1 FROM thought_tags g WHERE g.thought_id=t.id AND g.tag=?)'); args.push(tag); }
   if (!query && cursor) { where.push('t.seq < ?'); args.push(cursor); }
   if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
   sql += query ? ' ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT 41 OFFSET ?' : ' ORDER BY t.seq DESC LIMIT 41';
@@ -165,7 +168,10 @@ async function api(request, env, url, context) {
     if (query.length > 500) fail(400, 'Use a shorter search.');
     const saved = url.searchParams.get('saved') === '1';
     const cursor = integer(url.searchParams.get('cursor'));
-    return json(await listThoughts(env, query, saved, cursor));
+    const rawTag=url.searchParams.get('tag'),tag=rawTag===null?null:normalizeTag(rawTag);
+    if(rawTag!==null&&!tag)fail(400,'Invalid tag.');
+    const indexing=tag?await repairTagIndex(env):false;
+    return json({...await listThoughts(env, query, saved, cursor,tag),...(tag?{indexing}:{})});
   }
   if (path === '/api/thoughts' && request.method === 'POST') {
     const data = await readBody(request);
@@ -175,12 +181,14 @@ async function api(request, env, url, context) {
     const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(data.id).first();
     if (existing) {
       if (existing.body !== body || existing.title !== title) fail(409, 'This thought already exists.');
+      await indexTags(existing,env);
       return json({ entry: (await withPublicationState([existing], env))[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
     }
     const now = new Date().toISOString();
     const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now)];
     if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET title = '', body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ? AND title = ?").bind(data.draft_version, data.body, data.title || ''));
     const result = await env.JOURNAL_DB.batch(statements);
+    await indexTags(result[0].results[0],env);
     if (env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
     return json({ entry: { ...result[0].results[0], published_slug: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
@@ -201,6 +209,7 @@ async function api(request, env, url, context) {
         if (typeof data.updated_at !== 'string') fail(400, 'Missing thought version.');
         result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET title = COALESCE(?, title), body = ?, updated_at = ? WHERE id = ? AND updated_at = ? RETURNING ${thoughtColumns}`).bind(title, body, new Date().toISOString(), id, data.updated_at).first();
         if (!result) fail(409, 'This thought changed. Reload before editing.');
+        await indexTags(result,env);
         if (env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
       } else {
         if (typeof data.bookmarked !== 'boolean') fail(400, 'Invalid bookmark.');
@@ -256,7 +265,7 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
