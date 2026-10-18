@@ -271,6 +271,12 @@ textarea::placeholder {
   flex-direction:column;
   font-variant-numeric:tabular-nums
 }
+.thought-date { display:flex; flex-direction:column; align-items:flex-end }
+.entry-state { display:inline-flex; align-items:center; gap:8px; font-size:10px; line-height:1.5; color:var(--muted); white-space:nowrap }
+.thought-header>.entry-state { width:max-content }
+.entry-published { text-decoration:none }
+.entry-published:hover { text-decoration:underline; text-underline-offset:3px }
+.entry-heart { font-size:11px; line-height:1 }
 .thought-title {
   margin:0 0 6px;
   font:500 14px/1.55 var(--font-body);
@@ -347,6 +353,7 @@ textarea::placeholder {
   align-items:center;
   gap:16px
 }
+.reader-context { display:flex; align-items:center; gap:16px }
 .reader-actions button {
   color:var(--muted)
 }
@@ -653,23 +660,23 @@ dialog .public-actions {
   white-space:nowrap;
   border:0
 }
-.thought-header,.entry-footer {
+.thought-date,.entry-footer {
   opacity:0;
   pointer-events:none;
   transition:opacity 120ms ease-out
 }
-.thought:has(:focus-visible) :is(.thought-header,.entry-footer),.thought:focus-visible :is(.thought-header,.entry-footer) {
+.thought:has(:focus-visible) :is(.thought-date,.entry-footer),.thought:focus-visible :is(.thought-date,.entry-footer) {
   opacity:1;
   pointer-events:auto
 }
 @media(hover:hover) {
-  .thought:hover :is(.thought-header,.entry-footer) {
+  .thought:hover :is(.thought-date,.entry-footer) {
     opacity:1;
     pointer-events:auto
   }
 }
 @media(hover:none) {
-  .thought-header,.entry-footer {
+  .thought-date,.entry-footer {
     opacity:1;
     pointer-events:auto
   }

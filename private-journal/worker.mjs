@@ -55,6 +55,14 @@ async function limit(env, key, maximum, milliseconds) {
   if (row.attempts > maximum) fail(429, 'Too many attempts. Try again later.');
 }
 
+async function withPublicationState(entries, env) {
+  if (!entries.length) return entries;
+  const { results } = await env.JOURNAL_DB.prepare(`SELECT thought_id, published_slug FROM publications
+    WHERE published IS NOT NULL AND thought_id IN (${entries.map(() => '?').join(',')})`).bind(...entries.map(entry => entry.id)).all();
+  const published = new Map(results.map(row => [row.thought_id, row.published_slug]));
+  return entries.map(entry => ({ ...entry, published_slug: published.get(entry.id) || null }));
+}
+
 async function listThoughts(env, query, saved, cursor) {
   const terms = ftsQuery(query);
   if (query && !terms) return { entries: [], next: null };
@@ -67,7 +75,7 @@ async function listThoughts(env, query, saved, cursor) {
   sql += query ? ' ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT 41 OFFSET ?' : ' ORDER BY t.seq DESC LIMIT 41';
   if (query) args.push(cursor);
   const { results } = await env.JOURNAL_DB.prepare(sql).bind(...args).all();
-  return { entries: results.slice(0, 40), next: results.length > 40 ? (query ? cursor + 40 : results[39].seq) : null };
+  return { entries: await withPublicationState(results.slice(0, 40), env), next: results.length > 40 ? (query ? cursor + 40 : results[39].seq) : null };
 }
 
 async function api(request, env, url, context) {
@@ -123,7 +131,11 @@ async function api(request, env, url, context) {
     if (!env.AI) fail(503, 'Related search is unavailable.');
     if (cursor > 400) fail(400, 'Invalid page.');
     await limit(env, 'search:global', 120, 60 * 1000);
-    try { return json(await semanticSearch(query, data.saved, cursor, env)); }
+    try {
+      const result = await semanticSearch(query, data.saved, cursor, env);
+      result.entries = await withPublicationState(result.entries, env);
+      return json(result);
+    }
     catch { fail(502, 'Related search is unavailable.'); }
   }
   if (path === '/api/thoughts' && request.method === 'GET') {
@@ -141,14 +153,14 @@ async function api(request, env, url, context) {
     const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(data.id).first();
     if (existing) {
       if (existing.body !== body || existing.title !== title) fail(409, 'This thought already exists.');
-      return json({ entry: existing, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
+      return json({ entry: (await withPublicationState([existing], env))[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
     }
     const now = new Date().toISOString();
     const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now)];
     if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET title = '', body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ? AND title = ?").bind(data.draft_version, data.body, data.title || ''));
     const result = await env.JOURNAL_DB.batch(statements);
     if (env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
-    return json({ entry: result[0].results[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
+    return json({ entry: { ...result[0].results[0], published_slug: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
@@ -156,7 +168,7 @@ async function api(request, env, url, context) {
     if (request.method === 'GET') {
       const entry = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(id).first();
       if (!entry) fail(404, 'Thought not found.');
-      return json({ entry });
+      return json({ entry: (await withPublicationState([entry], env))[0] });
     }
     if (request.method === 'PATCH') {
       const data = await readBody(request);
@@ -173,7 +185,7 @@ async function api(request, env, url, context) {
         result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET bookmarked = ? WHERE id = ? RETURNING ${thoughtColumns}`).bind(data.bookmarked ? 1 : 0, id).first();
         if (!result) fail(404, 'Thought not found.');
       }
-      return json({ entry: result });
+      return json({ entry: (await withPublicationState([result], env))[0] });
     }
     if (request.method === 'DELETE') {
       if (await env.JOURNAL_DB.prepare('SELECT thought_id FROM publications WHERE thought_id = ? AND published IS NOT NULL').bind(id).first()) fail(409, 'Unpublish this entry before deleting it.');

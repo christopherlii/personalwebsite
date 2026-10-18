@@ -5,6 +5,11 @@ autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and three-line
 thought previews with an open link to a separate reading page. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
+A muted heart identifies bookmarked thoughts and a published link identifies
+live site snapshots. These remain visible beside the date area and in the
+writing page toolbar. Draft saves do not imply publication; unpublish removes
+the label. Timeline, keyword search, semantic search, and individual reads
+return the current publication slug, joined in one bounded query per page.
 The header, reading-page, and public-draft menus appear in reserved space without
 resizing their containers or moving surrounding content. Only opacity fades
 are used, with reduced-motion support. Hover reveals dates and small text actions, and moving away

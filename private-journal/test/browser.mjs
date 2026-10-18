@@ -75,9 +75,9 @@ try {
   const article = page.locator(`article[data-id="${root.id}"]`);
 
   await page.mouse.move(0, 0);
-  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '0', root.id);
+  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-date`)).opacity === '0', root.id);
   await article.hover();
-  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '1', root.id);
+  await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-date`)).opacity === '1', root.id);
   const openBeforeCopy = await article.locator('[data-action=read]').boundingBox();
   await article.locator('[data-action=copy]').click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `a day of building\n\n${first}`, 'direct copy includes title and full body');
@@ -98,10 +98,13 @@ try {
   await openReader(article); await readerMenu();
   await page.locator('#reader-bookmark').click();
   await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'true');
+  assert.equal(await page.locator('#reader-status [aria-label=bookmarked]').count(), 1, 'reading view shows the heart');
+  assert.equal(await article.locator('.entry-heart').count(), 1, 'feed also shows the heart');
   await backToFeed(); await setView('saved');
   await article.waitFor();
   await openReader(article); await readerMenu(); await page.locator('#reader-bookmark').click();
   await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'false');
+  assert.equal(await page.locator('#reader-status .entry-heart').count(), 0, 'removing the bookmark removes its indicator');
   await backToFeed();
   await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'no bookmarks yet.');
   await setView('all'); await idle();
@@ -143,6 +146,8 @@ try {
   assert.equal(await page.locator('#public-body').inputValue(), 'a separate public draft', 'public draft is saved independently');
   await page.locator('#publish-public').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
+  assert.equal(await page.locator('#reader-status .entry-published').textContent(), 'published');
+  assert.equal(await article.locator('.entry-published').count(), 1, 'publishing updates the existing feed entry');
   const publicSite = await publicSitePreview(context, origin);
   await publicSite.emulateMedia({ reducedMotion: 'reduce' });
   await publicSite.goto('https://site-preview.test/#thoughts');
@@ -172,6 +177,8 @@ try {
   if (await publicOptions.getAttribute('aria-expanded') !== 'true') await publicOptions.click();
   await page.locator('#unpublish').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'unpublished');
+  assert.equal(await page.locator('#reader-status .entry-published').count(), 0);
+  assert.equal(await article.locator('.entry-published').count(), 0, 'unpublishing removes the feed indicator');
   await publicSite.goto('https://site-preview.test/#thoughts');
   await publicSite.reload();
   await publicSite.locator('#thoughts-full-list .empty-note').waitFor();

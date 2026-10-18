@@ -184,6 +184,7 @@ function readerControls() {
   const bookmarked = Boolean(state.readerEntry?.bookmarked);
   $('#reader-bookmark').textContent = bookmarked ? 'remove bookmark' : 'bookmark';
   $('#reader-bookmark').setAttribute('aria-pressed', String(bookmarked));
+  $('#reader-status').replaceChildren(entryStatus(state.readerEntry));
 }
 function updateEntry(entry) {
   state.readerEntry = entry; state.selected = entry;
@@ -297,6 +298,20 @@ function bodyContent(body, query) {
   return fragment;
 }
 
+function entryStatus(entry) {
+  const status = document.createDocumentFragment();
+  if (entry?.bookmarked) {
+    const heart = document.createElement('span'); heart.className = 'entry-heart'; heart.textContent = '♥';
+    heart.setAttribute('role', 'img'); heart.setAttribute('aria-label', 'bookmarked'); heart.title = 'bookmarked'; status.append(heart);
+  }
+  if (entry?.published_slug) {
+    const published = document.createElement('a'); published.className = 'entry-published'; published.textContent = 'published';
+    published.href = `https://christopherli.dev/#thought/${encodeURIComponent(entry.published_slug)}`;
+    published.target = '_blank'; published.rel = 'noopener noreferrer'; published.setAttribute('aria-label', 'view published thought'); status.append(published);
+  }
+  return status;
+}
+
 function renderEntry(entry) {
   const article = document.createElement('article'); article.className = 'thought'; article.tabIndex = 0; article.dataset.id = entry.id;
   const header = document.createElement('header'); header.className = 'thought-header';
@@ -307,8 +322,10 @@ function renderEntry(entry) {
   const clock = document.createElement('span'); clock.textContent = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase();
   time.append(day);
   if (!entry.source_date) time.append(clock);
-  header.append(time);
-  if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; header.append(edited); }
+  const dateDetails = document.createElement('span'); dateDetails.className = 'thought-date'; dateDetails.append(time);
+  if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; dateDetails.append(edited); }
+  header.append(dateDetails);
+  const status = document.createElement('span'); status.className = 'entry-state'; status.append(entryStatus(entry)); header.append(status);
   article.append(header);
   if (entry.title) {
     const title = document.createElement('h2'); title.className = 'thought-title';
@@ -557,6 +574,10 @@ function publicationControls() {
   $('#view-public').hidden = !published;
   if (published) $('#view-public').href = `https://christopherli.dev/#thought/${published.slug}`;
   $('#publish-public').textContent = published ? 'update site ↗' : 'publish to site ↗';
+  if (state.readerEntry?.id === state.publicationId) {
+    updateEntry({ ...state.readerEntry, published_slug: published?.slug || null });
+    readerControls();
+  }
 }
 function publicBusy(value) {
   state.publicBusy = value;
