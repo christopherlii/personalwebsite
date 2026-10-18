@@ -20,7 +20,9 @@ to that mount; authentication and the current database/password are unchanged.
 
 ## DNS review
 
-Cloudflare scanned six existing records. Preserve these targets:
+The complete Squarespace DNS list was reviewed on October 18, 2026. Cloudflare's
+scan found six records; the existing GitHub Pages verification TXT record was
+also copied unchanged. All seven records are staged. Preserve these targets:
 
 | Name | Type | Target | Proxy after certificate activation |
 | --- | --- | --- | --- |
@@ -30,16 +32,16 @@ Cloudflare scanned six existing records. Preserve these targets:
 | @ | A | 185.199.111.153 | On |
 | www | CNAME | christopherlii.github.io | On |
 | _domainconnect | CNAME | _domainconnect.domains.squarespace.com | Off |
+| _github-pages-challenge-christopherlii | TXT | Existing GitHub verification value, copied unchanged | Off |
 
-All six records are staged as DNS-only during the nameserver migration, so
+All seven records are staged as DNS-only during the nameserver migration, so
 visitors continue directly to GitHub Pages while Cloudflare issues its edge
 certificate. Turn on the five web records only after that certificate is Active;
-keep `_domainconnect` DNS-only. This follows Cloudflare's
+keep `_domainconnect` and the verification TXT record DNS-only. This follows Cloudflare's
 [Universal SSL migration guidance](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/enable-universal-ssl/).
 
-Public lookups found no apex MX, TXT, AAAA, CAA, or DS records. This is not a
-complete inventory of possible custom subdomains: compare the full registrar
-DNS list before switching nameservers. Bot Preference Sync was disabled during
+Public lookups found no apex MX, TXT, AAAA, CAA, or DS records. The full registrar
+list contains the seven records above and no mail records. Bot Preference Sync was disabled during
 onboarding to preserve the existing robots.txt. Full (strict) origin TLS is configured and verified in the dashboard; GitHub
 Pages already has a valid certificate for the personal domain.
 

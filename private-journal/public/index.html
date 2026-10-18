@@ -22,21 +22,19 @@
   </section>
 
   <main id="app" class="journal" hidden>
-    <header class="page-header">
+    <header class="page-header page-entrance">
       <span class="site-name">Christopher Li</span>
       <div class="utilities">
-        <details id="journal-menu">
-          <summary aria-label="journal options">more</summary>
-          <nav class="entry-menu" aria-label="journal">
-            <button type="button" data-view="all" aria-current="page">all thoughts</button>
-            <button type="button" data-view="saved">bookmarks</button>
-            <button type="button" id="export">export</button>
-            <button type="button" id="logout">lock</button>
-          </nav>
-        </details>
+        <button type="button" id="journal-menu-toggle" data-menu aria-label="journal options" aria-expanded="false" aria-controls="journal-menu">more</button>
       </div>
+      <nav id="journal-menu" class="entry-menu journal-menu" aria-label="journal" hidden>
+        <button type="button" data-view="all" aria-current="page">all thoughts</button>
+        <button type="button" data-view="saved">bookmarks</button>
+        <button type="button" id="export">export</button>
+        <button type="button" id="logout">lock</button>
+      </nav>
     </header>
-    <section id="composer-section" class="composer-section" aria-label="write or search your thoughts">
+    <section id="composer-section" class="composer-section page-entrance" aria-label="write or search your thoughts">
       <form id="composer">
         <div id="composer-title" hidden>
           <label for="title" class="sr-only">title (optional)</label>
@@ -95,10 +93,11 @@
     </details>
     <p id="public-status" role="status"></p>
     <footer class="public-actions">
-      <details><summary aria-label="public draft options">…</summary><div class="entry-menu"><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></div></details>
+      <button type="button" id="public-menu-toggle" data-menu aria-label="public draft options" aria-expanded="false" aria-controls="public-menu">…</button>
       <a id="view-public" target="_blank" rel="noopener noreferrer" hidden>view on site ↗</a>
       <button type="button" id="save-public">save draft</button>
       <button type="button" id="publish-public">publish to site ↗</button>
+      <nav id="public-menu" class="entry-menu" aria-label="public draft actions" hidden><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></nav>
     </footer>
   </dialog>
   <p id="boot-status" class="boot" role="status">opening journal…</p>

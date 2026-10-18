@@ -21,10 +21,11 @@ const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method,
   const response = await fetch(`/api/${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Journal': '1' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   return { status: response.status, data: await response.json() };
 }, { path, method, body });
-const setView = async view => { await page.locator('#journal-menu > summary').click(); await page.locator(`[data-view=${view}]`).click(); };
-const entryMenu = async article => { await article.hover(); await article.locator('summary').click(); };
+const setView = async view => { await page.locator('#journal-menu-toggle').click(); await page.locator(`[data-view=${view}]`).click(); };
+const entryMenu = async article => { await article.hover(); await article.locator('[data-menu]').click(); };
 const blankDraft = () => page.waitForFunction(async () => { const response = await fetch('/api/draft'); const draft = await response.json(); return response.ok && !draft.body && !draft.title; });
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
+const settled = () => page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
 
 try {
   await page.goto(origin);
@@ -91,7 +92,7 @@ try {
   assert.equal(await page.locator('#public-body').inputValue(), edited);
   await page.locator('#public-body').fill('a separate public draft');
   await page.locator('#public-thought-title').fill('public version');
-  await page.locator('#public-dialog .public-actions > details > summary').click();
+  await page.locator('#public-menu-toggle').click();
   await page.locator('#copy-public').click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'public version\n\na separate public draft');
   await page.locator('[data-close=public-dialog]').click();
@@ -128,8 +129,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
   await publicSite.reload();
   await publicSite.locator('.article-body').filter({ hasText: 'a still private revision' }).waitFor();
-  const publicOptions = page.locator('#public-dialog .public-actions > details');
-  if (!await publicOptions.getAttribute('open').then(value => value !== null)) await publicOptions.locator('summary').click();
+  const publicOptions = page.locator('#public-menu-toggle');
+  if (await publicOptions.getAttribute('aria-expanded') !== 'true') await publicOptions.click();
   await page.locator('#unpublish').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'unpublished');
   await publicSite.goto('https://site-preview.test/#thoughts');
@@ -157,10 +158,39 @@ try {
   }
   await api(`thoughts/${ids[1]}`, 'PATCH', { bookmarked: true });
   await setView('all'); await idle();
+  await settled();
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true });
+  await page.locator('#journal-menu-toggle').click();
+  assert.equal(await page.locator('#journal-menu').evaluate(menu => getComputedStyle(menu).position), 'static', 'header actions stay in the document flow');
+  await settled();
+  await page.screenshot({ path: `${artifacts}/header-actions.png`, fullPage: true });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#journal-menu').isVisible(), false, 'Escape closes header actions');
+  assert.equal(await page.locator('#journal-menu-toggle').evaluate(button => button === document.activeElement), true, 'Escape returns focus to its trigger');
+  const sampleArticle = page.locator(`article[data-id="${ids[2]}"]`);
+  await entryMenu(sampleArticle);
+  assert.equal(await sampleArticle.locator('.thought-menu').evaluate(menu => getComputedStyle(menu).position), 'static', 'note actions never cover another thought');
+  await settled();
+  await page.screenshot({ path: `${artifacts}/note-actions.png`, fullPage: true });
+  await page.locator('#journal-menu-toggle').click();
+  assert.equal(await sampleArticle.locator('.thought-menu').isVisible(), false, 'opening a second menu closes the first');
+  await page.locator('#body').click();
+  assert.equal(await page.locator('#journal-menu').isVisible(), false, 'outside click closes actions');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${artifacts}/mobile.png`, fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await entryMenu(sampleArticle);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `open note actions fit ${width}px`);
+    await settled();
+    await page.screenshot({ path: `${artifacts}/note-actions-${width}.png`, fullPage: true });
+    await page.keyboard.press('Escape');
+  }
+  assert.equal(await page.locator('.page-header').evaluate(element => getComputedStyle(element).animationName), 'rise-in', 'the header uses the homepage entrance direction');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await page.locator('.page-header').evaluate(element => getComputedStyle(element).animationName), 'none', 'reduced motion disables entrances');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   const fontStatus = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].map(font => ({ family: font.family, status: font.status })); });
   assert.ok(fontStatus.some(font => font.family.includes('Instrument Sans') && font.status === 'loaded'), 'homepage body font loads');
   assert.ok(fontStatus.some(font => font.family.includes('Fraunces') && font.status === 'loaded'), 'homepage name font loads');
@@ -256,7 +286,7 @@ try {
   // Reload after explicitly discarding this synthetic conflict, then test lock.
   page.on('dialog', dialog => dialog.accept());
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
-  await page.locator('#journal-menu > summary').click();
+  await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
   assert.equal((await api('thoughts')).status, 401, 'locking revokes server session');
@@ -277,7 +307,7 @@ try {
   assert.ok(mountedRequests.includes('/journal/api/thoughts'));
   assert.ok(!mountedRequests.some(path => path.startsWith('/api/')), 'mounted UI never calls the origin root API');
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
-  await page.locator('#journal-menu > summary').click();
+  await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
   console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
