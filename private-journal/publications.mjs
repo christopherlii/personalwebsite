@@ -1,3 +1,5 @@
+import { plainThoughtLinks } from './public/thought-links.js';
+
 export class PublicationError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
@@ -16,7 +18,7 @@ export function publicationData(value) {
   if (!slugPattern.test(slug)) fail(400, 'Use lowercase words, hyphens, or underscores for the address.');
   const title = text(value.title, 160, 'title');
   if (/[\r\n]/.test(title)) fail(400, 'Keep the title on one line.');
-  const body = text(value.body, 20000, 'public text');
+  const body = plainThoughtLinks(text(value.body, 20000, 'public text'));
   const date = text(value.date, 10, 'date');
   const timestamp = Date.parse(`${date}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== date) fail(400, 'Choose a valid date.');
@@ -30,7 +32,7 @@ export function publicationData(value) {
 
 function initialDraft(thought) {
   const slug = thought.title.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80).replace(/-$/, '') || thought.id;
-  return { slug, title: thought.title, body: thought.body, date: thought.created_at.slice(0, 10), tags: [], description: '', cover: '', coverPosition: '' };
+  return { slug, title: thought.title, body: plainThoughtLinks(thought.body), date: thought.created_at.slice(0, 10), tags: [], description: '', cover: '', coverPosition: '' };
 }
 function ownerRecord(row, fallback) {
   if (!row) return { draft: initialDraft(fallback), version: 0, published: null, published_at: null };

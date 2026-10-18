@@ -41,8 +41,8 @@
           <label for="title" class="sr-only">title (optional)</label>
           <input id="title" class="title-input" placeholder="title" maxlength="160" autocomplete="off">
         </div>
-        <label for="body" class="sr-only">write or search your thoughts</label>
-        <textarea id="body" placeholder="write or search your thoughts…" maxlength="20000" rows="1"></textarea>
+        <div id="composer-editor"></div>
+        <textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
         <div class="compose-actions" id="compose-actions" hidden>
           <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
           <div class="compose-buttons"><button type="button" id="add-title">add title</button><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>

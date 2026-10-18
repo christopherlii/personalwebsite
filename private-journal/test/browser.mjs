@@ -38,6 +38,12 @@ const blankDraft = async () => {
   const { status, data } = await api('draft');
   assert.equal(status, 200); assert.equal(data.body, ''); assert.equal(data.title, '');
 };
+const fillComposer = async value => {
+  const editor = page.locator('#composer-editor .cm-content');
+  await editor.click(); await editor.press('ControlOrMeta+a');
+  if (value) await page.keyboard.insertText(value); else await editor.press('Backspace');
+  await page.waitForFunction(value => document.querySelector('#body').value === value, value);
+};
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
 const settled = () => page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
 const feedLayout = () => page.locator('#composer-section, #feed > .thought').evaluateAll(elements => elements.map(element => {
@@ -61,7 +67,7 @@ try {
   if (initial.data.body || initial.data.title) throw new Error('Use a clean local database: browser tests will not overwrite an existing draft.');
 
   const first = `${prefix}: basketball after a day of building things. café hopping tomorrow.\n\n${'a longer thought belongs here too. '.repeat(12)}`.trim();
-  await page.locator('#body').fill(first);
+  await fillComposer(first);
   await page.locator('#add-title').click();
   await page.locator('#title').fill('a day of building');
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
@@ -108,7 +114,7 @@ try {
   await backToFeed();
   await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'no bookmarks yet.');
   await setView('all'); await idle();
-  await page.locator('#body').fill('cafe');
+  await fillComposer('cafe');
   await page.waitForFunction(() => document.querySelector('#view-title').classList.contains('sr-only') && document.querySelector('mark')?.textContent === 'café');
   await page.locator('#clear-input').click();
   await idle(); await blankDraft();
@@ -338,7 +344,7 @@ try {
 
   // Capture the quiet inline editor before posting, then its saved entry.
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.locator('#body').fill('sample thought: i remember ideas better when i leave myself a few words about why they mattered.');
+  await fillComposer('sample thought: i remember ideas better when i leave myself a few words about why they mattered.');
   await page.locator('#add-title').click();
   await page.locator('#title').fill('leaving a little context');
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
@@ -347,7 +353,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${artifacts}/composing-mobile.png`, fullPage: true });
   await page.locator('#title').press('Enter');
-  assert.equal(await page.locator('#body').evaluate(element => element === document.activeElement), true, 'title Enter moves into the body without posting');
+  assert.equal(await page.locator('#composer-editor .cm-content').evaluate(element => element === document.activeElement), true, 'title Enter moves into the body without posting');
   const created = page.waitForResponse(response => response.url().endsWith('/api/thoughts') && response.request().method() === 'POST');
   await page.locator('#post').click();
   const newEntry = (await (await created).json()).entry; ids.push(newEntry.id);
@@ -362,7 +368,7 @@ try {
   await api(`thoughts/${newEntry.id}`, 'DELETE', {}); await setView('all'); await idle();
 
   // The same field filters old entries without publishing its contents.
-  await page.locator('#body').fill('remember a book');
+  await fillComposer('remember a book');
   await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: `${artifacts}/related-desktop.png`, fullPage: true });
@@ -392,7 +398,7 @@ try {
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#body').inputValue(), '', 'semantic checks start with a fully cleared draft');
   const recalled = page.waitForResponse(response => response.url().endsWith('/api/search') && response.request().postDataJSON().query === 'a thought about stories' && response.request().postDataJSON().semantic);
-  await page.locator('#body').pressSequentially('a thought about stories', { delay: 10 });
+  await page.locator('#composer-editor .cm-content').pressSequentially('a thought about stories', { delay: 10 });
   await recalled;
   await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
   assert.deepEqual(semanticCalls, ['a thought about stories'], 'semantic recall waits for a typing pause');
@@ -400,21 +406,21 @@ try {
   const oldRequest = page.waitForRequest(request => request.url().endsWith('/api/search') && request.postDataJSON().semantic && request.postDataJSON().query === 'older query');
   const retainedFeed = await page.locator('#feed').innerHTML();
   const retainedStatus = await page.locator('#feed-status').textContent();
-  await page.locator('#body').fill('older query');
+  await fillComposer('older query');
   await page.locator('#more').click();
   assert.equal((await oldRequest).postDataJSON().cursor, 0, 'a new query never reuses the previous result page');
   assert.equal(await page.locator('#feed').innerHTML(), retainedFeed, 'pending search preserves the exact displayed list');
   assert.equal(await page.locator('#feed-status').textContent(), retainedStatus, 'pending search shows no loading label');
   assert.equal(await page.locator('.thought').evaluate(article => getComputedStyle(article).animationName), 'none', 'search results never animate while editing');
-  await page.locator('#body').fill('newer query');
+  await fillComposer('newer query');
   await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
   await page.waitForTimeout(1800);
   assert.equal(await page.locator('.thought').getAttribute('data-id'), ids[1], 'a stale result cannot replace the newer query');
   assert.equal(await page.locator('#body').inputValue(), 'newer query');
   assert.equal((await api('export')).data.entries.length, samples.length);
-  await page.locator('#body').fill('an explicitly saved thought');
-  await page.locator('#body').press('Enter');
-  await page.locator('#body').pressSequentially('with a second line');
+  await fillComposer('an explicitly saved thought');
+  await page.locator('#composer-editor .cm-content').press('Enter');
+  await page.locator('#composer-editor .cm-content').pressSequentially('with a second line');
   const postedText = await page.locator('#body').inputValue();
   assert.ok(postedText.includes('\n'), 'Enter keeps a new line in the shared field');
   assert.equal((await api('export')).data.entries.length, samples.length);
@@ -428,7 +434,7 @@ try {
   // A second tab changes the draft: the first must preserve its own text.
   const oldVersion = (await api('draft')).data.version;
   await api('draft', 'PUT', { body: 'another device draft', version: oldVersion });
-  await page.locator('#body').fill('local text that must survive a conflict');
+  await fillComposer('local text that must survive a conflict');
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent.includes('changed elsewhere'));
   assert.equal(await page.locator('#body').inputValue(), 'local text that must survive a conflict');
   assert.equal((await api('draft')).data.body, 'another device draft');

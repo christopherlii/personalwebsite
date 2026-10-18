@@ -6,6 +6,7 @@ import worker from '../worker.mjs';
 import { passwordHash, digest, COOKIE } from '../auth.mjs';
 import { ftsQuery } from '../search.mjs';
 import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic.mjs';
+import { thoughtLink, thoughtLinks, plainThoughtLinks } from '../public/thought-links.js';
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
 const salt = '12'.repeat(16);
@@ -48,6 +49,36 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('internal links use stable targets, suggest untitled thoughts privately, and never publish private targets', async () => {
+  const c = client();
+  assert.equal((await c.call('/api/link-suggestions?q=walking')).status, 401);
+  await c.login();
+  const target = (await c.call('/api/thoughts', 'POST', thought('walking helped me notice this'))).data.entry;
+  const reference = thoughtLink(target);
+  assert.equal(thoughtLinks(reference)[0].id, target.id);
+  assert.equal(plainThoughtLinks(reference), target.body);
+  assert.equal(plainThoughtLinks('[[just text]]'), '[[just text]]');
+  assert.equal(thoughtLinks('[[javascript:alert(1)|unsafe]]').length, 0);
+  assert.equal((await c.call('/api/link-suggestions?q=walk')).data.entries[0].id, target.id);
+  assert.equal((await c.call(`/api/link-suggestions?q=walk&exclude=${target.id}`)).data.entries.length, 0);
+  assert.equal((await c.call('/api/link-suggestions?exclude=invalid')).status, 400);
+  assert.equal((await c.call('/api/link-suggestions?q=' + 'a'.repeat(161))).status, 400);
+  const source = (await c.call('/api/thoughts', 'POST', thought(`return to ${reference}`))).data.entry;
+  assert.equal(thoughtLinks(thoughtLink(source))[0].label, `return to ${target.body}`, 'untitled suggestions show linked words rather than nested target IDs');
+  await c.call(`/api/thoughts/${target.id}`, 'PATCH', { title: 'a new title', body: target.body, updated_at: target.updated_at });
+  assert.equal(thoughtLinks((await c.call(`/api/thoughts/${source.id}`)).data.entry.body)[0].id, target.id);
+  const path = `/api/thoughts/${source.id}/publication`;
+  assert.equal((await c.call(path)).data.draft.body, `return to ${target.body}`);
+  const saved = await c.call(path, 'PUT', { draft: publicDraft(`return to ${reference}`), version: 0 });
+  assert.equal(saved.data.draft.body, `return to ${target.body}`);
+  await c.call(path + '/publish', 'POST', { version: saved.data.version });
+  const published = (await c.call('/public/posts/a-public-note.md')).data;
+  assert.ok(published.includes(target.body)); assert.ok(!published.includes(target.id));
+  await c.call(`/api/thoughts/${target.id}`, 'DELETE');
+  assert.equal((await c.call(`/api/thoughts/${target.id}`)).status, 404);
+  assert.equal((await c.call(`/api/thoughts/${source.id}`)).data.entry.body, `return to ${reference}`, 'a deleted target cannot delete its referring thought');
+});
 
 test('thought status reflects live publication snapshots across reads, search, and bookmark changes', async () => {
   const c = client(); await c.login();

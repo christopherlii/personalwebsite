@@ -6,6 +6,7 @@
     "dev": "wrangler dev --port 8787",
     "test": "node --test test/*.test.mjs",
     "test:browser": "node test/browser.mjs",
+    "test:links": "node test/browser-links.mjs",
     "db:local": "wrangler d1 migrations apply JOURNAL_DB --local",
     "password": "node scripts/password.mjs",
     "deploy": "wrangler deploy --env production",
@@ -19,6 +20,7 @@
     "wrangler": "4.151.1"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-markdown": "6.5.2",
     "@codemirror/language": "6.13.1",

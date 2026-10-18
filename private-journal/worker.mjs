@@ -138,6 +138,18 @@ async function api(request, env, url, context) {
     }
     catch { fail(502, 'Related search is unavailable.'); }
   }
+  if (path === '/api/link-suggestions' && request.method === 'GET') {
+    const query = (url.searchParams.get('q') || '').trim();
+    const exclude = url.searchParams.get('exclude') || '';
+    if (query.length > 160 || (exclude && !uuid(exclude))) fail(400, 'Invalid thought lookup.');
+    const terms = ftsQuery(query);
+    if (query && !terms) return json({ entries: [] });
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT t.id, t.title, substr(t.body, 1, 200) AS body, t.created_at, t.source_date
+      FROM thoughts t${terms ? ' JOIN thoughts_fts ON thoughts_fts.rowid = t.seq' : ''}
+      WHERE t.id != ?${terms ? ' AND thoughts_fts MATCH ?' : ''}
+      ORDER BY ${terms ? 'bm25(thoughts_fts), ' : ''}t.seq DESC LIMIT 8`).bind(exclude, ...(terms ? [terms] : [])).all();
+    return json({ entries: results });
+  }
   if (path === '/api/thoughts' && request.method === 'GET') {
     const query = (url.searchParams.get('q') || '').trim();
     if (query.length > 500) fail(400, 'Use a shorter search.');
@@ -232,7 +244,7 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/markdown.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {

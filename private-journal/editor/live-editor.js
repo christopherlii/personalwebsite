@@ -1,11 +1,54 @@
-import { EditorState, StateField, Compartment } from '@codemirror/state';
-import { EditorView, Decoration, WidgetType, keymap } from '@codemirror/view';
+import { EditorState, StateField, Compartment, Prec, RangeSet } from '@codemirror/state';
+import { EditorView, Decoration, WidgetType, keymap, placeholder } from '@codemirror/view';
+import { autocompletion, completionKeymap, pickedCompletion } from '@codemirror/autocomplete';
 import { markdown } from '@codemirror/lang-markdown';
 import { GFM } from '@lezer/markdown';
 import { syntaxTree, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown as renderMarkdown } from './markdown.js';
+import { thoughtLinks, thoughtLink, thoughtLabel } from './thought-links.js';
+
+const wikiLinks = {
+  defineNodes: ['ThoughtLink', 'ThoughtLinkMark', 'ThoughtLinkTarget', 'ThoughtLinkLabel'],
+  parseInline: [{ name: 'ThoughtLink', before: 'Link', parse(context, next, position) {
+    if (next !== 91 || context.slice(position, position + 2) !== '[[') return -1;
+    const link = thoughtLinks(context.slice(position, context.end))[0];
+    if (!link || link.from !== 0) return -1;
+    const end = position + link.to, labelFrom = position + link.labelFrom;
+    return context.addElement(context.elt('ThoughtLink', position, end, [
+      context.elt('ThoughtLinkMark', position, position + 2), context.elt('ThoughtLinkTarget', position + 2, labelFrom),
+      context.elt('ThoughtLinkLabel', labelFrom, end - 2), context.elt('ThoughtLinkMark', end - 2, end)
+    ]));
+  } }]
+};
+const hiddenTargets = StateField.define({
+  create: state => targetRanges(state),
+  update: (value, transaction) => transaction.docChanged || syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? targetRanges(transaction.state) : value
+});
+function targetRanges(state) {
+  const ranges = []; syntaxTree(state).iterate({ enter(node) { if (node.name === 'ThoughtLinkTarget') ranges.push(Decoration.replace({}).range(node.from, node.to)); } });
+  return RangeSet.of(ranges, true);
+}
+function completions(findThoughts) {
+  return async context => {
+    const match = context.matchBefore(/\[\[[^\[\]\n|]{0,160}$/);
+    if (!match) return null;
+    for (let node = syntaxTree(context.state).resolveInner(context.pos, -1); node; node = node.parent) {
+      if (['InlineCode', 'FencedCode', 'CodeBlock', 'HTMLBlock', 'ThoughtLink'].includes(node.name)) return null;
+    }
+    const controller = new AbortController(); context.addEventListener('abort', () => controller.abort(), { onDocChange: true });
+    let entries; try { entries = await findThoughts(match.text.slice(2), controller.signal); } catch { return null; }
+    if (context.aborted) return null;
+    return { from: match.from, to: context.pos, filter: false, options: entries.map(entry => ({
+      label: thoughtLabel(entry), detail: new Date(entry.source_date ? entry.source_date + 'T12:00:00' : entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toLowerCase(),
+      apply(view, completion, from, to) {
+        const insert = thoughtLink(entry), closing = view.state.doc.sliceString(to, to + 2) === ']]' ? 2 : 0;
+        view.dispatch({ changes: { from, to: to + closing, insert }, selection: { anchor: from + insert.length }, annotations: pickedCompletion.of(completion), userEvent: 'input.complete' });
+      }
+    })) };
+  };
+}
 
 class Bullet extends WidgetType {
   toDOM() { const span = document.createElement('span'); span.className = 'cm-md-bullet'; span.textContent = '•'; return span; }
@@ -56,6 +99,9 @@ function decorate(state) {
   syntaxTree(state).iterate({ enter(node) {
     const { name, from, to } = node;
     const selected = editing(from, to);
+    if (name === 'ThoughtLinkTarget') { hide(from, to); return false; }
+    if (name === 'ThoughtLinkLabel') mark(from, to, 'cm-md-link');
+    if (name === 'ThoughtLink') mark(from, to, 'cm-thought-link');
     if (/^(ATX|Setext)Heading[1-6]$/.test(name)) lineClass(from, to, `cm-md-heading cm-md-h${name.at(-1)}`);
     if (name === 'Blockquote') lineClass(from, to, 'cm-md-quote');
     if (name === 'FencedCode' || name === 'CodeBlock') lineClass(from, to, 'cm-md-code-line');
@@ -78,7 +124,7 @@ function decorate(state) {
       else hide(from, to, new Bullet());
       return false;
     }
-    if (['HeaderMark', 'QuoteMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'CodeInfo'].includes(name)) {
+    if (['HeaderMark', 'QuoteMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'CodeInfo', 'ThoughtLinkMark'].includes(name)) {
       if (!selected) {
         let end = to;
         if (name === 'HeaderMark' || name === 'QuoteMark') while (state.doc.sliceString(end, end + 1) === ' ') end++;
@@ -102,26 +148,44 @@ const formatting = HighlightStyle.define([
   { tag: tags.strikethrough, class: 'cm-md-strike' }
 ]);
 
-export function createLiveEditor(parent, { value, nonce, onChange, onLimit }) {
+export function createLiveEditor(parent, { value, nonce, onChange, onLimit, findThoughts, onOpenThought, onSubmit, emptyText = '' }) {
   const editable = new Compartment(); let readOnly = false;
-  const view = new EditorView({ parent, state: EditorState.create({
+  const makeState = value => EditorState.create({
     doc: value, selection: { anchor: value.length },
     extensions: [
       EditorView.cspNonce.of(nonce),
-      markdown({ extensions: GFM }), syntaxHighlighting(formatting), liveFormatting,
+      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets,
+      EditorView.atomicRanges.of(view => view.state.field(hiddenTargets)),
+      placeholder(emptyText),
+      autocompletion({ override: [completions(findThoughts)], icons: false, maxRenderedOptions: 8, activateOnTypingDelay: 180 }),
+      Prec.highest(keymap.of(completionKeymap)),
+      ...(onSubmit ? [Prec.highest(keymap.of([{ key: 'Mod-Enter', run() { onSubmit(); return true; } }]))] : []),
       history(), keymap.of([...defaultKeymap, ...historyKeymap]), EditorView.lineWrapping,
       EditorView.contentAttributes.of({ 'aria-label': 'thought', 'aria-multiline': 'true', spellcheck: 'true', autocapitalize: 'sentences' }),
-      editable.of([EditorState.readOnly.of(false), EditorView.editable.of(true)]),
+      editable.of([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]),
+      EditorView.domEventHandlers({ click(event, view) {
+        if (!(event.metaKey || event.ctrlKey)) return false;
+        const position = view.posAtDOM(event.target, 0);
+        for (let node = syntaxTree(view.state).resolveInner(position, 1); node; node = node.parent) {
+          if (node.name === 'ThoughtLink') {
+            const link = thoughtLinks(view.state.doc.sliceString(node.from, node.to))[0];
+            if (link) { event.preventDefault(); onOpenThought(link.id); return true; }
+          }
+        }
+        return false;
+      } }),
       EditorState.changeFilter.of(transaction => {
         if (transaction.newDoc.length <= 20000) return true;
         queueMicrotask(onLimit); return false;
       }),
       EditorView.updateListener.of(update => { if (update.docChanged) onChange(update.state.doc.toString()); })
     ]
-  }) });
+  });
+  const view = new EditorView({ parent, state: makeState(value) });
   return {
     focus() { view.focus(); },
     destroy() { view.destroy(); },
+    setValue(value) { if (view.state.doc.toString() !== value) view.setState(makeState(value)); },
     setReadOnly(value) {
       if (value === readOnly) return;
       readOnly = value;
