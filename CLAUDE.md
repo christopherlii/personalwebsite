@@ -28,6 +28,14 @@ All content is data-driven via JSON index files and markdown, and lives in the *
 - **`server.py`** — local dev server on port 8001 with markdown content-type support; falls back to `content/` for paths missing at the root. Run with `python3 server.py`.
 - `marked` is vendored at `static/vendor/marked.min.js` (no CDN); the site makes no third-party requests.
 
+## Private journal
+
+`private-journal/` is a separate Cloudflare Worker with D1 storage and owner-only
+password login. See its README for local setup, verification, and deployment.
+Its entire directory is excluded from the GitHub Pages build. Journal entries
+and drafts belong only in the private database, never in this repo or the
+public-content assembly. `site-content` remains the source for published posts.
+
 ## Adding a New Post
 
 1. Create `content/posts/your-post-slug.md` with front matter (add `published: false` to keep it a draft):

@@ -5,3 +5,9 @@ __pycache__/
 # private content repo (christopherlii/site-content) and the assembled build
 /content/
 /_site/
+
+# Private journal development state and credentials
+.dev.vars*
+.wrangler/
+private-journal/node_modules/
+private-journal/test-results/

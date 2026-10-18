@@ -161,7 +161,8 @@ def assemble_site(out: Path):
         shutil.rmtree(out)
     tracked = subprocess.run(['git', 'ls-files'], cwd=ROOT, check=True,
                              capture_output=True, text=True).stdout.split()
-    skip = ('.github/', '.gitignore', 'build.py', 'server.py', 'CLAUDE.md', 'README.md')
+    skip = ('.github/', '.gitignore', 'build.py', 'server.py', 'CLAUDE.md', 'README.md',
+            'private-journal/')
     for rel in tracked:
         if not rel.startswith(skip):
             dest = out / rel
