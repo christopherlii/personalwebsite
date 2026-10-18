@@ -102,10 +102,10 @@ h1,h2 {
   padding:0 24px
 }
 .page-header {
-  display:flex;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
   align-items:center;
-  justify-content:space-between;
-  gap:30px;
+  gap:0 30px;
   margin-left:26px;
   margin-bottom:32px
 }
@@ -116,19 +116,16 @@ h1,h2 {
   color:var(--fg)
 }
 .utilities {
-  display:flex;
-  align-items:center;
-  gap:25px
+  justify-self:end
 }
-.utilities button,.utilities summary {
+.utilities button {
   color:var(--muted);
   font-size:11px
 }
-.utilities details {
-  position:relative
-}
-.utilities nav button {
-  color:var(--fg)
+.journal-menu {
+  grid-column:1/-1;
+  justify-content:flex-end;
+  margin-top:14px
 }
 .view-heading {
   margin-left:26px
@@ -295,9 +292,6 @@ textarea::placeholder {
   color:var(--muted)
 }
 .thought-actions {
-  position:relative
-}
-.thought-actions summary {
   min-width:24px;
   font-size:14px;
   line-height:1;
@@ -317,23 +311,21 @@ summary::-webkit-details-marker {
   display:none
 }
 .entry-menu {
-  position:absolute;
-  right:0;
-  top:100%;
-  z-index:3;
-  background:var(--bg);
-  border:1px solid var(--track);
-  padding:7px 15px;
-  width:160px;
   display:flex;
-  flex-direction:column;
-  align-items:stretch
+  flex-wrap:wrap;
+  align-items:center;
+  gap:0 20px
+}
+.thought-menu {
+  margin-top:6px
 }
 .entry-menu button {
   text-align:left;
-  font-size:11px
+  font-size:11px;
+  color:var(--muted)
 }
-.entry-menu button[aria-pressed=true] {
+.entry-menu button:hover,.entry-menu button[aria-current=page],.entry-menu button[aria-pressed=true] {
+  color:var(--fg);
   text-decoration:underline;
   text-underline-offset:4px
 }
@@ -449,18 +441,15 @@ dialog .public-actions {
   flex-wrap:wrap;
   gap:18px
 }
-.public-actions>details {
+#public-menu-toggle {
   margin-right:auto
 }
 .public-actions>a {
   font-size:11px;
   color:var(--muted)
 }
-.public-actions .entry-menu {
-  top:auto;
-  bottom:100%;
-  left:0;
-  right:auto
+#public-menu {
+  flex-basis:100%
 }
 .publication-details {
   margin-top:20px
@@ -506,7 +495,7 @@ dialog .public-actions {
 .thought-header,.entry-footer,.thought-actions {
   visibility:hidden
 }
-.thought:is(:focus-within,.is-active,:has(details[open])) :is(.thought-header,.entry-footer,.thought-actions) {
+.thought:is(:focus-within,.is-active,:has([data-menu][aria-expanded=true])) :is(.thought-header,.entry-footer,.thought-actions) {
   visibility:visible
 }
 @media(hover:hover) {
@@ -532,9 +521,6 @@ dialog .public-actions {
     margin-left:22px;
     margin-bottom:32px
   }
-  .utilities {
-    gap:22px
-  }
   .thought {
     padding-left:22px
   }
@@ -551,8 +537,24 @@ dialog .public-actions {
     margin-top:12svh
   }
 }
+@keyframes rise-in {
+  from { opacity:0; transform:translateY(8px) }
+}
+.page-entrance,.login:not([hidden]),.thought.is-entering {
+  animation:rise-in 180ms ease-out backwards
+}
+.composer-section.page-entrance {
+  animation-delay:30ms
+}
+.thought.is-entering {
+  animation-delay:var(--entry-delay,0ms)
+}
+.entry-menu:not([hidden]) {
+  animation:rise-in 160ms ease-out backwards
+}
 @media(prefers-reduced-motion:reduce) {
   * {
-    scroll-behavior:auto!important
+    scroll-behavior:auto!important;
+    animation:none!important
   }
 }

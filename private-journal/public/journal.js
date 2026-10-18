@@ -5,7 +5,32 @@ const state = { authenticated: false, view: 'all', query: '', cursor: null, entr
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
+function closeMenus(except = null) {
+  for (const trigger of document.querySelectorAll('[data-menu][aria-expanded=true]')) {
+    if (trigger === except) continue;
+    document.getElementById(trigger.getAttribute('aria-controls')).hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+}
+document.addEventListener('click', event => {
+  const trigger = event.target.closest('[data-menu]');
+  if (trigger) {
+    const opening = trigger.getAttribute('aria-expanded') !== 'true';
+    closeMenus(trigger);
+    trigger.setAttribute('aria-expanded', String(opening));
+    document.getElementById(trigger.getAttribute('aria-controls')).hidden = !opening;
+  } else closeMenus();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const open = document.querySelector('[data-menu][aria-expanded=true]');
+  if (!open) return;
+  event.preventDefault();
+  closeMenus();
+  open.focus({ preventScroll: true });
+});
 function showLogin(message = '') {
+  closeMenus();
   state.authenticated = false;
   state.generation++;
   state.controller?.abort();
@@ -194,14 +219,13 @@ function renderEntry(entry) {
   expand.className = 'expand-thought'; expand.hidden = !state.expanded.has(entry.id);
   expand.setAttribute('aria-expanded', String(state.expanded.has(entry.id)));
   expand.setAttribute('aria-controls', text.id); footer.append(expand);
-  const actions = document.createElement('div'); actions.className = 'thought-actions';
-  const details = document.createElement('details');
-  const summary = document.createElement('summary'); summary.textContent = '…'; summary.setAttribute('aria-label', 'more actions for thought');
-  const menu = document.createElement('div'); menu.className = 'entry-menu';
+  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = '…'; toggle.className = 'thought-actions'; toggle.dataset.menu = '';
+  toggle.setAttribute('aria-label', 'more actions for thought'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `entry-menu-${entry.id}`);
+  const menu = document.createElement('nav'); menu.className = 'entry-menu thought-menu'; menu.id = `entry-menu-${entry.id}`; menu.hidden = true; menu.setAttribute('aria-label', 'thought actions');
   const bookmark = button(entry.bookmarked ? 'bookmarked' : 'bookmark', 'bookmark', entry);
   bookmark.setAttribute('aria-pressed', String(Boolean(entry.bookmarked)));
   menu.append(bookmark, button('edit', 'edit', entry), button('public draft', 'public', entry), button('delete', 'delete', entry));
-  details.append(summary, menu); actions.append(details); footer.append(actions); article.append(footer);
+  footer.append(toggle); article.append(footer, menu);
   const observer = new ResizeObserver(() => { expand.hidden = !state.expanded.has(entry.id) && text.scrollHeight <= text.clientHeight + 2; });
   observer.observe(text); state.observers.push(observer);
 
@@ -268,12 +292,19 @@ async function loadFeed(append = false, semantic = state.semantic) {
     }
     if (generation !== state.generation || !state.authenticated) return;
     if (!append) {
+      closeMenus();
       state.observers.forEach(observer => observer.disconnect()); state.observers = [];
       state.entries.clear(); $('#feed').replaceChildren();
     }
+    let added = 0;
     for (const entry of data.entries) {
       if (state.entries.has(entry.id)) continue;
-      state.entries.set(entry.id, entry); $('#feed').append(renderEntry(entry));
+      const article = renderEntry(entry);
+      if (!queryText) {
+        article.classList.add('is-entering');
+        article.style.setProperty('--entry-delay', `${Math.min(added, 3) * 20 + 10}ms`);
+      }
+      state.entries.set(entry.id, entry); $('#feed').append(article); added++;
     }
     state.cursor = data.next;
     $('#more').hidden = data.next === null;
@@ -289,7 +320,7 @@ async function loadFeed(append = false, semantic = state.semantic) {
 }
 
 async function setView(view) {
-  $('#journal-menu').open = false;
+  closeMenus();
   state.view = view;
   await searchFromComposer(true);
 }
@@ -351,7 +382,7 @@ $('#feed').addEventListener('click', async event => {
   if (!target) return;
   const entry = state.entries.get(target.dataset.id);
   if (!entry) return;
-  document.querySelectorAll('details[open]').forEach(details => details.open = false);
+  closeMenus();
   const action = target.dataset.action;
   state.selected = entry;
   try {

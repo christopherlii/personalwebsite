@@ -4,8 +4,11 @@ A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and three-line
 thought previews with an open/close control. Optional titles sit above the
-body; dates sit to the left of the timeline on desktop and mobile. Typing
-recalls related past thoughts; clearing restores the timeline. Only an explicit post creates a new
+body; dates sit to the left of the timeline on desktop and mobile.
+The header and note options expand into inline text rows without covering the
+feed. Entrance motion rises briefly on load and opening actions, and is disabled
+for reduced-motion preferences. Search updates do not replay entry entrances.
+Typing recalls related past thoughts; clearing restores the timeline. Only an explicit post creates a new
 entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
 characters). No analytics, trackers, browser-local thought storage, or external
