@@ -102,12 +102,13 @@ h1,h2 {
   padding:0 24px
 }
 .page-header {
+  position:relative;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
   align-items:center;
   gap:0 30px;
   margin-left:26px;
-  margin-bottom:32px
+  margin-bottom:44px
 }
 .site-name {
   text-decoration:none;
@@ -130,9 +131,12 @@ h1,h2 {
   font-size:11px
 }
 .journal-menu {
-  grid-column:1/-1;
+  position:absolute;
+  top:100%;
+  right:0;
+  max-width:100%;
   justify-content:flex-end;
-  margin-top:14px
+  margin-top:6px
 }
 .view-heading {
   margin-left:26px
@@ -244,7 +248,7 @@ textarea::placeholder {
   font-size:12px
 }
 .thought {
-  padding-bottom:48px;
+  padding-bottom:64px;
   overflow-wrap:anywhere
 }
 .thought-header {
@@ -295,41 +299,29 @@ textarea::placeholder {
 .entry-footer {
   display:flex;
   align-items:center;
-  gap:12px;
-  min-height:0;
+  gap:16px;
+  min-height:28px;
   margin-top:8px
 }
-.entry-footer>button {
+.entry-footer>button,.entry-footer>a {
   font-size:11px;
-  color:var(--muted)
-}
-.thought-actions {
-  min-width:24px;
-  font-size:14px;
-  line-height:1;
-  text-align:left;
-  color:var(--muted)
-}
-.icon-control {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:28px;
-  height:28px;
-  padding:6px;
   color:var(--muted);
   text-decoration:none
 }
-.icon-control:hover {
-  color:var(--fg)
+.entry-footer>a {
+  padding:6px 0
 }
-.icon-control svg {
-  display:block;
-  width:16px;
-  height:16px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.4
+.entry-footer>a:hover,#reader-back:hover {
+  text-decoration:underline;
+  text-underline-offset:4px
+}
+.copy-thought {
+  min-width:36px;
+  text-align:left
+}
+.thought-actions {
+  min-width:24px;
+  text-align:left
 }
 .reader {
   max-width:640px;
@@ -337,7 +329,12 @@ textarea::placeholder {
   padding:0 50px
 }
 #reader-back {
-  margin:0 0 32px -6px
+  display:inline-block;
+  padding:6px 0;
+  margin-bottom:32px;
+  font-size:11px;
+  color:var(--muted);
+  text-decoration:none
 }
 #reader-content:focus {
   outline:none
@@ -362,15 +359,22 @@ summary::-webkit-details-marker {
   display:none
 }
 .entry-menu {
+  z-index:2;
+  background:var(--bg);
   display:flex;
   flex-wrap:wrap;
   align-items:center;
   gap:0 20px
 }
 .thought-menu {
-  margin-top:6px
+  position:absolute;
+  top:calc(100% - 58px);
+  left:26px;
+  right:0;
+  gap:0 16px
 }
 .entry-menu button {
+  padding:4px 0;
   text-align:left;
   font-size:11px;
   color:var(--muted)
@@ -489,8 +493,10 @@ dialog footer {
   margin-top:24px
 }
 dialog .public-actions {
+  position:relative;
   flex-wrap:wrap;
-  gap:18px
+  gap:18px;
+  padding-bottom:64px
 }
 #public-menu-toggle {
   margin-right:auto
@@ -500,7 +506,10 @@ dialog .public-actions {
   color:var(--muted)
 }
 #public-menu {
-  flex-basis:100%
+  position:absolute;
+  top:calc(100% - 58px);
+  left:0;
+  right:0
 }
 .publication-details {
   margin-top:20px
@@ -580,10 +589,13 @@ dialog .public-actions {
   }
   .page-header {
     margin-left:22px;
-    margin-bottom:32px
+    margin-bottom:44px
   }
   .thought {
     padding-left:22px
+  }
+  .thought-menu {
+    left:22px
   }
   .composer-section,.view-heading,.notice {
     margin-left:22px
@@ -602,17 +614,17 @@ dialog .public-actions {
     padding:0 46px
   }
 }
-@keyframes rise-in {
-  from { opacity:0; transform:translateY(8px) }
-}
 .page-entrance,.login:not([hidden]) {
-  animation:rise-in 180ms ease-out backwards
+  animation:menu-fade 120ms ease-out backwards
 }
 .composer-section.page-entrance {
   animation-delay:30ms
 }
 .entry-menu:not([hidden]) {
-  animation:rise-in 160ms ease-out backwards
+  animation:menu-fade 120ms ease-out backwards
+}
+@keyframes menu-fade {
+  from { opacity:0 }
 }
 @media(prefers-reduced-motion:reduce) {
   * {

@@ -1,7 +1,7 @@
 import { searchTerms } from './search-terms.js';
 
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -155,21 +155,6 @@ function button(label, action, entry) {
   return result;
 }
 
-const icons = {
-  copy: '<rect x="8" y="8" width="12" height="13"/><path d="M16 8V3H3v13h5"/>',
-  copied: '<path d="m4 12 5 5L20 6"/>',
-  open: '<path d="m5 9 7 7 7-7"/>',
-  close: '<path d="m5 15 7-7 7 7"/>',
-  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
-  read: '<path d="M14 3h7v7M21 3l-8 8M10 21H3v-7M3 21l8-8"/>'
-};
-function setIcon(control, icon, label) {
-  control.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[icon]}</svg>`;
-  control.setAttribute('aria-label', label); control.title = label;
-  control.classList.add('icon-control');
-}
-setIcon($('#public-menu-toggle'), 'more', 'public draft options');
-
 function readerId() { return location.hash.match(/^#thought\/([a-f0-9-]{36})$/)?.[1]; }
 async function showRoute() {
   if (!state.authenticated) return;
@@ -261,17 +246,12 @@ function renderEntry(entry) {
   }
   const text = document.createElement('p'); text.className = 'thought-body';
   text.id = `thought-${entry.id}`;
-  text.classList.toggle('collapsed', !state.expanded.has(entry.id));
+  text.classList.add('collapsed');
   text.append(bodyContent(entry.body, state.query)); article.append(text);
   const footer = document.createElement('div'); footer.className = 'entry-footer';
-  const copy = button('', 'copy', entry); setIcon(copy, 'copy', 'copy thought'); footer.append(copy);
-  const expand = button(state.expanded.has(entry.id) ? 'close' : 'open', 'expand', entry);
-  expand.className = 'expand-thought'; expand.hidden = !state.expanded.has(entry.id);
-  setIcon(expand, state.expanded.has(entry.id) ? 'close' : 'open', state.expanded.has(entry.id) ? 'collapse thought' : 'open thought inline');
-  expand.setAttribute('aria-expanded', String(state.expanded.has(entry.id)));
-  expand.setAttribute('aria-controls', text.id); footer.append(expand);
-  const read = document.createElement('a'); read.href = `#thought/${entry.id}`; read.dataset.action = 'read'; setIcon(read, 'read', 'expand to reading page'); footer.append(read);
-  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'thought-actions'; toggle.dataset.menu = ''; setIcon(toggle, 'more', 'more actions for thought');
+  const copy = button('copy', 'copy', entry); copy.className = 'copy-thought'; copy.setAttribute('aria-label', 'copy thought'); footer.append(copy);
+  const read = document.createElement('a'); read.href = `#thought/${entry.id}`; read.dataset.action = 'read'; read.textContent = 'open'; read.setAttribute('aria-label', 'open thought'); footer.append(read);
+  const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'thought-actions'; toggle.dataset.menu = ''; toggle.textContent = '…';
   toggle.setAttribute('aria-label', 'more actions for thought'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `entry-menu-${entry.id}`);
   const menu = document.createElement('nav'); menu.className = 'entry-menu thought-menu'; menu.id = `entry-menu-${entry.id}`; menu.hidden = true; menu.setAttribute('aria-label', 'thought actions');
   const bookmark = button(entry.bookmarked ? 'bookmarked' : 'bookmark', 'bookmark', entry);
@@ -282,10 +262,6 @@ function renderEntry(entry) {
     if (event.pointerType !== 'mouse') return;
     menu.hidden = true; toggle.setAttribute('aria-expanded', 'false');
   });
-  const observer = new ResizeObserver(() => {
-    if (text.getClientRects().length) expand.hidden = !state.expanded.has(entry.id) && text.scrollHeight <= text.clientHeight + 2;
-  });
-  observer.observe(text); state.observers.push(observer);
 
   return article;
 }
@@ -348,7 +324,6 @@ async function loadFeed(append = false, semantic = state.semantic) {
     if (generation !== state.generation || !state.authenticated) return;
     if (!append) {
       closeMenus();
-      state.observers.forEach(observer => observer.disconnect()); state.observers = [];
       state.entries.clear();
       const fragment = document.createDocumentFragment();
       for (const entry of data.entries) { state.entries.set(entry.id, entry); fragment.append(renderEntry(entry)); }
@@ -442,18 +417,7 @@ $('#feed').addEventListener('click', async event => {
   const action = target.dataset.action;
   state.selected = entry;
   try {
-    if (action === 'expand') {
-      const focused = document.activeElement === target;
-      if (state.expanded.has(entry.id)) state.expanded.delete(entry.id); else state.expanded.add(entry.id);
-      const replacement = renderEntry(entry);
-      target.closest('article').replaceWith(replacement);
-      if (focused) {
-        const control = replacement.querySelector('[data-action=expand]');
-        control.hidden = false;
-        replacement.focus({ preventScroll: true });
-        control.focus({ preventScroll: true });
-      }
-    } else if (action === 'bookmark') {
+    if (action === 'bookmark') {
       target.disabled = true;
       const data = await api(`thoughts/${entry.id}`, { method: 'PATCH', body: JSON.stringify({ bookmarked: !entry.bookmarked }) });
       state.entries.set(entry.id, { ...entry, ...data.entry });
@@ -461,8 +425,8 @@ $('#feed').addEventListener('click', async event => {
       else target.closest('article').replaceWith(renderEntry({ ...entry, ...data.entry }));
     } else if (action === 'copy') {
       await navigator.clipboard.writeText(entryText(entry));
-      setIcon(target, 'copied', 'thought copied');
-      setTimeout(() => { setIcon(target, 'copy', 'copy thought'); }, 1200);
+      target.textContent = 'copied';
+      setTimeout(() => { target.textContent = 'copy'; }, 1200);
     } else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
     else if (action === 'public') { await openPublication(entry); }

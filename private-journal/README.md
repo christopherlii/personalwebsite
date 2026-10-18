@@ -3,11 +3,11 @@
 A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and three-line
-thought previews with an open/close control. Optional titles sit above the
+thought previews with an open link to a separate reading page. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
-The header and note options expand into inline text rows without covering the
-feed. Header entrances and control fades respect reduced-motion preferences;
-the list never animates. Hover reveals dates and icon actions, and moving away
+The header, note, and public-draft menus appear in reserved space without
+resizing their containers or moving surrounding content. Only opacity fades
+are used, with reduced-motion support. Hover reveals dates and small text actions, and moving away
 fades them out even after a click. Keyboard focus reveals the same controls;
 touch devices show them directly. Hide timeline removes the whole feed while
 leaving writing and autosave available. It is a temporary view choice.
@@ -15,8 +15,9 @@ leaving writing and autosave available. It is a temporary view choice.
 Typing recalls related past thoughts after a pause. The existing list and its
 status stay intact until the full response is ready, including semantic
 indexing; there is no intermediate word-match pass or loading label. Clearing
-restores the timeline. An expand icon opens a private reading link containing
-only the complete writing and a back control. Reading links require the same
+restores the timeline. Open navigates to a private reading link containing
+only the complete writing and a text back control. Previews never expand inline.
+Reading links require the same
 session and work on reload and under `/journal/`.
 Only an explicit post creates a new
 entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
@@ -77,7 +78,8 @@ checks cover retained results without a loading label, pause-triggered semantic 
 clear-to-restore behavior, and typing without creating entries. Browser semantic
 responses are controlled test fixtures, not live model quality verification.
 The browser workflow also covers hiding/restoring the timeline, fading controls
-after clicks, icon rendering, and complete private reading links on reload.
+after clicks, fixed geometry while menus open on desktop and mobile, and
+complete private reading links on reload.
 
 ## Deploy after connecting a Cloudflare account
 
