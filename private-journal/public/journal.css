@@ -208,46 +208,28 @@ textarea::placeholder {
   outline:none;
   field-sizing:content
 }
-.compose-actions {
+.composer-toolbar {
   display:flex;
   justify-content:space-between;
   align-items:center;
-  margin-top:10px;
-  gap:16px
+  gap:16px;
+  min-height:30px;
+  margin-top:8px
 }
-.compose-actions[hidden] {
-  display:flex!important;
-  visibility:hidden;
-  pointer-events:none
-}
-.draft-feedback {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  font-size:10px;
-  color:var(--muted)
-}
-.draft-feedback button {
-  font-size:10px
-}
-.compose-buttons {
-  display:flex;
-  align-items:center;
-  gap:20px
-}
-.compose-buttons>button {
-  font-size:11px
-}
-.dictation-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:54px; margin-top:8px; font-size:11px; color:var(--muted) }
-.tool-button { border:1px solid #ccc; border-radius:0; padding:5px 10px; min-height:30px; background:var(--bg); color:var(--fg); font:inherit; line-height:1.5; text-align:center }
-.tool-button:focus-visible { border-color:var(--fg) }
-.dictate-toggle { width:72px; font-size:11px }
-.dictate-toggle[aria-pressed=true] { background:var(--fg); color:var(--bg); border-color:var(--fg) }
-.dictation-controls [role=status] { flex-basis:100%; min-height:16px; line-height:16px }
-@media(pointer:coarse) { .tool-button { min-height:44px } }
-.post {
-  font-size:12px
-}
+.composer-tools { display:flex; align-items:center; gap:16px; min-width:0 }
+.composer-toolbar button { min-height:30px; color:var(--muted); font-size:11px; white-space:nowrap }
+.composer-toolbar .post { color:var(--fg) }
+.compose-actions { display:flex; align-items:center; flex-shrink:0 }
+.compose-actions[hidden] { display:flex!important; visibility:hidden; pointer-events:none }
+.writing-feedback { min-height:16px; margin-top:2px; font-size:10px; line-height:16px; color:var(--muted) }
+.writing-feedback>[role=status]:empty { display:none }
+.draft-feedback { display:flex; align-items:baseline; gap:12px }
+.draft-feedback button { padding:0; font-size:10px }
+.dictation-controls { display:flex; align-items:center; gap:16px; min-height:30px; margin-top:8px }
+.tool-button { min-height:30px; padding:6px 0; color:var(--muted); font:400 11px/1.5 var(--font-body); text-align:left }
+.dictate-toggle { width:44px }
+.dictate-toggle[aria-pressed=true] { color:var(--fg) }
+@media(pointer:coarse) { .composer-toolbar button,.dictation-controls button { min-height:44px } }
 .thought {
   padding-bottom:64px;
   overflow-wrap:anywhere
@@ -764,8 +746,8 @@ dialog .public-actions {
 #active-tag { max-width:100%; overflow-wrap:anywhere }
 .tag-filter>a { color:var(--muted); font-size:11px; text-decoration:none }
 .tag-filter>a { transition:opacity 250ms ease }
-.add-photo { width:72px; font-size:11px }
-.photo-tools { margin:0 0 12px }
+.add-photo { width:44px }
+.photo-tools { margin-top:8px }
 .journal-photo { display:block; max-width:100%; height:auto; margin:12px 0; border:0 }
 .thought-preview .journal-photo { max-height:160px; width:auto; object-fit:contain; object-position:left }
 .cm-photo { display:inline-block; width:100%; vertical-align:top }
