@@ -1,5 +1,6 @@
 import './vendor/marked.min.js';
 import { thoughtLinks } from './thought-links.js';
+import { textTags } from './tags.js';
 
 const parser = new globalThis.marked.Marked({ gfm: true, breaks: false, extensions: [{
   name: 'thoughtLink', level: 'inline', start: source => source.indexOf('[['),
@@ -28,11 +29,17 @@ function safeLink(href) {
     return ['https:', 'http:', 'mailto:'].includes(url.protocol) ? url.href : null;
   } catch { return null; }
 }
-function nodes(tokens) {
+function nodes(tokens, allowTags = true) {
   const result = document.createDocumentFragment();
   for (const token of tokens) {
-    const children = () => token.tokens ? nodes(token.tokens) : document.createTextNode(decode(token.text || ''));
+    const children = () => token.tokens ? nodes(token.tokens,allowTags) : document.createTextNode(decode(token.text || ''));
     switch (token.type) {
+      case 'text': {
+        if(token.tokens){result.append(nodes(token.tokens,allowTags));break;}
+        const value=token.raw || token.text || '',tags=allowTags?textTags(value):[];let end=0;
+        for(const tag of tags){result.append(document.createTextNode(decode(value.slice(end,tag.from))));const link=element('a',document.createTextNode(tag.text));link.href=`#tag/${encodeURIComponent(tag.tag)}`;link.dataset.tag=tag.tag;link.className='thought-tag';result.append(link);end=tag.to;}
+        result.append(document.createTextNode(decode(value.slice(end))));break;
+      }
       case 'thoughtLink': {
         const link = element('a', document.createTextNode(token.text)); link.href = `#thought/${token.id}`;
         link.dataset.thoughtLink = token.id; result.append(link); break;
@@ -48,7 +55,7 @@ function nodes(tokens) {
       case 'html': result.append(document.createTextNode(token.text)); break;
       case 'link': case 'image': {
         const href = safeLink(token.href);
-        const content = token.type === 'image' ? document.createTextNode(decode(token.text || token.href)) : children();
+        const content = token.type === 'image' ? document.createTextNode(decode(token.text || token.href)) : token.tokens ? nodes(token.tokens,false) : document.createTextNode(decode(token.text || ''));
         if (!href) { result.append(content); break; }
         const link = element('a', content);
         link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';

@@ -67,6 +67,36 @@ current thought; it does not call an AI model. Search uses link labels instead
 of target IDs. Public drafts and published snapshots retain only the linked
 words, so private destinations are never published by following a link.
 
+## Tags
+
+Write an inline hashtag such as `#ideas` in a thought's title or body. Tags are
+quiet text links in feed previews and the reading view, not separate chips.
+Clicking one opens `#tag/ideas`, an exact, case-insensitive timeline filter.
+The filter survives reload; back from a thought returns to it. The writing
+field retains its draft and autosave while browsing a tag, without re-searching
+the filtered list on every keystroke. The all-thoughts link clears the tag and
+resumes the writing field's usual search. Bookmark filtering can further narrow
+the tagged timeline.
+
+Tag names use Unicode letters/marks, digits, underscore, hyphen, and optional
+slash-separated segments, up to 64 characters; a name cannot be only numeric.
+Names normalize to NFC and lower case. Nested names currently match exactly:
+`#life` and `#life/notes` are different filters. The existing Marked lexer keeps
+code, escaped text, HTML, external links, and internal thought-link labels out
+of the index. Tags in paragraphs, headings, quotes, lists, and tables retain
+their exact source positions for inline links. There is no separate tag editor
+or automatic conversion into public post metadata. Source copying, exports,
+and publication continue to retain the Markdown as written.
+
+`0006_tags.sql` adds derived tag/index tables with deletion cascades and
+invalidation on title/body edits. Posts and edits index synchronously. Existing
+and imported thoughts are indexed in eight-entry batches when a tag is first
+opened; the client preserves the previous list until the index is complete.
+Version-guarded inserts prevent stale indexing jobs from restoring removed
+tags. Tags do not call an AI service. `npm run test:tags` checks feed/reader
+links, exact filtering, literal code/URLs, reload, drafts, back navigation,
+edits, clearing, and 320px layout; API tests cover legacy repair and pagination.
+
 ## Saved reading
 
 The journal menu opens `#reading`, a private read-later collection with a

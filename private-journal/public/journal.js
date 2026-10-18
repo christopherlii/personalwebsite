@@ -3,10 +3,12 @@ import { markdown } from './markdown.js';
 import { createLiveEditor } from './live-editor.js';
 import { thoughtLinks, plainThoughtLinks } from './thought-links.js';
 import { createReading } from './reading.js';
+import { markdownTags, normalizeTag } from './tags.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
 Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerHistory: null });
+state.tag = null;
 let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
@@ -173,7 +175,7 @@ async function enter() {
   });
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
-  if (readerId() || location.hash === '#reading') await showRoute();
+  if (readerId() || location.hash === '#reading' || routeTag()) await showRoute();
   else await searchFromComposer(true);
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
@@ -186,11 +188,13 @@ function button(label, action, entry) {
 }
 
 function readerId() { return location.hash.match(/^#thought\/([a-f0-9-]{36})$/)?.[1]; }
+function routeTag(){try{return location.hash.startsWith('#tag/')?normalizeTag(decodeURIComponent(location.hash.slice(5))):null;}catch{return null;}}
+function readerBackTarget(){return history.state?.previousThought?`#thought/${history.state.previousThought}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#';}
 function renderReader(entry = state.readerEntry) {
   const content = $('#reader-content'); content.replaceChildren();
   if (!entry) return;
   if (entry.title) {
-    const title = document.createElement('h1'); title.className = 'thought-title'; title.textContent = entry.title; content.append(title);
+    const title = document.createElement('h1'); title.className = 'thought-title'; title.append(bodyContent(entry.title,'')); content.append(title);
   }
   const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); content.append(body);
   readingView.related(entry);
@@ -245,7 +249,7 @@ async function showRoute() {
   const generation = ++state.readerGeneration;
   const id = readerId();
   readingView.hide();
-  $('#reader-back').href = history.state?.previousThought ? `#thought/${history.state.previousThought}` : '#';
+  $('#reader-back').href = readerBackTarget();
   if (state.readerDirty && id !== state.readerEntry?.id) {
     try { await saveReader(); }
     catch (error) {
@@ -262,14 +266,17 @@ async function showRoute() {
     closeMenus(); document.title = 'read later'; await readingView.show(); return;
   }
   if (!id) {
+    const tag=routeTag(),tagChanged=tag!==state.tag;state.tag=tag;
+    if(tagChanged&&tag){state.timelineHidden=false;$('#timeline').hidden=false;$('#toggle-timeline').textContent='hide timeline';$('#toggle-timeline').setAttribute('aria-expanded','true');}
     const wasReading = !$('#reader').hidden;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
     state.readerHistory = null;
     readingView.hideRelated();
     $('#app').hidden = false; document.title = 'journal';
-    if (!state.entries.size && !state.timelineHidden) await searchFromComposer(true);
-    if (wasReading) window.scrollTo(0, state.feedScroll);
+    if ((tag || tagChanged || !state.entries.size) && !state.timelineHidden) await searchFromComposer(true);
+    updateView();
+    if (wasReading || tagChanged) window.scrollTo(0, tagChanged ? 0 : state.feedScroll);
     return;
   }
   if (state.readerDirty && id === state.readerEntry?.id) {
@@ -332,6 +339,7 @@ function bodyContent(body, query) {
   // The timeline stays a plain-text preview, including search highlights.
   const links = [...body.matchAll(/https?:\/\/[^\s<>]+/gu)].map(match => ({ from: match.index, to: match.index + match[0].length, text: match[0] }));
   links.push(...thoughtLinks(body).map(link => ({ ...link, text: link.label })));
+  links.push(...markdownTags(body));
   links.sort((a, b) => a.from - b.from);
   let end = 0;
   for (const link of links) {
@@ -339,7 +347,8 @@ function bodyContent(body, query) {
     appendText(body.slice(end, link.from));
     const a = document.createElement('a');
     a.textContent = link.text;
-    if (link.id) { a.href = `#thought/${link.id}`; a.dataset.thoughtLink = link.id; }
+    if(link.tag){a.href=`#tag/${encodeURIComponent(link.tag)}`;a.dataset.tag=link.tag;a.className='thought-tag';}
+    else if (link.id) { a.href = `#thought/${link.id}`; a.dataset.thoughtLink = link.id; }
     else { a.href = link.text; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
     fragment.append(a); end = link.to;
   }
@@ -393,6 +402,7 @@ function renderEntry(entry) {
 }
 
 function updateView() {
+  $('#tag-filter').hidden=!state.tag;$('#active-tag').textContent=state.tag?`#${state.tag}`:'';
   for (const item of document.querySelectorAll('[data-view]')) {
     if (item.dataset.view === state.view) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
@@ -403,6 +413,7 @@ function updateView() {
 
 function searchFromComposer(immediate = false) {
   clearTimeout(state.searchTimer);
+  if(state.tag){state.query='';if(immediate)return loadFeed(false,false);return;}
   state.query = plainThoughtLinks(entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() })).trim();
   state.controller?.abort();
   state.generation++;
@@ -430,7 +441,10 @@ async function loadFeed(append = false, semantic = state.semantic) {
   });
   try {
     let data;
-    if (queryText && semanticMode) {
+    if(state.tag){
+      const params=new URLSearchParams({tag:state.tag});if(saved)params.set('saved','1');if(append&&state.cursor!==null)params.set('cursor',state.cursor);
+      do{data=await api(`thoughts?${params}`,{signal:controller.signal});}while(data.indexing&&generation===state.generation);
+    }else if (queryText && semanticMode) {
       try {
         do { data = await search(true); } while (data.indexing && generation === state.generation);
       } catch (error) {
@@ -711,6 +725,7 @@ $('#logout').addEventListener('click', async () => {
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     composerEditor?.setValue('');
+    state.tag=null;
     readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     $('#composer-title').hidden = true;
