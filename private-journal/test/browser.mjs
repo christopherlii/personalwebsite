@@ -22,7 +22,12 @@ const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method,
   return { status: response.status, data: await response.json() };
 }, { path, method, body });
 const setView = async view => { await page.locator('#journal-menu-toggle').click(); await page.locator(`[data-view=${view}]`).click(); };
-const entryMenu = async article => { await article.hover(); await article.locator('[data-menu]').click(); };
+const openReader = async article => {
+  await article.hover(); await article.locator('[data-action=read]').click();
+  await page.locator('#reader').waitFor({ state: 'visible' });
+};
+const readerMenu = async () => { await page.locator('#reader-menu-toggle').click(); };
+const backToFeed = async () => { await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' }); };
 const blankDraft = async () => {
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent === '');
   const { status, data } = await api('draft');
@@ -81,30 +86,37 @@ try {
   assert.equal(await article.locator('[data-action=expand]').count(), 0, 'thoughts have no inline expansion');
   await article.locator('[data-action=read]').click();
   await page.locator('#reader').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#reader .thought-body').textContent(), first, 'open navigates to the complete writing');
+  assert.equal((await page.locator('#reader .thought-body p').allTextContents()).join('\n\n'), first, 'open navigates to the complete writing');
   assert.equal(await page.locator('#reader-back').textContent(), 'back');
   await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await article.locator('.thought-body').evaluate(element => element.classList.contains('collapsed')), true, 'back returns to the unchanged preview');
-  await entryMenu(article);
-  await article.locator('[data-action=bookmark]').click();
-  await setView('saved');
-  await page.waitForFunction(id => Boolean(document.querySelector(`article[data-id="${id}"] button[aria-pressed=true]`)), root.id);
+  await openReader(article); await readerMenu();
+  await page.locator('#reader-bookmark').click();
+  await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'true');
+  await backToFeed(); await setView('saved');
+  await article.waitFor();
+  await openReader(article); await readerMenu(); await page.locator('#reader-bookmark').click();
+  await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'false');
+  await backToFeed();
+  await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'no bookmarks yet.');
+  await setView('all'); await idle();
   await page.locator('#body').fill('cafe');
   await page.waitForFunction(() => document.querySelector('#view-title').classList.contains('sr-only') && document.querySelector('mark')?.textContent === 'café');
   await page.locator('#clear-input').click();
   await idle(); await blankDraft();
 
-  await entryMenu(article);
-  await article.locator('[data-action=edit]').click();
+  await openReader(article);
+  await page.locator('#reader-edit').click();
   const edited = `${prefix}: soccer and coffee instead. <img src=x onerror=alert(1)>`;
   await page.locator('#edit-body').fill(edited);
   await page.locator('#edit-thought-title').fill('a different day <img src=x onerror=alert(1)>');
-  await page.locator('#edit-form button[type=submit]').click();
+  await page.locator('#reader-save').click();
+  await page.locator('#edit-form').waitFor({ state: 'hidden' });
   await page.waitForFunction(text => [...document.querySelectorAll('.thought-body')].some(p => p.textContent === text), edited);
   assert.equal(await page.locator('.thought-body img').count(), 0, 'HTML is rendered as text');
   assert.equal(await article.locator('.thought-title img').count(), 0, 'title HTML is text too');
-  await entryMenu(article);
-  await article.locator('[data-action=public]').click();
+  await readerMenu();
+  await page.locator('#reader-public').click();
   await page.locator('#public-dialog').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#public-body').inputValue(), edited);
   await page.locator('#public-body').fill('a separate public draft');
@@ -121,7 +133,7 @@ try {
   await page.locator('#public-dialog').waitFor({ state: 'hidden' });
   assert.equal((await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries.find(e => e.id === root.id).body, edited, 'public draft does not edit journal');
 
-  await entryMenu(article); await article.locator('[data-action=public]').click();
+  await readerMenu(); await page.locator('#reader-public').click();
   await page.locator('#public-dialog').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#public-body').inputValue(), 'a separate public draft', 'public draft is saved independently');
   await page.locator('#publish-public').click();
@@ -163,12 +175,25 @@ try {
   await page.locator('[data-close=public-dialog]').click();
   await page.locator('#public-dialog').waitFor({ state: 'hidden' });
 
+  await backToFeed();
+
   // Clearly labeled sample text for review screenshots, separate from the
   // hostile-input and conflict fixtures used to exercise the implementation.
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   ids.length = 0;
-  const samples = [
-    'sample thought: somewhere to leave an idea before it needs to become a post.\n\na longer thought can stay in the timeline without taking over it. open it on its own page when you want to read the rest, then go back to the same place in the feed. short thoughts keep their full text, while longer ones leave room for the next entry.',
+  const markdownSample = [
+    'sample thought: somewhere to leave an idea before it needs to become a post.',
+    '## holding an idea',
+    'Some thoughts need **a little structure**, others just *a sentence*. Keep the writing itself at the center.',
+    '- a question to return to\n- a connection worth following\n  - an unfinished thread',
+    '> Leave room for a thought to change.',
+    'Try `one small step` before making a plan.',
+    '```\nwrite → revisit → revise\n```',
+    '- [x] write it down\n- [ ] come back to it',
+    '| idea | next step |\n| --- | --- |\n| unfinished | revisit |',
+    '[a reference](https://example.com)'
+  ].join('\n\n');
+  const samples = [markdownSample,
     'sample thought: what did i want to remember about that book?',
     'sample thought: a passing idea worth keeping.'
   ];
@@ -192,16 +217,9 @@ try {
   assert.equal(await page.locator('#journal-menu').isVisible(), false, 'Escape closes header actions');
   assert.equal(await page.locator('#journal-menu-toggle').evaluate(button => button === document.activeElement), true, 'Escape returns focus to its trigger');
   const sampleArticle = page.locator(`article[data-id="${ids[2]}"]`);
-  const beforeNoteMenu = await feedLayout();
-  await entryMenu(sampleArticle);
-  await settled();
-  assert.deepEqual(await feedLayout(), beforeNoteMenu, 'note options never move following thoughts');
-  assert.equal(await sampleArticle.locator('.entry-footer svg').count(), 0, 'hover actions use small text instead of SVG icons');
+  assert.equal(await sampleArticle.locator('.entry-footer svg, [data-menu]').count(), 0, 'feed actions contain only copy and open');
+  await sampleArticle.hover();
   await page.screenshot({ path: `${artifacts}/note-actions.png`, fullPage: true });
-  await page.locator('#journal-menu-toggle').click();
-  assert.equal(await sampleArticle.locator('.thought-menu').isVisible(), false, 'opening a second menu closes the first');
-  await page.locator('#body').click();
-  assert.equal(await page.locator('#journal-menu').isVisible(), false, 'outside click closes actions');
   const beforeHide = await page.locator('#feed').innerHTML();
   await page.locator('#toggle-timeline').click();
   assert.equal(await page.locator('#timeline').isVisible(), false, 'hide timeline removes the whole feed');
@@ -212,12 +230,59 @@ try {
   await longSample.hover();
   await longSample.locator('[data-action=read]').click();
   await page.locator('#reader').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#reader .thought-body').textContent(), samples[0], 'reading page contains all writing');
+  assert.equal(await page.locator('#reader .markdown-body h2').textContent(), 'holding an idea');
+  assert.equal(await page.locator('#reader .markdown-body strong').textContent(), 'a little structure');
+  assert.equal(await page.locator('#reader .markdown-body ul ul li').textContent(), 'an unfinished thread');
+  assert.equal(await page.locator('#reader .markdown-body blockquote').textContent(), 'Leave room for a thought to change.');
+  assert.equal(await page.locator('#reader .markdown-body pre code').textContent(), 'write → revisit → revise');
+  assert.equal(await page.locator('#reader .markdown-body table td').first().textContent(), 'unfinished');
+  assert.equal(await page.locator('#reader .markdown-body input:checked').count(), 1);
   assert.equal(await page.locator('#app').isVisible(), false, 'reading page hides the feed and composer');
   assert.equal(await page.locator('#reader .thought-header, #reader .entry-footer').count(), 0, 'reading page contains no note chrome');
   await page.screenshot({ path: `${artifacts}/reader-desktop.png`, fullPage: true });
   await page.reload(); await page.locator('#reader').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#reader .thought-body').textContent(), samples[0], 'a reading link works after reload');
+  assert.equal(await page.locator('#reader .markdown-body h2').textContent(), 'holding an idea', 'Markdown renders after reloading a reading link');
+  await page.locator('#reader-edit').click();
+  assert.equal(await page.locator('#edit-body').inputValue(), markdownSample, 'editing preserves exact Markdown source');
+  await page.screenshot({ path: `${artifacts}/editing-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 320, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'full-page editor fits 320px');
+  await page.screenshot({ path: `${artifacts}/editing-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const unsafeMarkdown = markdownSample + '\n\n**an unsaved idea** [unsafe](javascript:alert%281%29) [encoded](jav&#x61;script:alert%281%29) <img src=x onerror=alert(1)> ![an image](https://example.com/tracker.png)';
+  await page.locator('#edit-body').fill(unsafeMarkdown);
+  await page.locator('#reader-preview').click();
+  assert.equal(await page.locator('#reader .markdown-body strong').last().textContent(), 'an unsaved idea');
+  assert.equal(await page.locator('#reader-content img, #reader-content script, #reader-content a[href^="javascript:"]').count(), 0, 'Markdown cannot execute HTML or create unsafe links or remote image requests');
+  assert.ok((await page.locator('#reader-content').textContent()).includes('<img src=x onerror=alert(1)>'), 'raw HTML remains literal text');
+  assert.equal((await api(`thoughts/${ids[0]}`)).data.entry.body, markdownSample, 'preview does not save changes');
+  await page.locator('#reader-preview').click();
+  assert.equal(await page.locator('#edit-body').inputValue(), unsafeMarkdown, 'source survives preview toggles');
+  await page.locator('#reader-cancel').click();
+  assert.equal(await page.locator('#reader .markdown-body strong').count(), 1, 'cancel restores saved writing');
+  await page.locator('#reader-edit').click();
+  const revisedMarkdown = markdownSample + '\n\na saved revision';
+  await page.locator('#edit-body').fill(revisedMarkdown);
+  await backToFeed();
+  assert.equal((await api(`thoughts/${ids[0]}`)).data.entry.body, revisedMarkdown, 'back saves edited writing before returning');
+  await openReader(longSample);
+  await page.locator('#reader-edit').click();
+  await page.locator('#edit-body').fill(markdownSample);
+  await page.locator('#reader-save').click();
+  await page.locator('#edit-form').waitFor({ state: 'hidden' });
+  await page.locator('#reader-edit').click();
+  await page.locator('#edit-body').fill(markdownSample + '\n\nmy local change');
+  const currentEntry = (await api(`thoughts/${ids[0]}`)).data.entry;
+  await api(`thoughts/${ids[0]}`, 'PATCH', { title: currentEntry.title, body: markdownSample + '\n\nchange from another tab', updated_at: currentEntry.updated_at });
+  await page.locator('#reader-save').click();
+  await page.waitForFunction(() => document.querySelector('#reader-error').textContent.includes('changed'));
+  assert.equal(await page.locator('#edit-body').inputValue(), markdownSample + '\n\nmy local change', 'a conflict retains the unsaved source');
+  await page.locator('#reader-back').click();
+  await page.waitForFunction(() => location.hash.startsWith('#thought/'));
+  assert.equal(await page.locator('#reader').isVisible(), true, 'a failed save keeps the editor open on back');
+  await page.locator('#reader-cancel').click();
+  await page.reload(); await page.locator('#reader').waitFor({ state: 'visible' });
+
   await page.setViewportSize({ width: 320, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'reading page fits a narrow screen');
   await page.screenshot({ path: `${artifacts}/reader-mobile.png`, fullPage: true });
@@ -227,14 +292,15 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
-    const beforeMobileMenu = await feedLayout();
-    await entryMenu(sampleArticle);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `open note actions fit ${width}px`);
-    await settled();
-    assert.deepEqual(await feedLayout(), beforeMobileMenu, `menus never shift the ${width}px layout`);
-    assert.ok(await sampleArticle.evaluate(article => article.querySelector('.thought-menu').getBoundingClientRect().bottom <= article.getBoundingClientRect().bottom), 'note options fit the reserved spacing');
-    await page.screenshot({ path: `${artifacts}/note-actions-${width}.png`, fullPage: true });
+    await openReader(sampleArticle);
+    const beforeMobileMenu = await page.locator('#reader-content').boundingBox();
+    await readerMenu(); await settled();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `reader actions fit ${width}px`);
+    assert.deepEqual(await page.locator('#reader-content').boundingBox(), beforeMobileMenu, `reader menu never shifts the ${width}px writing`);
+    assert.ok(await page.locator('#reader-menu').evaluate(menu => menu.getBoundingClientRect().bottom < document.querySelector('#reader-content').getBoundingClientRect().top), 'reader menu stays above writing');
+    await page.screenshot({ path: `${artifacts}/reader-actions-${width}.png`, fullPage: true });
     await page.keyboard.press('Escape');
+    await backToFeed();
   }
   assert.equal(await page.locator('.page-header').evaluate(element => getComputedStyle(element).transform), 'none', 'the header never translates while controls open');
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -369,7 +435,7 @@ try {
   await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'source/preview and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

@@ -5,7 +5,7 @@ autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and three-line
 thought previews with an open link to a separate reading page. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
-The header, note, and public-draft menus appear in reserved space without
+The header, reading-page, and public-draft menus appear in reserved space without
 resizing their containers or moving surrounding content. Only opacity fades
 are used, with reduced-motion support. Hover reveals dates and small text actions, and moving away
 fades them out even after a click. Keyboard focus reveals the same controls;
@@ -15,8 +15,15 @@ leaving writing and autosave available. It is a temporary view choice.
 Typing recalls related past thoughts after a pause. The existing list and its
 status stay intact until the full response is ready, including semantic
 indexing; there is no intermediate word-match pass or loading label. Clearing
-restores the timeline. Open navigates to a private reading link containing
-only the complete writing and a text back control. Previews never expand inline.
+restores the timeline. The feed offers copy and open; other actions live on
+the full-page writing view. Open renders Markdown with headings, emphasis,
+lists, quotes, code, tasks, tables, and links. Edit switches to a borderless
+Markdown source editor with preview, save, and cancel. Back saves changes
+before returning; save errors or version conflicts keep the source visible.
+Unsaved source and preview also survive reauthentication in the same tab.
+Reload/close warns while edits are unsaved. Publishing stays an explicit,
+separate public draft, and delete still requires confirmation.
+Previews never expand inline.
 Reading links require the same
 session and work on reload and under `/journal/`.
 Only an explicit post creates a new
@@ -24,6 +31,13 @@ entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
 characters). No analytics, trackers, browser-local thought storage, or external
 runtime assets.
+
+Markdown uses the existing site's vendored Marked 15.0.12 lexer (MIT), copied
+unchanged to `public/vendor/marked.min.js`. `public/markdown.js` constructs DOM
+nodes from tokens instead of injecting parsed HTML. Raw HTML remains literal
+text, links allow only HTTP(S)/mailto, and Markdown images become links rather
+than automatic external requests. This is a reading view and source editor,
+not Obsidian's block-level Live Preview editor or its plugin syntax.
 
 The interface and backend live in `personalwebsite`. **Journal text is stored in
 Cloudflare D1, not Git or `site-content`.** `build.py` excludes this entire
