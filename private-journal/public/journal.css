@@ -106,26 +106,6 @@ h1,h2 {
 .utilities nav button {
   color:var(--fg)
 }
-.search {
-  display:flex;
-  align-items:center;
-  gap:16px;
-  margin:0 0 36px 26px
-}
-.search input {
-  flex:1;
-  min-width:0;
-  padding:5px 0;
-  border:0;
-  background:var(--bg);
-  font:14px/1.55 var(--font-body)
-}
-.search input::-webkit-search-cancel-button {
-  display:none
-}
-.search button {
-  color:var(--muted)
-}
 .view-heading {
   margin-left:26px
 }
@@ -145,11 +125,11 @@ h1,h2 {
   width:1px;
   background:var(--track)
 }
-.composer-section,.thought {
+.thought {
   position:relative;
   padding-left:26px
 }
-.composer-section::before,.thought::before {
+.thought::before {
   content:'';
   position:absolute;
   left:-2px;
@@ -159,17 +139,8 @@ h1,h2 {
   background:#d4d4d4
 }
 .composer-section {
-  padding-bottom:32px
-}
-.composer-section:focus-within::before {
-  background:#222
-}
-.compose-time {
-  display:block;
-  font-size:10px;
-  color:var(--muted);
-  line-height:1.5;
-  margin-bottom:10px
+  margin-left:26px;
+  margin-bottom:40px
 }
 textarea {
   resize:vertical;
@@ -208,6 +179,17 @@ textarea::placeholder {
 }
 .draft-feedback button {
   font-size:10px
+}
+.compose-buttons {
+  display:flex;
+  align-items:center;
+  gap:20px
+}
+.compose-buttons>button {
+  font-size:11px
+}
+#clear-input {
+  color:var(--muted)
 }
 .post {
   font-size:12px
@@ -444,10 +426,10 @@ dialog .public-actions {
   .utilities {
     gap:22px
   }
-  .composer-section,.thought {
+  .thought {
     padding-left:22px
   }
-  .search,.view-heading,.notice {
+  .composer-section,.view-heading,.notice {
     margin-left:22px
   }
   .feed-footer {

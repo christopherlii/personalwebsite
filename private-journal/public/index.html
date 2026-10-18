@@ -25,7 +25,6 @@
     <header class="page-header">
 
       <div class="utilities">
-        <button type="button" id="search-toggle" aria-expanded="false" aria-controls="search-form">search</button>
         <details id="journal-menu">
           <summary aria-label="journal options">more</summary>
           <nav class="entry-menu" aria-label="journal">
@@ -37,22 +36,18 @@
         </details>
       </div>
     </header>
-    <form id="search-form" class="search" role="search" hidden>
-      <label for="search" class="sr-only">find a thought</label>
-      <input id="search" type="search" placeholder="find a thought…" autocomplete="off" maxlength="500">
-      <button type="button" id="clear-search" hidden>clear</button>
-      <button type="submit">search</button>
-    </form>
+    <section id="composer-section" class="composer-section" aria-label="write or search your thoughts">
+      <form id="composer">
+        <label for="body" class="sr-only">write or search your thoughts</label>
+        <textarea id="body" placeholder="write or search your thoughts…" maxlength="20000" rows="1"></textarea>
+        <div class="compose-actions" id="compose-actions" hidden>
+          <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
+          <div class="compose-buttons"><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
+        </div>
+      </form>
+    </section>
     <div class="view-heading"><h1 id="view-title" class="sr-only">thoughts</h1></div>
     <div class="stream">
-      <section id="composer-section" class="composer-section" aria-label="new thought">
-        <span class="compose-time" aria-hidden="true">now</span>
-        <form id="composer">
-          <label for="body" class="sr-only">a thought…</label>
-          <textarea id="body" placeholder="a thought…" maxlength="20000" rows="1"></textarea>
-          <div class="compose-actions" id="compose-actions" hidden><div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div><button class="post" type="submit" id="post" disabled>post ↗</button></div>
-        </form>
-      </section>
       <p id="notice" class="notice" role="status" hidden></p>
       <div id="feed" aria-busy="false"></div>
     </div>

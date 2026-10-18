@@ -22,6 +22,7 @@ const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method,
 }, { path, method, body });
 const setView = async view => { await page.locator('#journal-menu > summary').click(); await page.locator(`[data-view=${view}]`).click(); };
 const entryMenu = async article => { await article.hover(); await article.locator('summary').click(); };
+const blankDraft = () => page.waitForFunction(async () => { const response = await fetch('/api/draft'); return response.ok && (await response.json()).body === ''; });
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
 
 try {
@@ -56,11 +57,10 @@ try {
   await article.locator('[data-action=bookmark]').click();
   await setView('saved');
   await page.waitForFunction(id => Boolean(document.querySelector(`article[data-id="${id}"] button[aria-pressed=true]`)), root.id);
-  await page.locator('#search-toggle').click();
-  await page.locator('#search').fill('cafe');
-  await page.waitForFunction(() => document.querySelector('#view-title').textContent === 'search' && document.querySelector('mark')?.textContent === 'café');
-  await page.locator('#clear-search').click();
-  await idle();
+  await page.locator('#body').fill('cafe');
+  await page.waitForFunction(() => document.querySelector('#view-title').textContent === 'related thoughts' && document.querySelector('mark')?.textContent === 'café');
+  await page.locator('#clear-input').click();
+  await idle(); await blankDraft();
 
   await entryMenu(article);
   await article.locator('[data-action=edit]').click();
@@ -87,19 +87,73 @@ try {
     'sample thought: what did i want to remember about that book?',
     'sample thought: a passing idea worth keeping.'
   ];
+  const sampleEntries = [];
   for (const body of samples) {
     const result = await api('thoughts', 'POST', { id: crypto.randomUUID(), body });
-    ids.push(result.data.entry.id);
+    ids.push(result.data.entry.id); sampleEntries.push(result.data.entry);
   }
   await api(`thoughts/${ids[1]}`, 'PATCH', { bookmarked: true });
   await setView('all'); await idle();
-  await page.locator('#search-toggle').click();
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${artifacts}/mobile.png`, fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
   const fontStatus = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].map(font => ({ family: font.family, status: font.status })); });
   assert.ok(fontStatus.some(font => font.family.includes('Instrument Sans') && font.status === 'loaded'), 'homepage body font loads');
+
+  // The same field filters old entries without publishing its contents.
+  await page.locator('#body').fill('remember a book');
+  await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: `${artifacts}/related-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: `${artifacts}/related-mobile.png`, fullPage: true });
+  assert.equal(await page.locator('#body').inputValue(), 'remember a book');
+  assert.equal((await api('export')).data.entries.length, samples.length, 'typing/searching creates no timeline entry');
+  await page.locator('#clear-input').click();
+  await page.waitForFunction(() => document.querySelectorAll('.thought').length === 3 && document.querySelector('#compose-actions').hidden);
+  await blankDraft();
+  assert.equal(await page.locator('#composer-section').evaluate(element => element.closest('.stream') === null), true, 'composer is separate from the timeline');
+
+  // Controlled provider responses verify automatic semantic requests and stale
+  // response cancellation. They do not claim to test the live model's quality.
+  const semanticCalls = [];
+  await page.route('**/api/session', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...await response.json(), semanticSearch: true } });
+  });
+  await page.route('**/api/search', async route => {
+    const payload = route.request().postDataJSON();
+    if (!payload.semantic) return route.continue();
+    semanticCalls.push(payload.query);
+    if (payload.query === 'older query') await new Promise(resolve => setTimeout(resolve, 1500));
+    await route.fulfill({ json: { entries: [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: null, indexing: false } }).catch(() => {});
+  });
+  await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
+  await page.locator('#body').pressSequentially('a thought about stories', { delay: 10 });
+  await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
+  assert.deepEqual(semanticCalls, ['a thought about stories'], 'semantic recall waits for a typing pause');
+  assert.equal(await page.locator('#body').inputValue(), 'a thought about stories');
+  const oldRequest = page.waitForRequest(request => request.url().endsWith('/api/search') && request.postDataJSON().semantic && request.postDataJSON().query === 'older query');
+  await page.locator('#body').fill('older query'); await oldRequest;
+  await page.locator('#body').fill('newer query');
+  await page.waitForFunction(id => document.querySelectorAll('.thought').length === 1 && document.querySelector('.thought').dataset.id === id, ids[1]);
+  await page.waitForTimeout(1800);
+  assert.equal(await page.locator('.thought').getAttribute('data-id'), ids[1], 'a stale result cannot replace the newer query');
+  assert.equal(await page.locator('#body').inputValue(), 'newer query');
+  assert.equal((await api('export')).data.entries.length, samples.length);
+  await page.locator('#body').fill('an explicitly saved thought');
+  await page.locator('#body').press('Enter');
+  await page.locator('#body').pressSequentially('with a second line');
+  const postedText = await page.locator('#body').inputValue();
+  assert.ok(postedText.includes('\n'), 'Enter keeps a new line in the shared field');
+  assert.equal((await api('export')).data.entries.length, samples.length);
+  await page.locator('#post').click();
+  await page.waitForFunction(() => document.querySelectorAll('.thought').length === 4 && document.querySelector('#body').value === '');
+  const posted = (await api('export')).data.entries.find(entry => entry.body === postedText);
+  assert.ok(posted, 'the explicit post saves the shared field as a new thought'); ids.push(posted.id);
+  await page.unroute('**/api/search'); await page.unroute('**/api/session');
+  await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
 
   // A second tab changes the draft: the first must preserve its own text.
   const oldVersion = (await api('draft')).data.version;
@@ -122,7 +176,7 @@ try {
   await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'search', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

@@ -49,6 +49,21 @@ async function limit(env, key, maximum, milliseconds) {
   if (row.attempts > maximum) fail(429, 'Too many attempts. Try again later.');
 }
 
+async function listThoughts(env, query, saved, cursor) {
+  const terms = ftsQuery(query);
+  if (query && !terms) return { entries: [], next: null };
+  let sql = `SELECT ${thoughtSelect} FROM thoughts t`;
+  const where = [], args = [];
+  if (query) { sql += ' JOIN thoughts_fts ON thoughts_fts.rowid = t.seq'; where.push('thoughts_fts MATCH ?'); args.push(terms); }
+  if (saved) where.push('t.bookmarked = 1');
+  if (!query && cursor) { where.push('t.seq < ?'); args.push(cursor); }
+  if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
+  sql += query ? ' ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT 41 OFFSET ?' : ' ORDER BY t.seq DESC LIMIT 41';
+  if (query) args.push(cursor);
+  const { results } = await env.JOURNAL_DB.prepare(sql).bind(...args).all();
+  return { entries: results.slice(0, 40), next: results.length > 40 ? (query ? cursor + 40 : results[39].seq) : null };
+}
+
 async function api(request, env, url, context) {
   const path = url.pathname;
   const configured = Boolean(env.JOURNAL_DB && validPasswordConfig(env.JOURNAL_PASSWORD_HASH));
@@ -91,11 +106,13 @@ async function api(request, env, url, context) {
     return json(updated);
   }
   if (path === '/api/search' && request.method === 'POST') {
-    if (!env.AI) fail(503, 'Related search is unavailable.');
     const data = await readBody(request);
     const query = typeof data.query === 'string' ? data.query.trim() : '';
     const cursor = integer(data.cursor);
-    if (!query || query.length > 500 || cursor > 400 || typeof data.saved !== 'boolean') fail(400, 'Invalid search.');
+    if (!query || query.length > 20000 || typeof data.saved !== 'boolean' || (data.semantic !== undefined && typeof data.semantic !== 'boolean')) fail(400, 'Invalid search.');
+    if (data.semantic === false) return json({ ...await listThoughts(env, query, data.saved, cursor), indexing: false });
+    if (!env.AI) fail(503, 'Related search is unavailable.');
+    if (cursor > 400) fail(400, 'Invalid page.');
     await limit(env, 'search:global', 120, 60 * 1000);
     try { return json(await semanticSearch(query, data.saved, cursor, env)); }
     catch { fail(502, 'Related search is unavailable.'); }
@@ -105,19 +122,7 @@ async function api(request, env, url, context) {
     if (query.length > 500) fail(400, 'Use a shorter search.');
     const saved = url.searchParams.get('saved') === '1';
     const cursor = integer(url.searchParams.get('cursor'));
-    const terms = ftsQuery(query);
-    if (query && !terms) return json({ entries: [], next: null });
-    let sql = `SELECT ${thoughtSelect} FROM thoughts t`;
-    const where = [], args = [];
-    if (query) { sql += ' JOIN thoughts_fts ON thoughts_fts.rowid = t.seq'; where.push('thoughts_fts MATCH ?'); args.push(terms); }
-    if (saved) where.push('t.bookmarked = 1');
-    if (!query && cursor) { where.push('t.seq < ?'); args.push(cursor); }
-    if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
-    sql += query ? ' ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT 41 OFFSET ?' : ' ORDER BY t.seq DESC LIMIT 41';
-    if (query) args.push(cursor);
-    const { results } = await env.JOURNAL_DB.prepare(sql).bind(...args).all();
-    const count = 40;
-    return json({ entries: results.slice(0, count), next: results.length > count ? (query ? cursor + count : results[count - 1].seq) : null });
+    return json(await listThoughts(env, query, saved, cursor));
   }
   if (path === '/api/thoughts' && request.method === 'POST') {
     const data = await readBody(request);
@@ -175,7 +180,7 @@ export default {
     try {
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) fail(400, 'HTTPS is required.');
       if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-      else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+      else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
       else fail(404, 'Not found.');
     } catch (error) {
       response = json({ error: error instanceof HttpError ? error.message : 'The journal is unavailable. Try again later.' }, error instanceof HttpError ? error.status : 500);

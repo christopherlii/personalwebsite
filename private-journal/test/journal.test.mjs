@@ -116,9 +116,13 @@ test('Unicode/prefix search, punctuation, bookmark filtering, editing, and delet
   const b = (await c.call('/api/thoughts', 'POST', thought('finishing a book'))).data.entry;
   assert.equal((await c.call('/api/thoughts?q=cafe')).data.entries[0].id, a.id);
   assert.equal((await c.call('/api/thoughts?q=basket')).data.entries.length, 1);
+  const privateQuery = await c.call('/api/search', 'POST', { query: 'basketball '.repeat(100), saved: false, semantic: false });
+  assert.equal(privateQuery.status, 200);
+  assert.equal(privateQuery.data.entries[0].id, a.id);
   assert.equal((await c.call('/api/thoughts?q=%22%20OR%20%2A')).status, 200);
   assert.deepEqual((await c.call('/api/thoughts?q=%22%2A')).data.entries, []);
-  assert.equal(ftsQuery('café "x"* OR'), '"café"* OR "x"* OR "OR"*');
+  assert.equal(ftsQuery('café "x"* OR'), '"café"* OR "x"*');
+  assert.equal(ftsQuery('i want to remember a book'), '"want"* OR "remember"* OR "book"*');
   await c.call(`/api/thoughts/${b.id}`, 'PATCH', { bookmarked: true });
   assert.deepEqual((await c.call('/api/thoughts?saved=1')).data.entries.map(e => e.id), [b.id]);
   await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'soccer instead', updated_at: a.updated_at });
@@ -178,6 +182,9 @@ test('semantic transport, ranking, indexing reuse, and stale-vector invalidation
   await c.call('/api/search', 'POST', { query: 'tired', saved: false, cursor: 0 });
   assert.equal(calls.length, previous + 1, 'indexed thoughts are not embedded again on each search');
   assert.deepEqual(calls.at(-1), ['tired']);
+  const longQuery = await c.call('/api/search', 'POST', { query: 'exhausted '.repeat(100), saved: false });
+  assert.equal(longQuery.status, 200, 'a composed thought can exceed a short search-bar query');
+  assert.equal(longQuery.data.entries[0].id, a.id);
   const edited = await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'soccer all afternoon', updated_at: a.updated_at });
   assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null);
   await indexEntry(a, c.env);

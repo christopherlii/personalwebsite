@@ -1,5 +1,7 @@
+import { searchTerms } from './search-terms.js';
+
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, draftTimer: null, searchTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -8,6 +10,8 @@ function showLogin(message = '') {
   state.generation++;
   state.controller?.abort();
   clearTimeout(state.draftTimer);
+  clearTimeout(state.searchTimer);
+  clearTimeout(state.relatedTimer);
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('#app').hidden = true;
   $('#login').hidden = false;
@@ -42,7 +46,9 @@ function download(filename, content, type) {
 
 function updateComposer() {
   $('#post').disabled = !$('#body').value.trim() || state.posting;
-  $('#compose-actions').hidden = !$('#body').value && !state.dirty;
+  $('#compose-actions').hidden = !$('#body').value && !state.conflict && $('#retry-draft').hidden;
+  $('#clear-input').hidden = !$('#body').value;
+  $('#clear-input').disabled = state.posting;
 }
 
 async function saveDraft() {
@@ -74,12 +80,13 @@ async function saveDraft() {
     }
   })();
   try { await state.saving; }
-  finally { state.saving = null; }
+  finally { state.saving = null; updateComposer(); }
 }
 
 function changedDraft() {
   state.dirty = true;
   updateComposer();
+  searchFromComposer();
   draftStatus(state.conflict ? 'draft changed elsewhere. copy your text or post it.' : 'unsaved');
   clearTimeout(state.draftTimer);
   state.draftTimer = setTimeout(() => saveDraft().catch(() => {}), 650);
@@ -101,7 +108,7 @@ async function enter() {
   $('#password').value = '';
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : draft.body ? 'draft saved' : '');
   updateComposer();
-  await loadFeed();
+  await searchFromComposer(true);
 }
 
 function button(label, action, entry) {
@@ -114,7 +121,7 @@ function button(label, action, entry) {
 function bodyContent(body, query) {
   const fragment = document.createDocumentFragment();
   const fold = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
-  const matches = (query?.match(/[\p{L}\p{N}]+/gu) || []).slice(0, 20).map(fold).filter(Boolean);
+  const matches = searchTerms(query).map(fold).filter(Boolean);
   const terms = matches.length ? new RegExp(matches.join('|'), 'gu') : null;
   const appendText = value => {
     if (!terms) { fragment.append(document.createTextNode(value)); return; }
@@ -186,9 +193,24 @@ function updateView() {
     if (item.dataset.view === state.view) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   }
-  $('#view-title').textContent = state.query ? 'search' : state.view === 'saved' ? 'bookmarks' : 'thoughts';
+  $('#view-title').textContent = state.query ? 'related thoughts' : state.view === 'saved' ? 'bookmarks' : 'thoughts';
   $('#view-title').classList.toggle('sr-only', state.view === 'all' && !state.query);
-  $('#clear-search').hidden = !state.query;
+}
+
+function searchFromComposer(immediate = false) {
+  clearTimeout(state.searchTimer);
+  clearTimeout(state.relatedTimer);
+  state.query = $('#body').value.trim();
+  state.semantic = false;
+  state.controller?.abort();
+  state.generation++;
+  updateView();
+  if (!state.authenticated || (state.posting && !immediate)) return;
+  notice();
+  if (!state.query || immediate) return loadFeed(false, Boolean(state.query && state.semanticAvailable));
+  // Word matches arrive first; semantic recall runs only after a typing pause.
+  state.searchTimer = setTimeout(() => loadFeed(false, false), 150);
+  if (state.semanticAvailable) state.relatedTimer = setTimeout(() => loadFeed(false, true), 750);
 }
 
 async function loadFeed(append = false, semantic = state.semantic) {
@@ -196,28 +218,39 @@ async function loadFeed(append = false, semantic = state.semantic) {
   state.controller?.abort();
   const controller = new AbortController(); state.controller = controller;
   const generation = ++state.generation;
-  if (!append) { state.observers.forEach(observer => observer.disconnect()); state.observers = []; state.cursor = null; state.entries.clear(); $('#feed').replaceChildren(); }
+  if (!append) state.cursor = null;
+  const queryText = state.query;
+  const saved = state.view === 'saved';
+  let cursor = state.cursor || 0;
   updateView();
   $('#feed').setAttribute('aria-busy', 'true'); $('#feed-status').textContent = 'loading…'; $('#more').hidden = true;
-  const query = new URLSearchParams();
-  if (state.query) query.set('q', state.query);
-  if (state.view === 'saved') query.set('saved', '1');
-  if (state.cursor !== null) query.set('cursor', state.cursor);
+  const search = semanticMode => api('search', {
+    method: 'POST', body: JSON.stringify({ query: queryText, saved, cursor, semantic: semanticMode }), signal: controller.signal
+  });
   try {
     let data;
-    if (state.semantic) {
+    if (queryText && state.semantic) {
       try {
-        do {
-          data = await api('search', { method: 'POST', body: JSON.stringify({ query: state.query, saved: state.view === 'saved', cursor: state.cursor || 0 }), signal: controller.signal });
-        } while (data.indexing && generation === state.generation);
+        do { data = await search(true); } while (data.indexing && generation === state.generation);
       } catch (error) {
         if (error.name === 'AbortError') throw error;
-        state.semantic = false;
+        if (generation !== state.generation) return;
+        state.semantic = false; append = false; cursor = 0;
         notice('showing matching words. related search is unavailable.');
-        data = await api(`thoughts?${query}`, { signal: controller.signal });
+        data = await search(false);
       }
-    } else data = await api(`thoughts?${query}`, { signal: controller.signal });
+    } else if (queryText) data = await search(false);
+    else {
+      const params = new URLSearchParams();
+      if (saved) params.set('saved', '1');
+      if (state.cursor !== null) params.set('cursor', state.cursor);
+      data = await api(`thoughts?${params}`, { signal: controller.signal });
+    }
     if (generation !== state.generation || !state.authenticated) return;
+    if (!append) {
+      state.observers.forEach(observer => observer.disconnect()); state.observers = [];
+      state.entries.clear(); $('#feed').replaceChildren();
+    }
     for (const entry of data.entries) {
       if (state.entries.has(entry.id)) continue;
       state.entries.set(entry.id, entry); $('#feed').append(renderEntry(entry));
@@ -237,8 +270,8 @@ async function loadFeed(append = false, semantic = state.semantic) {
 
 async function setView(view) {
   $('#journal-menu').open = false;
-  state.view = view; state.query = ''; $('#search').value = ''; notice();
-  await loadFeed();
+  state.view = view;
+  await searchFromComposer(true);
 }
 
 $('#login-form').addEventListener('submit', async event => {
@@ -255,7 +288,9 @@ $('#body').addEventListener('keydown', event => {
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
   if (state.posting || !$('#body').value.trim()) return;
-  state.posting = true; $('#body').disabled = true; updateComposer(); notice();
+  state.posting = true; $('#body').disabled = true;
+  clearTimeout(state.searchTimer); clearTimeout(state.relatedTimer); state.controller?.abort(); state.generation++;
+  updateComposer(); notice();
   try {
     // If autosave failed, posting still saves the thought. A conflict cannot
     // clear the other device's draft because the version is checked in SQL.
@@ -269,20 +304,12 @@ $('#composer').addEventListener('submit', async event => {
   } catch (error) { notice(error.message); }
   finally { state.posting = false; $('#body').disabled = false; updateComposer(); }
 });
-$('#search').addEventListener('input', () => {
-  state.semantic = false; clearTimeout(state.searchTimer); state.query = $('#search').value.trim();
-  state.controller?.abort(); state.generation++; updateView();
-  state.searchTimer = setTimeout(() => { notice(); loadFeed(); }, 150);
+$('#clear-input').addEventListener('click', () => {
+  $('#body').value = ''; changedDraft(); $('#body').focus();
 });
-$('#search-form').addEventListener('submit', event => { event.preventDefault(); clearTimeout(state.searchTimer); notice(); loadFeed(false, true); });
-$('#clear-search').addEventListener('click', () => { state.query = ''; $('#search').value = ''; loadFeed(); $('#search').focus(); });
 $('#more').addEventListener('click', () => { $('#more').textContent = 'load more'; loadFeed(state.entries.size > 0 && state.cursor !== null); });
-$('#search-toggle').addEventListener('click', () => {
-  const open = $('#search-form').hidden; $('#search-form').hidden = !open; $('#search-toggle').setAttribute('aria-expanded', String(open));
-  if (open) $('#search').focus();
-});
 document.addEventListener('keydown', event => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('#search-form').hidden = false; $('#search-toggle').setAttribute('aria-expanded', 'true'); $('#search').focus(); }
+  if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('#body').focus(); }
 });
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
 for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => $(`#${item.dataset.close}`).close());

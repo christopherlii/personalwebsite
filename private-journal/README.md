@@ -2,8 +2,10 @@
 
 A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
-has a faint left timeline, a borderless inline composer, and three-line thought
-previews with an open/close control. Entries have no 280-character limit (the
+has a borderless writing/search field above a faint timeline, and three-line
+thought previews with an open/close control. Typing recalls related past
+thoughts; clearing restores the timeline. Only an explicit post creates a new
+entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no 280-character limit (the
 storage limit is 20,000 characters). No analytics, trackers, browser-local
 thought storage, or external runtime assets.
 
@@ -53,7 +55,10 @@ clean local draft before running them. Screenshots go to ignored `test-results/`
 An existing Chromium binary can be selected with `CHROMIUM_PATH`. These tests
 cover autosave restoration, posting, bookmarks, accent-insensitive search,
 editing, safe rendering, separate public drafts, desktop/mobile layout,
-font loading, draft conflicts, and server-side session revocation.
+font loading, draft conflicts, and server-side session revocation. Shared-field
+checks cover pause-triggered semantic requests, stale response cancellation,
+clear-to-restore behavior, and typing without creating entries. Browser semantic
+responses are controlled test fixtures, not live model quality verification.
 
 ## Deploy after connecting a Cloudflare account
 
@@ -112,11 +117,19 @@ on the new deployment because every session is bound to the current hash.
 - All responses are `no-store` and `noindex`; request observability is disabled.
   Avoid enabling request/body logging for production. These headers are not
   the access control; login is.
-- SQLite FTS5 ranks prefix matches across words and normalizes accents. Typing
-  shows keyword results after 150ms; submitting search adds semantic results
-  when the AI binding is configured. Keyword results remain available if the
-  provider fails. Results and timelines use 40-entry pages. Search
-  highlighting never renders user text as HTML.
+- The writing field also searches. Typing shows keyword results after 150ms;
+  after a 750ms pause it requests semantic results when the AI binding is
+  configured. Earlier requests are canceled and stale responses cannot replace
+  newer results. Input, selection, and draft content stay separate from result
+  rendering. Clearing restores the timeline; switching bookmark views preserves
+  what is being written. No typing/search request creates a timeline entry.
+- SQLite FTS5 ranks prefix matches, normalizes accents, and ignores common
+  function words when specific terms are present. Search requests use a POST
+  body so a composed thought is not placed in a URL. Queries support the full
+  20,000-character writing limit; embedding batches never exceed eight chunks.
+  Keyword results remain available without the AI binding or on provider
+  failure. Results and timelines use 40-entry pages. Search highlighting uses
+  the same term selection and never renders user text as HTML.
 - Semantic search uses Cloudflare-hosted `@cf/baai/bge-small-en-v1.5` (384
   dimensions). Thoughts are embedded on creation/edit and normalized Float32
   vectors are stored in D1. Long text is split into overlapping chunks of at
@@ -141,15 +154,17 @@ on the new deployment because every session is bound to the current hash.
   Deleting an entry removes it from active search; provider backups may retain
   previous data under their own policies.
 - No Jev or OpenAI key is required. Semantic indexing sends each thought to
-  Cloudflare Workers AI when it is created/edited; searches send the query.
+  Cloudflare Workers AI when it is created/edited; searches send the current writing/search text after the typing pause, even
+  before it is posted.
   This stays within the selected Cloudflare backend but is still model
   processing, not on-device inference. See [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
 - Typography matches the personal homepage: self-hosted Instrument Sans at
   14px with 1.55 line height, #333 reading text, and the same #fafafa background.
   The existing font subsets are reused with their OFL license. Square corners, solid fills, and visible rules
   separate menus and controls; the feed itself has no cards or boxed composer.
-  Its line marks chronology, points align with timestamps, and the composer
-  point darkens only while editing. There are no decorative effects or motion.
+  Its line marks saved chronology and points align with timestamps. The
+  writing/search field stays separate above the line, without a timestamp or
+  timeline marker. There are no decorative effects or motion.
 
 For host setup, use the official [Workers static asset docs](https://developers.cloudflare.com/workers/static-assets/)
 and [D1 docs](https://developers.cloudflare.com/d1/). The public GitHub Pages

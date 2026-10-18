@@ -30,13 +30,18 @@ async function embed(texts, env) {
   });
 }
 
+async function embedAll(chunks, env) {
+  const vectors = [];
+  for (let start = 0; start < chunks.length; start += 8) vectors.push(...await embed(chunks.slice(start, start + 8), env));
+  return vectors;
+}
+
 export async function indexEntry(entry, env) {
   if (!env.AI) return;
   const bodyHash = await digest(entry.body);
   const existing = await env.JOURNAL_DB.prepare('SELECT body_hash, model FROM embeddings WHERE thought_id = ?').bind(entry.id).first();
   if (existing?.body_hash === bodyHash && existing.model === MODEL) return;
-  const chunks = chunksOf(entry.body), vectors = [];
-  for (let start = 0; start < chunks.length; start += 8) vectors.push(...await embed(chunks.slice(start, start + 8), env));
+  const vectors = await embedAll(chunksOf(entry.body), env);
   const packed = new Float32Array(vectors.flat());
   // An old async indexing job cannot replace an embedding for a newer edit.
   await env.JOURNAL_DB.prepare(`INSERT OR REPLACE INTO embeddings(thought_id, body_hash, model, vectors, chunks, dimensions)
@@ -64,7 +69,7 @@ export async function semanticSearch(query, saved, cursor, env) {
   const pending = await env.JOURNAL_DB.prepare(`SELECT t.* ${pendingSql} ORDER BY t.seq LIMIT 4`).bind(MODEL).all();
   for (const entry of pending.results) await indexEntry(entry, env);
   const remaining = await env.JOURNAL_DB.prepare(`SELECT count(*) AS count ${pendingSql}`).bind(MODEL).first();
-  const queryVectors = await embed(chunksOf(query), env);
+  const queryVectors = await embedAll(chunksOf(query), env);
   const queryVector = Array.from({ length: DIMENSIONS }, (_, index) => queryVectors.reduce((sum, vector) => sum + vector[index], 0));
   const norm = Math.hypot(...queryVector);
   if (!norm) throw new Error('Empty query vector.');
