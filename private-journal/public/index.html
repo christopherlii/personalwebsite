@@ -31,6 +31,7 @@
       <nav id="journal-menu" class="entry-menu journal-menu" aria-label="journal" hidden>
         <button type="button" data-view="all" aria-current="page">all thoughts</button>
         <button type="button" data-view="saved">bookmarks</button>
+        <a href="#reading">read later</a>
         <button type="button" id="export">export</button>
         <button type="button" id="logout">lock</button>
       </nav>
@@ -82,6 +83,21 @@
       <textarea id="edit-body" hidden aria-hidden="true" tabindex="-1"></textarea>
     </form>
     <p id="reader-error" role="status"></p>
+    <section id="related" class="related-reading" aria-label="related thoughts and reading" hidden></section>
+  </main>
+  <main id="reading" class="reader reading-page" hidden>
+    <header class="reader-toolbar"><a href="#">back</a><a class="site-name" href="https://christopherli.dev/">Christopher Li</a></header>
+    <h1>read later</h1>
+    <form id="reading-form">
+      <label for="reading-url" class="sr-only">web address to save</label>
+      <input id="reading-url" type="url" placeholder="paste a link to save…" maxlength="2048" required autocomplete="off">
+      <button id="reading-save" type="submit">save link</button>
+    </form>
+    <p id="reading-message" class="reading-message" role="status"></p>
+    <nav class="reading-filters" aria-label="reading status"><button type="button" data-reading-filter="unread" aria-current="page">to read</button><button type="button" data-reading-filter="read">read</button></nav>
+    <div id="reading-list"></div>
+    <p id="reading-empty" class="reading-message" role="status"></p>
+    <button id="reading-more" type="button" hidden>load more</button>
   </main>
   <dialog id="delete-dialog" aria-labelledby="delete-title">
     <form id="delete-form">

@@ -2,12 +2,14 @@ import { searchTerms } from './search-terms.js';
 import { markdown } from './markdown.js';
 import { createLiveEditor } from './live-editor.js';
 import { thoughtLinks, plainThoughtLinks } from './thought-links.js';
+import { createReading } from './reading.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
 Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerHistory: null });
 let readerEditor = null;
 let composerEditor = null;
+const readingView = createReading({ api, navigateThought });
 function navigateThought(id) {
   const current = readerId(); if (id === current) return;
   history.pushState({ journalNavigation: true, previousThought: current || null }, '', `#thought/${id}`);
@@ -57,6 +59,7 @@ function showLogin(message = '') {
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('#app').hidden = true;
   $('#reader').hidden = true;
+  readingView.hide(); readingView.hideRelated();
   $('#reader-content').replaceChildren();
   $('#login').hidden = false;
   $('#boot-status').hidden = true;
@@ -157,7 +160,7 @@ async function enter() {
   $('#composer-title').hidden = !$('#title').value;
   state.authenticated = true;
   $('#login').hidden = true;
-  $('#app').hidden = Boolean(readerId());
+  $('#app').hidden = Boolean(readerId()) || location.hash === '#reading';
   $('#boot-status').hidden = true;
   $('#password').value = '';
   if (!composerEditor) composerEditor = createLiveEditor($('#composer-editor'), {
@@ -170,7 +173,7 @@ async function enter() {
   });
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
-  if (readerId()) await showRoute();
+  if (readerId() || location.hash === '#reading') await showRoute();
   else await searchFromComposer(true);
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
@@ -190,6 +193,7 @@ function renderReader(entry = state.readerEntry) {
     const title = document.createElement('h1'); title.className = 'thought-title'; title.textContent = entry.title; content.append(title);
   }
   const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); content.append(body);
+  readingView.related(entry);
 }
 function readerControls() {
   const editing = state.readerEditing;
@@ -199,6 +203,7 @@ function readerControls() {
   $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
   $('#edit-form').hidden = !editing;
   $('#reader-content').hidden = editing;
+  readingView.editing(editing);
   readerEditor?.setReadOnly(busy);
   for (const control of document.querySelectorAll('.reader-actions button, #edit-form input, #edit-form textarea')) control.disabled = busy;
   $('#reader-save').disabled = busy || !$('#edit-body').value.trim();
@@ -239,6 +244,7 @@ async function showRoute() {
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
   const id = readerId();
+  readingView.hide();
   $('#reader-back').href = history.state?.previousThought ? `#thought/${history.state.previousThought}` : '#';
   if (state.readerDirty && id !== state.readerEntry?.id) {
     try { await saveReader(); }
@@ -250,11 +256,17 @@ async function showRoute() {
     }
     if (generation !== state.readerGeneration) return;
   }
+  if (location.hash === '#reading') {
+    $('#app').hidden = true; $('#reader').hidden = true; readingView.hideRelated();
+    state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
+    closeMenus(); document.title = 'read later'; await readingView.show(); return;
+  }
   if (!id) {
     const wasReading = !$('#reader').hidden;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
     state.readerHistory = null;
+    readingView.hideRelated();
     $('#app').hidden = false; document.title = 'journal';
     if (!state.entries.size && !state.timelineHidden) await searchFromComposer(true);
     if (wasReading) window.scrollTo(0, state.feedScroll);
@@ -276,6 +288,7 @@ async function showRoute() {
   } catch (error) {
     if (generation !== state.readerGeneration || !state.authenticated) return;
     $('#reader-content').replaceChildren(); $('#reader-error').textContent = error.message;
+    readingView.hideRelated();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor(); readerControls();
   }
   if (!$('#app').hidden) state.feedScroll = window.scrollY;
@@ -698,6 +711,7 @@ $('#logout').addEventListener('click', async () => {
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     composerEditor?.setValue('');
+    readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     $('#composer-title').hidden = true;
     showLogin();

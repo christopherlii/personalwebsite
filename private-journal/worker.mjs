@@ -2,6 +2,7 @@ import { COOKIE, digest, hex, sessionFor, sessionCookie, SESSION_SECONDS, validP
 import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
 import { indexEntry, semanticSearch } from './semantic.mjs';
 import { PublicationError, publicationApi, publicWriting } from './publications.mjs';
+import { ReadingError, readingApi, relatedToThought } from './reading.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -106,6 +107,15 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  if (path === '/api/reading' && request.method === 'POST') await limit(env, 'reading:global', 30, 60 * 1000);
+  const reading = await readingApi(request, env, path, readBody, context);
+  if (reading) return reading;
+  const related = path.match(/^\/api\/thoughts\/([a-f0-9-]+)\/related$/);
+  if (related && uuid(related[1]) && request.method === 'POST') {
+    const result = await relatedToThought(related[1], env);
+    result.thoughts = await withPublicationState(result.thoughts, env);
+    return json(result);
+  }
   const publication = await publicationApi(request, env, path, readBody);
   if (publication) return publication;
   if (path === '/api/logout' && request.method === 'POST') {
@@ -210,7 +220,9 @@ async function api(request, env, url, context) {
     const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, created_at, updated_at, source_date FROM thoughts ORDER BY seq').all();
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
+    const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();
     return json({ format: 'christopher-journal-v2', exported_at: new Date().toISOString(), entries: results, draft,
+      reading: reading.results,
       publications: publications.results.map(row => ({ ...row, draft: JSON.parse(row.draft), published: row.published ? JSON.parse(row.published) : null }))
     }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
@@ -244,11 +256,11 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     // CodeMirror mounts its base styles at runtime. Authorize only those

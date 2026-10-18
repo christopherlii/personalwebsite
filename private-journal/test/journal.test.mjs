@@ -7,6 +7,7 @@ import { passwordHash, digest, COOKIE } from '../auth.mjs';
 import { ftsQuery } from '../search.mjs';
 import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic.mjs';
 import { thoughtLink, thoughtLinks, plainThoughtLinks } from '../public/thought-links.js';
+import { readingURL, readingMetadata, fetchReadingMetadata, indexReading, relatedToThought } from '../reading.mjs';
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
 const salt = '12'.repeat(16);
@@ -49,6 +50,68 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('saved reading stays private, deduplicates URLs, tracks read status, exports, and supplies related reading', async t => {
+  const fetched=[];
+  t.mock.method(globalThis,'fetch',async (url,options)=>{
+    fetched.push(url); assert.equal(options.redirect,'manual');assert.equal(Object.hasOwn(options.headers,'Cookie'),false);
+    return new Response('<title>Walking &amp; ideas</title><article><p>walking makes room for unfinished ideas.</p></article>',{headers:{'Content-Type':'text/html'}});
+  });
+  const c=client();
+  assert.equal((await c.call('/api/reading')).status,401);
+  assert.equal((await c.call('/api/reading','POST',{id:crypto.randomUUID(),url:'https://example.com/essay'})).status,401);
+  await c.login();
+  const input={id:crypto.randomUUID(),url:'https://example.com/essay?utm_source=email#section'};
+  const saved=await c.call('/api/reading','POST',input);assert.equal(saved.status,201);assert.equal(saved.data.entry.title,'Walking & ideas');
+  assert.equal(saved.data.entry.url,'https://example.com/essay');assert.equal(saved.data.entry.read_at,null);
+  assert.equal((await c.call('/api/reading','POST',{...input,id:crypto.randomUUID(),url:'https://example.com/essay'})).data.existing,true);
+  assert.equal(fetched.length,1,'a duplicate does not fetch again');
+  assert.equal((await c.call('/api/reading','POST',{...input,url:'https://example.com/different'})).status,409);
+  assert.equal((await c.call('/api/reading')).data.entries.length,1);
+  const source=(await c.call('/api/thoughts','POST',thought('walking gives ideas room'))).data.entry;
+  const related=(await c.call(`/api/thoughts/${source.id}/related`,'POST',{})).data;
+  assert.equal(related.reading[0].id,input.id);assert.equal(related.thoughts.length,0,'the current thought is excluded');
+  await c.call(`/api/reading/${input.id}`,'PATCH',{read:true});
+  assert.equal((await c.call('/api/reading')).data.entries.length,0);
+  assert.equal((await c.call('/api/reading?read=1')).data.entries.length,1);
+  assert.equal((await c.call(`/api/thoughts/${source.id}/related`,'POST',{})).data.reading.length,1,'read articles remain in the matching collection');
+  const exported=(await c.call('/api/export')).data.reading[0];assert.ok(exported.read_at);assert.ok(exported.excerpt.includes('unfinished ideas'));
+  await c.call(`/api/reading/${input.id}`,'PATCH',{read:false});assert.equal((await c.call('/api/reading')).data.entries.length,1);
+  assert.equal((await c.call('/api/reading?cursor=-1')).status,400);
+  assert.equal((await c.call(`/api/reading/${input.id}`,'PATCH',{read:'yes'})).status,400);
+  assert.equal((await c.call(`/api/reading/${input.id}`,'DELETE')).status,200);
+  assert.equal((await c.call(`/api/reading/${input.id}`,'DELETE')).status,404);
+  assert.equal((await c.call(`/api/thoughts/${source.id}/related`,'POST',{})).data.reading.length,0);
+  assert.equal((await c.call('/public/reading')).status,404);
+  await c.call('/api/logout','POST',{});assert.equal((await c.call('/api/reading?read=1')).status,401);
+});
+
+test('reading metadata is bounded plain text and unsafe destinations and redirects never fetch', async () => {
+  for(const url of ['javascript:alert(1)','file:///etc/passwd','http://127.0.0.1/','http://2130706433/','https://[::1]/','https://localhost/','https://host.local/','https://user:pass@example.com/','https://example.com:8080/','https://christopherli.dev/journal/','https://private.workers.dev/'])assert.throws(()=>readingURL(url));
+  const metadata=readingMetadata('<title>fallback</title><meta property="og:title" content="A &quot;title&quot;"><script><p>secret script</p></script><article><p>hello <em>world</em></p></article>');
+  assert.equal(metadata.title,'A "title"');assert.equal(metadata.excerpt,'hello world');
+  const calls=[];
+  const redirected=await fetchReadingMetadata('https://example.com/',async url=>{calls.push(url);return new Response(null,{status:302,headers:{Location:'http://127.0.0.1/private'}});});
+  assert.deepEqual(redirected,{});assert.equal(calls.length,1);
+  assert.deepEqual(await fetchReadingMetadata('https://example.com/',async()=>{throw new Error('blocked');}),{});
+  const large=await fetchReadingMetadata('https://example.com/',async()=>new Response('<title>bounded</title><p>'+ 'x'.repeat(300000)+'</p>',{headers:{'Content-Type':'text/html'}}));
+  assert.equal(large.title,'bounded');assert.ok(large.excerpt.length<=8000);
+});
+
+test('related reading reuses stored semantic vectors without sending journal text to publishers', async () => {
+  const c=client();await c.login();
+  const entry=(await c.call('/api/thoughts','POST',thought('garden orchard'))).data.entry;
+  c.env.AI={run:async(model,{text})=>({data:text.map(()=>[1,...Array(DIMENSIONS-1).fill(0)])})};
+  await indexEntry(entry,c.env);
+  const id=crypto.randomUUID();
+  await c.env.JOURNAL_DB.prepare('INSERT INTO reading(id,url,title,excerpt,created_at) VALUES(?,?,?,?,?)').bind(id,'https://example.com/botany','Botany','Cultivating plants',new Date().toISOString()).run();
+  await indexReading({id,title:'Botany',excerpt:'Cultivating plants'},c.env);
+  c.env.AI.run=()=>{throw new Error('related lookup must reuse vectors');};
+  assert.equal((await relatedToThought(entry.id,c.env)).reading[0].id,id);
+  await c.env.JOURNAL_DB.prepare('DELETE FROM reading WHERE id=?').bind(id).run();
+  assert.equal((await c.env.JOURNAL_DB.prepare('SELECT count(*) AS count FROM reading_embeddings').first()).count,0);
+});
+
 
 test('internal links use stable targets, suggest untitled thoughts privately, and never publish private targets', async () => {
   const c = client();

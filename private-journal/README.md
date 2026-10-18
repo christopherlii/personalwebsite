@@ -67,6 +67,38 @@ current thought; it does not call an AI model. Search uses link labels instead
 of target IDs. Public drafts and published snapshots retain only the linked
 words, so private destinations are never published by following a link.
 
+## Saved reading
+
+The journal menu opens `#reading`, a private read-later collection with a
+borderless URL field, to-read/read views, pagination, explicit read/unread
+controls, and a two-click remove action. Opening an article uses its original
+site in a separate tab and does not silently mark it read. Repeated saves keep
+one item; tracking parameters and fragments are removed for deduplication.
+Read status and links persist in D1 and are included in the owner JSON export.
+This collection is separate from the public site's existing reading list.
+
+Saving tries to collect the publisher's title and article text. The outbound
+request has no journal cookie, referrer, or writing. It allows only public HTTP(S)
+domain addresses and standard ports, validates every redirect (at most three),
+uses a 4.5-second timeout, reads at most 192 KiB of HTML, and retains at most
+8,000 plain-text characters. Scripts, styles, images, navigation, and publisher
+markup never execute or render in the journal. A blocked, non-HTML, unavailable,
+or paywalled page still saves as a link, using the address as its fallback label.
+The captured excerpt is for retrieval, not an offline article copy.
+
+Related suggestions appear after a saved thought's writing, once a complete
+response is ready, and stay hidden during editing. They include up to three
+other thoughts (including published writing) and three saved articles, including
+articles already marked read. There is no open-web discovery or backlink index.
+FTS prefix matches provide keyword candidates. When cached vectors are available,
+the normalized mean of the source thought's embeddings is compared with saved
+article and thought chunks, scanned in 80-row pages with a bounded candidate
+set. A 0.55 cosine threshold and reciprocal-rank combination are retrieval
+heuristics, not confidence scores. Lookup reuses stored vectors; it does not
+send journal text to publishers or make an AI call. Saved article excerpts are
+embedded with the existing Cloudflare model in a background task after saving;
+if indexing fails, keyword matching remains available.
+
 `npm run build:editor` bundles the pinned CodeMirror dependencies into
 `public/live-editor.js` and assembles licenses for every bundled dependency.
 Both generated assets are committed and rebuilt before `npm run dev` or
@@ -134,6 +166,11 @@ both writing fields, untitled targets, exact draft restoration, hidden IDs,
 rename-safe links, back/forward navigation, literal code, deleted destinations,
 stationary picker geometry, and a 320px mobile layout. It uses only synthetic
 local thoughts and removes its own fixtures afterward.
+`npm run test:reading` checks saved-link persistence, deduplication, read/unread,
+removal confirmation, related items, edit stability, and mobile layout against
+the local preview (`JOURNAL_TEST_URL` may select its port). API tests additionally
+cover private access, export, rejected destinations and redirects, bounded
+metadata, and cached semantic retrieval without provider calls during lookup.
 
 ## Deploy after connecting a Cloudflare account
 
