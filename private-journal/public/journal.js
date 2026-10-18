@@ -1,9 +1,12 @@
 import { searchTerms } from './search-terms.js';
-import { markdown } from './markdown.js';
+import { markdown, markdownPreview } from './markdown.js';
 import { createLiveEditor } from './live-editor.js';
 import { thoughtLinks, plainThoughtLinks } from './thought-links.js';
 import { createReading } from './reading.js';
 import { markdownTags, normalizeTag } from './tags.js';
+import { createDictation } from './dictation.js';
+import { createPhotos } from './photos.js';
+import { plainPhotoLinks } from './photo-links.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -12,6 +15,28 @@ state.tag = null;
 let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
+const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEditor:readerEditor,
+  onBusy(busy){for(const owner of ['composer','reader']){const button=$(`#photo-${owner}`);button.disabled=busy;button.textContent=busy?'adding…':'photo';}},
+  onMessage(owner,message){if(owner==='composer')notice(message);else $('#reader-error').textContent=message;}
+});
+$('#photo-composer').addEventListener('click',()=>photos.choose('composer'));
+$('#photo-reader').addEventListener('click',()=>photos.choose('reader'));
+const dictation = createDictation({
+  onState(owner, value) {
+    const button = $(`#dictate-${owner}`), active = value !== 'idle';
+    button.textContent = active ? 'stop' : 'dictate';
+    button.setAttribute('aria-pressed', String(active));
+    button.setAttribute('aria-label', active ? 'stop dictation' : 'start dictation');
+    button.disabled = value === 'stopping';
+    if (owner === 'composer') {
+      if (active) $('#dictation-composer-status').textContent = value === 'starting' ? 'allow microphone access' : value === 'stopping' ? 'finishing…' : 'listening…';
+      else if (['allow microphone access', 'finishing…', 'listening…'].includes($('#dictation-composer-status').textContent)) $('#dictation-composer-status').textContent = '';
+    }
+  },
+  onMessage(owner, message) { $(owner === 'composer' ? '#dictation-composer-status' : '#reader-error').textContent = message; }
+});
+$('#dictate-composer').addEventListener('click', () => dictation.toggle('composer', composerEditor));
+$('#dictate-reader').addEventListener('click', () => dictation.toggle('reader', readerEditor));
 function navigateThought(id) {
   const current = readerId(); if (id === current) return;
   history.pushState({ journalNavigation: true, previousThought: current || null }, '', `#thought/${id}`);
@@ -50,6 +75,8 @@ document.addEventListener('keydown', event => {
   open.focus({ preventScroll: true });
 });
 function showLogin(message = '') {
+  photos.cancel();
+  dictation.cancel();
   closeMenus();
   if (state.readerDirty && state.readerEntry) history.replaceState(state.readerHistory, '', `#thought/${state.readerEntry.id}`);
   state.authenticated = false;
@@ -102,6 +129,8 @@ function updateComposer() {
   $('#add-title').hidden = !$('#composer-title').hidden;
   $('#add-title').disabled = state.posting;
   $('#clear-input').disabled = state.posting;
+  $('#dictate-composer').disabled = state.posting;
+  $('#photo-composer').disabled=state.posting||photos.busy;
 }
 
 const hasDraft = draft => Boolean(draft.title || draft.body);
@@ -193,8 +222,10 @@ function readerBackTarget(){return history.state?.previousThought?`#thought/${hi
 function renderReader(entry = state.readerEntry) {
   const content = $('#reader-content'); content.replaceChildren();
   if (!entry) return;
-  if (entry.title) {
-    const title = document.createElement('h1'); title.className = 'thought-title'; title.append(bodyContent(entry.title,'')); content.append(title);
+  const name = entry.title || entry.published_title;
+  if (name) {
+    const title = document.createElement('h1'); title.className = 'thought-title';
+    const label = document.createElement('span'); label.append(bodyContent(name,'')); title.append(label,publishedTag(entry)); content.append(title);
   }
   const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); content.append(body);
   readingView.related(entry);
@@ -202,9 +233,11 @@ function renderReader(entry = state.readerEntry) {
 function readerControls() {
   const editing = state.readerEditing;
   const busy = Boolean(state.readerSaving);
+  $('#photo-reader').disabled=busy||photos.busy;
   $('#reader-edit').hidden = editing || !state.readerEntry;
   $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
   $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
+  $('#dictate-reader').hidden = !editing;
   $('#edit-form').hidden = !editing;
   $('#reader-content').hidden = editing;
   readingView.editing(editing);
@@ -228,10 +261,13 @@ function updateEntry(entry) {
   }
 }
 function stopEditing() {
+  if (dictation.owner === 'reader') dictation.cancel();
   state.readerEditing = false; state.readerDirty = false; clearReaderEditor();
   $('#reader-error').textContent = ''; renderReader(); readerControls();
 }
 async function saveReader() {
+  if(!await photos.finish())throw new Error('Photo upload failed. Try adding the photo again.');
+  if (dictation.owner === 'reader') await dictation.stop();
   if (state.readerSaving) return state.readerSaving;
   if (!state.readerDirty) { stopEditing(); return; }
   const title = $('#edit-thought-title').value, body = $('#edit-body').value;
@@ -245,6 +281,9 @@ async function saveReader() {
   finally { state.readerSaving = null; readerControls(); }
 }
 async function showRoute() {
+  if (!state.authenticated) return;
+  if(!await photos.finish()){history.replaceState(state.readerHistory||null,'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
+  await dictation.stop();
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
   const id = readerId();
@@ -310,7 +349,7 @@ document.addEventListener('click', event => {
   event.preventDefault(); navigateThought(link.dataset.thoughtLink);
 });
 
-function bodyContent(body, query) {
+function bodyContent(body, query, linkify = true) {
   const fragment = document.createDocumentFragment();
   const fold = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
   const matches = searchTerms(query).map(fold).filter(Boolean);
@@ -336,7 +375,8 @@ function bodyContent(body, query) {
     }
     fragment.append(document.createTextNode(value.slice(end)));
   };
-  // The timeline stays a plain-text preview, including search highlights.
+  if (!linkify) { appendText(body); return fragment; }
+  // Titles stay plain text, with safe links and search highlights.
   const links = [...body.matchAll(/https?:\/\/[^\s<>]+/gu)].map(match => ({ from: match.index, to: match.index + match[0].length, text: match[0] }));
   links.push(...thoughtLinks(body).map(link => ({ ...link, text: link.label })));
   links.push(...markdownTags(body));
@@ -362,6 +402,10 @@ function entryStatus(entry) {
     const heart = document.createElement('span'); heart.className = 'entry-heart'; heart.textContent = '♥';
     heart.setAttribute('role', 'img'); heart.setAttribute('aria-label', 'bookmarked'); heart.title = 'bookmarked'; status.append(heart);
   }
+  return status;
+}
+function publishedTag(entry) {
+  const status = document.createDocumentFragment();
   if (entry?.published_slug) {
     const published = document.createElement('a'); published.className = 'entry-published'; published.textContent = 'published';
     published.href = `https://christopherli.dev/#thought/${encodeURIComponent(entry.published_slug)}`;
@@ -385,14 +429,21 @@ function renderEntry(entry) {
   header.append(dateDetails);
   const status = document.createElement('span'); status.className = 'entry-state'; status.append(entryStatus(entry)); header.append(status);
   article.append(header);
-  if (entry.title) {
+  const name = entry.title || entry.published_title;
+  if (name) {
     const title = document.createElement('h2'); title.className = 'thought-title';
-    title.append(bodyContent(entry.title, state.query)); article.append(title);
+    const label = document.createElement('span'); label.append(bodyContent(name, state.query));
+    title.append(label, publishedTag(entry)); article.append(title);
   }
-  const text = document.createElement('p'); text.className = 'thought-body';
+  const text = document.createElement('div'); text.className = 'thought-body markdown-body thought-preview';
   text.id = `thought-${entry.id}`;
-  text.classList.add('collapsed');
-  text.append(bodyContent(entry.body, state.query)); article.append(text);
+  text.append(markdownPreview(entry.body));
+  if (state.query) {
+    const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT), nodes = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+    for (const node of nodes) node.replaceWith(bodyContent(node.data, state.query, false));
+  }
+  article.append(text);
   const footer = document.createElement('div'); footer.className = 'entry-footer';
   const copy = button('copy', 'copy', entry); copy.className = 'copy-thought'; copy.setAttribute('aria-label', 'copy thought'); footer.append(copy);
   const read = document.createElement('a'); read.href = `#thought/${entry.id}`; read.dataset.action = 'read'; read.textContent = 'open'; read.setAttribute('aria-label', 'open thought'); footer.append(read);
@@ -414,7 +465,7 @@ function updateView() {
 function searchFromComposer(immediate = false) {
   clearTimeout(state.searchTimer);
   if(state.tag){state.query='';if(immediate)return loadFeed(false,false);return;}
-  state.query = plainThoughtLinks(entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() })).trim();
+  state.query = plainPhotoLinks(plainThoughtLinks(entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() }))).trim();
   state.controller?.abort();
   state.generation++;
   $('#feed').setAttribute('aria-busy', 'false');
@@ -478,7 +529,7 @@ async function loadFeed(append = false, semantic = state.semantic) {
     updateView(); notice(message);
     $('#more').hidden = data.next === null;
     $('#more').textContent = 'load more';
-    $('#feed-status').textContent = !state.entries.size ? queryText ? 'no thoughts found.' : saved ? 'no bookmarks yet.' : 'your first thought goes here.' : '';
+    $('#feed-status').textContent = !state.entries.size && !queryText ? saved ? 'no bookmarks yet.' : 'your first thought goes here.' : '';
   } catch (error) {
     if (error.name !== 'AbortError' && generation === state.generation) {
       $('#feed-status').textContent = error.message;
@@ -511,6 +562,8 @@ $('#composer').addEventListener('keydown', event => {
 });
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
+  if(!await photos.finish())return;
+  if (dictation.owner === 'composer') await dictation.stop();
   if (state.posting || !$('#body').value.trim()) return;
   state.posting = true; $('#body').disabled = true; $('#title').disabled = true;
   clearTimeout(state.searchTimer); state.controller?.abort(); state.generation++;
@@ -531,6 +584,8 @@ $('#composer').addEventListener('submit', async event => {
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
 });
 $('#clear-input').addEventListener('click', () => {
+  photos.cancel();
+  if (dictation.owner === 'composer') dictation.cancel();
   $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); composerEditor?.focus();
 });
 $('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true' && state.query === state.renderedQuery && state.view === state.renderedView) loadFeed(state.entries.size > 0 && state.cursor !== null); });
@@ -639,7 +694,8 @@ function publicationControls() {
   if (published) $('#view-public').href = `https://christopherli.dev/#thought/${published.slug}`;
   $('#publish-public').textContent = published ? 'update site ↗' : 'publish to site ↗';
   if (state.readerEntry?.id === state.publicationId) {
-    updateEntry({ ...state.readerEntry, published_slug: published?.slug || null });
+    updateEntry({ ...state.readerEntry, published_slug: published?.slug || null, published_title: published?.title || null });
+    if (!state.readerEditing) renderReader();
     readerControls();
   }
 }
@@ -711,12 +767,14 @@ $('#download-public').addEventListener('click', () => {
   $('#public-status').textContent = 'downloaded.';
 });
 $('#export').addEventListener('click', async () => {
-  try { await saveDraft(); if (state.publicDirty) await savePublication(); const data = await api('export'); download(`journal-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json'); }
+  try { if(!await photos.finish())return;await saveDraft(); if (state.publicDirty) await savePublication(); const data = await api('export'); download(`journal-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json'); }
   catch (error) { notice(error.message); }
 });
 $('#logout').addEventListener('click', async () => {
   if (state.posting) return;
   try {
+    if(!await photos.finish())return;
+    await dictation.stop();
     await saveDraft();
     if (state.publicDirty) await savePublication();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
@@ -732,9 +790,10 @@ $('#logout').addEventListener('click', async () => {
     showLogin();
   } catch (error) { notice(error.message); }
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && state.dirty) saveDraft().catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { dictation.cancel(); if (state.dirty) saveDraft().catch(() => {}); } });
 window.addEventListener('beforeunload', event => {
-  if (state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }
+  dictation.cancel();
+  if (photos.busy || state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }
 });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 

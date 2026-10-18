@@ -5,9 +5,11 @@ import { markdown } from '@codemirror/lang-markdown';
 import { GFM } from '@lezer/markdown';
 import { syntaxTree, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { markdown as renderMarkdown } from './markdown.js';
 import { thoughtLinks, thoughtLink, thoughtLabel } from './thought-links.js';
+import { photoReference } from './photo-links.js';
+const isPhoto=source=>photoReference(source.match(/^!\[(?:\\.|[^\]])*\]\(([^)]+)\)$/u)?.[1]);
 
 const wikiLinks = {
   defineNodes: ['ThoughtLink', 'ThoughtLinkMark', 'ThoughtLinkTarget', 'ThoughtLinkLabel'],
@@ -27,7 +29,7 @@ const hiddenTargets = StateField.define({
   update: (value, transaction) => transaction.docChanged || syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? targetRanges(transaction.state) : value
 });
 function targetRanges(state) {
-  const ranges = []; syntaxTree(state).iterate({ enter(node) { if (node.name === 'ThoughtLinkTarget') ranges.push(Decoration.replace({}).range(node.from, node.to)); } });
+  const ranges = []; syntaxTree(state).iterate({ enter(node) { if (node.name === 'ThoughtLinkTarget'||(node.name==='Image'&&isPhoto(state.doc.sliceString(node.from,node.to)))) ranges.push(Decoration.replace({}).range(node.from, node.to)); } });
   return RangeSet.of(ranges, true);
 }
 function completions(findThoughts) {
@@ -83,6 +85,12 @@ class Table extends WidgetType {
   ignoreEvent() { return false; }
 }
 
+class Photo extends WidgetType{
+  constructor(source){super();this.source=source;}
+  eq(other){return this.source===other.source;}
+  toDOM(){const span=document.createElement('span');span.className='cm-photo';const parsed=document.createElement('div');parsed.append(renderMarkdown(this.source));const img=parsed.querySelector('img');if(img)span.append(img);return span;}
+  ignoreEvent(){return true;}
+}
 function decorate(state) {
   const ranges = [], lines = new Map();
   const active = state.selection.ranges.map(range => ({ from: state.doc.lineAt(range.from).from, to: state.doc.lineAt(range.to).to }));
@@ -99,6 +107,7 @@ function decorate(state) {
   syntaxTree(state).iterate({ enter(node) {
     const { name, from, to } = node;
     const selected = editing(from, to);
+    if(name==='Image'&&isPhoto(state.doc.sliceString(from,to))){hide(from,to,new Photo(state.doc.sliceString(from,to)));return false;}
     if (name === 'ThoughtLinkTarget') { hide(from, to); return false; }
     if (name === 'ThoughtLinkLabel') mark(from, to, 'cm-md-link');
     if (name === 'ThoughtLink') mark(from, to, 'cm-thought-link');
@@ -149,7 +158,7 @@ const formatting = HighlightStyle.define([
 ]);
 
 export function createLiveEditor(parent, { value, nonce, onChange, onLimit, findThoughts, onOpenThought, onSubmit, emptyText = '' }) {
-  const editable = new Compartment(); let readOnly = false;
+  const editable = new Compartment(),insertions=new Set(); let readOnly = false, destroyed = false;
   const makeState = value => EditorState.create({
     doc: value, selection: { anchor: value.length },
     extensions: [
@@ -178,14 +187,41 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
         if (transaction.newDoc.length <= 20000) return true;
         queueMicrotask(onLimit); return false;
       }),
-      EditorView.updateListener.of(update => { if (update.docChanged) onChange(update.state.doc.toString()); })
+      EditorView.updateListener.of(update => { if (update.docChanged){
+        for(const target of insertions){const collapsed=target.from===target.to;target.from=update.changes.mapPos(target.from,1);target.to=collapsed?target.from:Math.max(target.from,update.changes.mapPos(target.to,-1));}
+        onChange(update.state.doc.toString());
+      } })
     ]
   });
   const view = new EditorView({ parent, state: makeState(value) });
   return {
     focus() { view.focus(); },
-    destroy() { view.destroy(); },
-    setValue(value) { if (view.state.doc.toString() !== value) view.setState(makeState(value)); },
+    destroy() { destroyed = true; insertions.clear(); view.destroy(); },
+    captureInsertion(){
+      if(readOnly||destroyed)return null;
+      const target={from:view.state.selection.main.from,to:view.state.selection.main.to};insertions.add(target);
+      return{cancel(){insertions.delete(target);},insert(source){
+        if(destroyed||readOnly||!insertions.has(target))return false;
+        const {from,to}=target,before=view.state.doc.sliceString(Math.max(0,from-2),from),after=view.state.doc.sliceString(to,to+2);
+        const prefix=!before||before.endsWith('\n\n')?'':before.endsWith('\n')?'\n':'\n\n';
+        const suffix=after.startsWith('\n\n')?'':after.startsWith('\n')?'\n':'\n\n';const insert=prefix+source+suffix;
+        if(view.state.doc.length-(to-from)+insert.length>20000){onLimit();return false;}
+        view.dispatch({changes:{from,to,insert},selection:{anchor:from+insert.length},annotations:isolateHistory.of('full'),userEvent:'input.photo'});
+        target.from=target.to=from+insert.length;return true;
+      }};
+    },
+    insertText(text) {
+      if (readOnly || destroyed) return false;
+      const { from, to } = view.state.selection.main;
+      const before = view.state.doc.sliceString(Math.max(0, from - 1), from), after = view.state.doc.sliceString(to, to + 1);
+      const prefix = before && !/[\s([{]/u.test(before) && !/^[.,!?;:)}\]]/u.test(text) ? ' ' : '';
+      const suffix = after && !/[\s.,!?;:)}\]]/u.test(after) ? ' ' : '';
+      const insert = prefix + text + suffix;
+      if (view.state.doc.length - (to - from) + insert.length > 20000) { onLimit(); return false; }
+      view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length }, annotations: isolateHistory.of('full'), userEvent: 'input.dictation' });
+      return true;
+    },
+    setValue(value) { if (view.state.doc.toString() !== value){insertions.clear();view.setState(makeState(value));} },
     setReadOnly(value) {
       if (value === readOnly) return;
       readOnly = value;

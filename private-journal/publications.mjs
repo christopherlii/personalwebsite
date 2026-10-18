@@ -1,4 +1,5 @@
 import { plainThoughtLinks } from './public/thought-links.js';
+import { publishPhotoLinks, publicPhoto } from './photos.mjs';
 
 export class PublicationError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -104,10 +105,11 @@ export async function publicationApi(request, env, path, readBody) {
     if (action === 'publish') {
       const draft = publicationData(JSON.parse(existing.draft));
       if (!draft.title.trim() || !draft.body.trim()) fail(400, 'Add a title and text before publishing.');
-      result = await write(env.JOURNAL_DB.prepare(`UPDATE publications SET published = draft,
+      const published={...draft,...await publishPhotoLinks(draft.body,env)};
+      result = await write(env.JOURNAL_DB.prepare(`UPDATE publications SET published = ?,
         published_slug = ?, published_at = COALESCE(published_at, ?), version = version + 1, updated_at = ?
         WHERE thought_id = ? AND version = ? RETURNING *`)
-        .bind(draft.slug, new Date().toISOString(), new Date().toISOString(), thought.id, revision));
+        .bind(JSON.stringify(published),draft.slug, new Date().toISOString(), new Date().toISOString(), thought.id, revision));
     } else {
       result = await env.JOURNAL_DB.prepare(`UPDATE publications SET published = NULL, published_slug = NULL,
         published_at = NULL, version = version + 1, updated_at = ? WHERE thought_id = ? AND version = ? RETURNING *`)
@@ -127,6 +129,7 @@ export function markdown(post) {
 export async function publicWriting(request, env, url) {
   if (!['GET', 'HEAD'].includes(request.method)) fail(405, 'Method not allowed.');
   if (!env.JOURNAL_DB) fail(503, 'Writing is unavailable.');
+  const photo=await publicPhoto(request,env,url.pathname);if(photo)return photo;
   let response;
   const article = url.pathname.match(/^\/public\/posts\/([a-z0-9_-]+)\.md$/);
   if (article) {
