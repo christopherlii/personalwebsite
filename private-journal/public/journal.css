@@ -748,3 +748,25 @@ dialog .public-actions {
 .cm-tooltip-autocomplete .cm-completionLabel { overflow-wrap:anywhere }
 .cm-tooltip-autocomplete .cm-completionDetail { margin-left:auto; font-style:normal; font-size:11px; color:var(--muted); white-space:nowrap }
 .cm-completionInfo { display:none }
+
+.journal-menu>a { padding:6px 0; color:var(--muted); font-size:11px; text-decoration:none }
+.journal-menu>a:hover { text-decoration:underline; text-underline-offset:4px }
+.reading-page>h1 { margin-bottom:28px; font-size:14px }
+#reading-form { display:flex; align-items:baseline; gap:20px; margin-bottom:8px }
+#reading-url { flex:1; min-width:0; border:0; padding:0; background:var(--bg); font-size:14px }
+#reading-url::placeholder { color:var(--muted) }
+#reading-save { white-space:nowrap }
+.reading-message { min-height:20px; color:var(--muted); font-size:11px }
+.reading-filters { display:flex; gap:24px; margin:28px 0 36px }
+.reading-filters button { color:var(--muted) }
+.reading-filters [aria-current=page] { color:var(--fg); text-decoration:underline; text-underline-offset:4px }
+.reading-item { margin-bottom:40px; overflow-wrap:anywhere }
+.reading-meta { color:var(--muted); font-size:11px; margin-bottom:3px }
+.reading-title { display:inline-block; text-decoration:none; font-size:14px; overflow-wrap:anywhere }
+.reading-title:hover { text-decoration:underline; text-underline-offset:3px }
+.reading-actions { display:flex; gap:20px; margin-top:8px; color:var(--muted) }
+.related-reading { margin-top:64px }
+.related-reading>h2 { color:var(--muted); font:400 11px/1.5 var(--font-body); margin-bottom:22px }
+.related-item { margin-bottom:24px; overflow-wrap:anywhere }
+.related-title { font:400 14px/1.55 var(--font-body); text-align:left; padding:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+@media(pointer:coarse) { #reading-url { font-size:16px } .reading-actions button,.reading-filters button,#reading-save { min-height:44px } }
