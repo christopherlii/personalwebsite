@@ -19,7 +19,7 @@ resizing their containers or moving surrounding content. Only opacity fades
 are used, with reduced-motion support. Hover reveals dates and small text actions, and moving away
 fades them out even after a click. Keyboard focus reveals the same controls;
 touch devices show them directly. Hide timeline removes the whole feed while
-leaving writing and autosave available. It is a temporary view choice.
+leaving writing and autosave available. Visibility is remembered in this browser.
 
 Typing recalls related past thoughts after a pause. The existing list and its
 status stay intact until the full response is ready, including semantic
@@ -42,7 +42,7 @@ valid. Previews have no line clamp and never expand inline; copy retains the
 complete original source, and open shows the complete writing.
 Reading links require the same
 session and work on reload and under `/journal/`.
-Only an explicit post creates a new
+Only an explicit post or save draft creates a new
 entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Tapping Shift
 twice within 400ms locks the journal like the lock button; a tap only counts
 when no other key is pressed while Shift is held. Entries have no
@@ -52,6 +52,30 @@ marked off for autofill and password managers, so browsers never offer to save
 or fill it; browsers without CSS masking fall back to a password input with
 `new-password`. No analytics, trackers, browser-local thought storage, or external
 runtime assets.
+
+## Essay drafts
+
+Choose save draft beside post to keep a piece in progress. It becomes a private
+timeline entry with a muted draft label and opens in the existing live Markdown
+editor. Multiple essays can be kept independently; edits autosave after a pause,
+without closing the editor or stopping dictation. Back and lock flush edits.
+Post marks the same entry finished, retaining its original ID, creation date,
+and timeline position. Public-site publishing remains a separate action and is
+unavailable for unfinished essays. The composer scratch draft remains separate.
+
+Migration `0009_essay_drafts.sql` adds `is_draft` (existing thoughts default to
+finished) and a monotonic body/title revision. Autosave uses optimistic revision
+checks, preserves Markdown whitespace, queues edits made during a save, and
+keeps local text on errors. Conflicts block posting/navigation until the text
+is copied and the current entry reloaded; other failures offer retry. The
+existing 20,000-character body and 160-character title limits remain. Clearing
+all text cannot save an empty timeline entry; explicit delete remains available.
+Flags and revision travel through normal reads, search, and owner export.
+
+`npm run test:essays` covers multiple timeline drafts, reload, in-flight typing,
+failed-save retry, cross-tab conflict protection, back navigation, live
+dictation while autosaving, final flush on post, stable start date/order, delete,
+and mobile layout. All fixtures are synthetic and local.
 
 Markdown uses the existing site's vendored Marked 15.0.12 lexer (MIT), copied
 unchanged to `public/vendor/marked.min.js`. `public/markdown.js` constructs DOM

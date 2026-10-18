@@ -76,8 +76,9 @@ export async function publicationApi(request, env, path, readBody) {
   }
   const match = path.match(/^\/api\/thoughts\/([a-f0-9-]+)\/publication(?:\/(publish|unpublish))?$/);
   if (!match || !uuidPattern.test(match[1])) return null;
-  const thought = await env.JOURNAL_DB.prepare('SELECT id, title, body, created_at FROM thoughts WHERE id = ?').bind(match[1]).first();
+  const thought = await env.JOURNAL_DB.prepare('SELECT id, title, body, created_at, is_draft FROM thoughts WHERE id = ?').bind(match[1]).first();
   if (!thought) fail(404, 'Thought not found.');
+  if (thought.is_draft) fail(409, 'Post this draft before preparing it for your public site.');
   const existing = await env.JOURNAL_DB.prepare('SELECT * FROM publications WHERE thought_id = ?').bind(thought.id).first();
   const action = match[2];
   if (!action && request.method === 'GET') return json(ownerRecord(existing, thought));
