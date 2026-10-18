@@ -38,15 +38,16 @@ async function embedAll(chunks, env) {
 
 export async function indexEntry(entry, env) {
   if (!env.AI) return;
-  const bodyHash = await digest(entry.body);
+  const content = entry.title ? `${entry.title}\n\n${entry.body}` : entry.body;
+  const bodyHash = await digest(content);
   const existing = await env.JOURNAL_DB.prepare('SELECT body_hash, model FROM embeddings WHERE thought_id = ?').bind(entry.id).first();
   if (existing?.body_hash === bodyHash && existing.model === MODEL) return;
-  const vectors = await embedAll(chunksOf(entry.body), env);
+  const vectors = await embedAll(chunksOf(content), env);
   const packed = new Float32Array(vectors.flat());
   // An old async indexing job cannot replace an embedding for a newer edit.
   await env.JOURNAL_DB.prepare(`INSERT OR REPLACE INTO embeddings(thought_id, body_hash, model, vectors, chunks, dimensions)
-    SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM thoughts WHERE id = ? AND body = ? AND updated_at = ?)`)
-    .bind(entry.id, bodyHash, MODEL, packed.buffer, vectors.length, DIMENSIONS, entry.id, entry.body, entry.updated_at).run();
+    SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM thoughts WHERE id = ? AND body = ? AND title = ? AND updated_at = ?)`)
+    .bind(entry.id, bodyHash, MODEL, packed.buffer, vectors.length, DIMENSIONS, entry.id, entry.body, entry.title || '', entry.updated_at).run();
 }
 
 export function maximumSimilarity(query, blob, count, dimensions) {

@@ -38,11 +38,15 @@
     </header>
     <section id="composer-section" class="composer-section" aria-label="write or search your thoughts">
       <form id="composer">
+        <div id="composer-title" hidden>
+          <label for="title" class="sr-only">title (optional)</label>
+          <input id="title" class="title-input" placeholder="title" maxlength="160" autocomplete="off">
+        </div>
         <label for="body" class="sr-only">write or search your thoughts</label>
         <textarea id="body" placeholder="write or search your thoughts…" maxlength="20000" rows="1"></textarea>
         <div class="compose-actions" id="compose-actions" hidden>
           <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
-          <div class="compose-buttons"><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
+          <div class="compose-buttons"><button type="button" id="add-title">add title</button><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
         </div>
       </form>
     </section>
@@ -57,6 +61,8 @@
   <dialog id="edit-dialog" aria-labelledby="edit-title">
     <form id="edit-form">
       <header><h2 id="edit-title">edit thought</h2><button type="button" data-close="edit-dialog" aria-label="close edit">close</button></header>
+      <label for="edit-thought-title" class="sr-only">title (optional)</label>
+      <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
       <label for="edit-body" class="sr-only">thought</label>
       <textarea id="edit-body" rows="8" maxlength="20000" required></textarea>
       <p id="edit-error" role="status"></p>
@@ -72,6 +78,8 @@
   </dialog>
   <dialog id="public-dialog" aria-labelledby="public-title">
     <header><h2 id="public-title">public draft</h2><button type="button" data-close="public-dialog">close</button></header>
+    <label for="public-thought-title" class="sr-only">public title (optional)</label>
+    <input id="public-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
     <label for="public-body" class="sr-only">public draft text</label>
     <textarea id="public-body" rows="10" maxlength="20000"></textarea>
     <p id="public-status" role="status"></p>

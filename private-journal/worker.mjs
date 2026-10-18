@@ -41,6 +41,11 @@ function bodyText(value, allowEmpty = false) {
   return value;
 }
 
+function titleText(value = '') {
+  if (typeof value !== 'string' || value.length > 160 || /[\r\n]/.test(value)) fail(400, 'Use a title of up to 160 characters.');
+  return value;
+}
+
 async function limit(env, key, maximum, milliseconds) {
   const now = Date.now();
   const row = await env.JOURNAL_DB.prepare(`INSERT INTO login_limits(key, attempts, reset_at) VALUES (?, 1, ?)
@@ -96,12 +101,13 @@ async function api(request, env, url, context) {
     await env.JOURNAL_DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(session.token_hash).run();
     return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
   }
-  if (path === '/api/draft' && request.method === 'GET') return json(await env.JOURNAL_DB.prepare('SELECT body, version FROM draft WHERE id = 1').first());
+  if (path === '/api/draft' && request.method === 'GET') return json(await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first());
   if (path === '/api/draft' && request.method === 'PUT') {
     const data = await readBody(request);
     bodyText(data.body, true);
+    const title = titleText(data.title);
     if (!Number.isSafeInteger(data.version) || data.version < 0) fail(400, 'Invalid draft.');
-    const updated = await env.JOURNAL_DB.prepare('UPDATE draft SET body = ?, version = version + 1 WHERE id = 1 AND version = ? RETURNING body, version').bind(data.body, data.version).first();
+    const updated = await env.JOURNAL_DB.prepare('UPDATE draft SET title = ?, body = ?, version = version + 1 WHERE id = 1 AND version = ? RETURNING title, body, version').bind(title, data.body, data.version).first();
     if (!updated) fail(409, 'Your draft changed on another device. Copy this text before reloading.');
     return json(updated);
   }
@@ -109,7 +115,7 @@ async function api(request, env, url, context) {
     const data = await readBody(request);
     const query = typeof data.query === 'string' ? data.query.trim() : '';
     const cursor = integer(data.cursor);
-    if (!query || query.length > 20000 || typeof data.saved !== 'boolean' || (data.semantic !== undefined && typeof data.semantic !== 'boolean')) fail(400, 'Invalid search.');
+    if (!query || query.length > 20200 || typeof data.saved !== 'boolean' || (data.semantic !== undefined && typeof data.semantic !== 'boolean')) fail(400, 'Invalid search.');
     if (data.semantic === false) return json({ ...await listThoughts(env, query, data.saved, cursor), indexing: false });
     if (!env.AI) fail(503, 'Related search is unavailable.');
     if (cursor > 400) fail(400, 'Invalid page.');
@@ -127,18 +133,19 @@ async function api(request, env, url, context) {
   if (path === '/api/thoughts' && request.method === 'POST') {
     const data = await readBody(request);
     const body = bodyText(data.body).trim();
+    const title = titleText(data.title).trim();
     if (!uuid(data.id)) fail(400, 'Invalid thought.');
     const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(data.id).first();
     if (existing) {
-      if (existing.body !== body) fail(409, 'This thought already exists.');
-      return json({ entry: existing, draft: await env.JOURNAL_DB.prepare('SELECT body, version FROM draft WHERE id = 1').first() });
+      if (existing.body !== body || existing.title !== title) fail(409, 'This thought already exists.');
+      return json({ entry: existing, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
     }
     const now = new Date().toISOString();
-    const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, body, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, body, now, now)];
-    if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ?").bind(data.draft_version, data.body));
+    const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now)];
+    if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET title = '', body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ? AND title = ?").bind(data.draft_version, data.body, data.title || ''));
     const result = await env.JOURNAL_DB.batch(statements);
     if (env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
-    return json({ entry: result[0].results[0], draft: await env.JOURNAL_DB.prepare('SELECT body, version FROM draft WHERE id = 1').first() }, 201);
+    return json({ entry: result[0].results[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
@@ -148,8 +155,9 @@ async function api(request, env, url, context) {
       let result;
       if (Object.hasOwn(data, 'body')) {
         const body = bodyText(data.body).trim();
+        const title = Object.hasOwn(data, 'title') ? titleText(data.title).trim() : null;
         if (typeof data.updated_at !== 'string') fail(400, 'Missing thought version.');
-        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET body = ?, updated_at = ? WHERE id = ? AND updated_at = ? RETURNING ${thoughtColumns}`).bind(body, new Date().toISOString(), id, data.updated_at).first();
+        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET title = COALESCE(?, title), body = ?, updated_at = ? WHERE id = ? AND updated_at = ? RETURNING ${thoughtColumns}`).bind(title, body, new Date().toISOString(), id, data.updated_at).first();
         if (!result) fail(409, 'This thought changed. Reload before editing.');
         if (env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
       } else {
@@ -166,8 +174,8 @@ async function api(request, env, url, context) {
     }
   }
   if (path === '/api/export' && request.method === 'GET') {
-    const { results } = await env.JOURNAL_DB.prepare('SELECT id, body, bookmarked, created_at, updated_at FROM thoughts ORDER BY seq').all();
-    const draft = await env.JOURNAL_DB.prepare('SELECT body FROM draft WHERE id = 1').first();
+    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, created_at, updated_at FROM thoughts ORDER BY seq').all();
+    const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     return json({ format: 'christopher-journal-v1', exported_at: new Date().toISOString(), entries: results, draft }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
   fail(404, 'Not found.');

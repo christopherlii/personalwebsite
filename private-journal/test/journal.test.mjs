@@ -144,6 +144,59 @@ test('timeline pagination preserves independent thoughts and deletion removes on
   assert.equal(remaining.entries.length, 44);
 });
 
+test('optional titles persist with drafts, participate in search, and invalidate edited embeddings', async () => {
+  const c = client(); await c.login();
+  const input = { title: 'quiet mornings', body: 'a little space to think' };
+  const draft = (await c.call('/api/draft', 'PUT', { ...input, version: 0 })).data;
+  assert.equal((await c.call('/api/draft')).data.title, input.title);
+  const data = { ...thought(input.body), title: input.title, draft_version: draft.version };
+  const post = await c.call('/api/thoughts', 'POST', data);
+  assert.equal(post.status, 201);
+  assert.equal(post.data.draft.title, '');
+  assert.equal(post.data.draft.body, '');
+  assert.equal((await c.call('/api/thoughts', 'POST', data)).status, 200);
+  assert.equal((await c.call('/api/thoughts', 'POST', { ...data, title: 'changed title' })).status, 409);
+  assert.equal((await c.call('/api/thoughts?q=morning')).data.entries[0].title, input.title);
+  assert.equal((await c.call('/api/search', 'POST', { query: 'morning', saved: false, semantic: false })).data.entries[0].id, data.id);
+  const embedded = [];
+  c.env.AI = { async run(model, input) {
+    embedded.push(...input.text);
+    return { data: input.text.map(() => [1, ...Array(DIMENSIONS - 1).fill(0)]) };
+  } };
+  await indexEntry(post.data.entry, c.env);
+  assert.equal(embedded[0], `${input.title}\n\n${input.body}`, 'semantic content includes the title');
+  const edited = await c.call(`/api/thoughts/${data.id}`, 'PATCH', { title: 'evening walks', body: input.body, updated_at: post.data.entry.updated_at });
+  assert.equal(edited.status, 200);
+  assert.equal((await c.call('/api/thoughts?q=morning')).data.entries.length, 0);
+  assert.equal((await c.call('/api/thoughts?q=evening')).data.entries[0].id, data.id);
+  assert.equal(await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(data.id).first(), null);
+  await indexEntry(post.data.entry, c.env);
+  assert.equal(await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(data.id).first(), null, 'stale title cannot be indexed');
+  assert.equal((await c.call('/api/export')).data.entries[0].title, 'evening walks');
+  const version = (await c.call('/api/draft')).data.version;
+  await c.call('/api/draft', 'PUT', { title: 'another device title', body: input.body, version });
+  const conflict = await c.call('/api/thoughts', 'POST', { ...thought(input.body), title: input.title, draft_version: version + 1 });
+  assert.equal(conflict.data.draft.title, 'another device title', 'posting cannot clear a differently titled draft');
+  for (const title of ['x'.repeat(161), 'two\nlines', 42, null]) {
+    assert.equal((await c.call('/api/thoughts', 'POST', { ...thought('body'), title })).status, 400);
+  }
+  await c.call(`/api/thoughts/${data.id}`, 'DELETE', {});
+  assert.equal((await c.call('/api/thoughts?q=evening')).data.entries.length, 0);
+});
+
+test('title migration preserves existing entries, drafts, and their search index', () => {
+  const db = new DatabaseSync(':memory:');
+  const migrations = readdirSync(new URL('../migrations/', import.meta.url)).sort();
+  for (const name of migrations.slice(0, 2)) db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
+  db.exec("INSERT INTO thoughts(id, body, created_at, updated_at) VALUES ('old-id', 'an existing memory', '2026-01-01', '2026-01-01'); UPDATE draft SET body = 'unfinished text', version = 7;");
+  db.exec(readFileSync(new URL('../migrations/0003_titles.sql', import.meta.url), 'utf8'));
+  assert.equal(db.prepare('SELECT body FROM thoughts').get().body, 'an existing memory');
+  assert.equal(db.prepare('SELECT title FROM thoughts').get().title, '');
+  assert.equal(db.prepare("SELECT count(*) AS n FROM thoughts_fts WHERE thoughts_fts MATCH 'memory'").get().n, 1);
+  assert.deepEqual({ ...db.prepare('SELECT title, body, version FROM draft').get() }, { title: '', body: 'unfinished text', version: 7 });
+  db.close();
+});
+
 test('HTML stays data, input limits are enforced, and exports include the private draft', async () => {
   const c = client(); await c.login();
   assert.equal((await c.call('/api/thoughts', 'POST', thought('   '))).status, 400);

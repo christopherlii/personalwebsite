@@ -22,7 +22,7 @@ const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method,
 }, { path, method, body });
 const setView = async view => { await page.locator('#journal-menu > summary').click(); await page.locator(`[data-view=${view}]`).click(); };
 const entryMenu = async article => { await article.hover(); await article.locator('summary').click(); };
-const blankDraft = () => page.waitForFunction(async () => { const response = await fetch('/api/draft'); return response.ok && (await response.json()).body === ''; });
+const blankDraft = () => page.waitForFunction(async () => { const response = await fetch('/api/draft'); const draft = await response.json(); return response.ok && !draft.body && !draft.title; });
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
 
 try {
@@ -35,14 +35,17 @@ try {
   const prior = await api('thoughts?q=journal%20browser%20test');
   for (const entry of prior.data.entries) if (entry.body.startsWith('journal browser test ')) await api(`thoughts/${entry.id}`, 'DELETE', {});
   const initial = await api('draft');
-  if (initial.data.body) throw new Error('Use a clean local database: browser tests will not overwrite an existing draft.');
+  if (initial.data.body || initial.data.title) throw new Error('Use a clean local database: browser tests will not overwrite an existing draft.');
 
   const first = `${prefix}: basketball after a day of building things. café hopping tomorrow.\n\n${'a longer thought belongs here too. '.repeat(12)}`.trim();
   await page.locator('#body').fill(first);
+  await page.locator('#add-title').click();
+  await page.locator('#title').fill('a day of building');
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
   await page.reload();
   await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#body').inputValue(), first, 'draft survives reload');
+  assert.equal(await page.locator('#title').inputValue(), 'a day of building', 'title survives reload');
   await page.locator('#post').click();
   await page.waitForFunction(text => [...document.querySelectorAll('.thought-body')].some(p => p.textContent === text), first);
   const root = (await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries[0]; ids.push(root.id);
@@ -66,15 +69,18 @@ try {
   await article.locator('[data-action=edit]').click();
   const edited = `${prefix}: soccer and coffee instead. <img src=x onerror=alert(1)>`;
   await page.locator('#edit-body').fill(edited);
+  await page.locator('#edit-thought-title').fill('a different day <img src=x onerror=alert(1)>');
   await page.locator('#edit-form button[type=submit]').click();
   await page.waitForFunction(text => [...document.querySelectorAll('.thought-body')].some(p => p.textContent === text), edited);
   assert.equal(await page.locator('.thought-body img').count(), 0, 'HTML is rendered as text');
+  assert.equal(await article.locator('.thought-title img').count(), 0, 'title HTML is text too');
   await entryMenu(article);
   await article.locator('[data-action=public]').click();
   assert.equal(await page.locator('#public-body').inputValue(), edited);
   await page.locator('#public-body').fill('a separate public draft');
+  await page.locator('#public-thought-title').fill('public version');
   await page.locator('#copy-public').click();
-  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'a separate public draft');
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'public version\n\na separate public draft');
   await page.locator('[data-close=public-dialog]').click();
   assert.equal((await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries.find(e => e.id === root.id).body, edited, 'public draft does not edit journal');
 
@@ -88,8 +94,9 @@ try {
     'sample thought: a passing idea worth keeping.'
   ];
   const sampleEntries = [];
-  for (const body of samples) {
-    const result = await api('thoughts', 'POST', { id: crypto.randomUUID(), body });
+  const sampleTitles = ['a place for unfinished ideas', 'a note from that book', 'a small observation'];
+  for (const [index, body] of samples.entries()) {
+    const result = await api('thoughts', 'POST', { id: crypto.randomUUID(), title: sampleTitles[index], body });
     ids.push(result.data.entry.id); sampleEntries.push(result.data.entry);
   }
   await api(`thoughts/${ids[1]}`, 'PATCH', { bookmarked: true });
@@ -101,6 +108,31 @@ try {
   const fontStatus = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].map(font => ({ family: font.family, status: font.status })); });
   assert.ok(fontStatus.some(font => font.family.includes('Instrument Sans') && font.status === 'loaded'), 'homepage body font loads');
   assert.ok(fontStatus.some(font => font.family.includes('Fraunces') && font.status === 'loaded'), 'homepage name font loads');
+
+  // Capture the quiet inline editor before posting, then its saved entry.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('#body').fill('sample thought: i remember ideas better when i leave myself a few words about why they mattered.');
+  await page.locator('#add-title').click();
+  await page.locator('#title').fill('leaving a little context');
+  await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
+  await idle();
+  await page.screenshot({ path: `${artifacts}/composing-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: `${artifacts}/composing-mobile.png`, fullPage: true });
+  await page.locator('#title').press('Enter');
+  assert.equal(await page.locator('#body').evaluate(element => element === document.activeElement), true, 'title Enter moves into the body without posting');
+  const created = page.waitForResponse(response => response.url().endsWith('/api/thoughts') && response.request().method() === 'POST');
+  await page.locator('#post').click();
+  const newEntry = (await (await created).json()).entry; ids.push(newEntry.id);
+  await page.waitForFunction(() => document.querySelectorAll('.thought').length === 4 && !document.querySelector('#body').value && !document.querySelector('#title').value);
+  assert.equal(await page.locator('.thought').first().locator('.thought-title').textContent(), 'leaving a little context');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: `${artifacts}/posted-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: `${artifacts}/posted-mobile.png`, fullPage: true });
+  const rail = await page.locator('.thought').first().evaluate(article => ({ date: article.querySelector('time').getBoundingClientRect().right, line: article.getBoundingClientRect().left, title: article.querySelector('.thought-title').getBoundingClientRect().left }));
+  assert.ok(rail.date < rail.line && rail.line < rail.title, 'date stays left of the timeline on mobile');
+  await api(`thoughts/${newEntry.id}`, 'DELETE', {}); await setView('all'); await idle();
 
   // The same field filters old entries without publishing its contents.
   await page.locator('#body').fill('remember a book');
@@ -177,7 +209,7 @@ try {
   await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

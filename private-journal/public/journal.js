@@ -46,10 +46,15 @@ function download(filename, content, type) {
 
 function updateComposer() {
   $('#post').disabled = !$('#body').value.trim() || state.posting;
-  $('#compose-actions').hidden = !$('#body').value && !state.conflict && $('#retry-draft').hidden;
-  $('#clear-input').hidden = !$('#body').value;
+  $('#compose-actions').hidden = !$('#body').value && !$('#title').value && !state.conflict && $('#retry-draft').hidden;
+  $('#clear-input').hidden = !$('#body').value && !$('#title').value;
+  $('#add-title').hidden = !$('#composer-title').hidden;
+  $('#add-title').disabled = state.posting;
   $('#clear-input').disabled = state.posting;
 }
+
+const hasDraft = draft => Boolean(draft.title || draft.body);
+const entryText = entry => entry.title ? `${entry.title}\n\n${entry.body}` : entry.body;
 
 async function saveDraft() {
   clearTimeout(state.draftTimer);
@@ -63,13 +68,14 @@ async function saveDraft() {
   state.saving = (async () => {
     while (state.dirty && state.authenticated) {
       const body = $('#body').value;
+      const title = $('#title').value;
       state.dirty = false;
       draftStatus('saving…');
       $('#retry-draft').hidden = true;
       try {
-        const draft = await api('draft', { method: 'PUT', body: JSON.stringify({ body, version: state.draft.version }) });
+        const draft = await api('draft', { method: 'PUT', body: JSON.stringify({ title, body, version: state.draft.version }) });
         state.draft.version = draft.version;
-        draftStatus(state.dirty ? 'unsaved' : body ? 'draft saved' : '');
+        draftStatus(state.dirty ? 'unsaved' : title || body ? 'draft saved' : '');
       } catch (error) {
         state.dirty = true;
         state.conflict = error.status === 409;
@@ -93,20 +99,22 @@ function changedDraft() {
 }
 
 async function enter() {
-  const unsaved = state.dirty ? { body: $('#body').value } : null;
+  const unsaved = state.dirty ? { title: $('#title').value, body: $('#body').value } : null;
   const session = await api('session');
   state.semanticAvailable = Boolean(session.semanticSearch);
   const draft = await api('draft');
   state.draft = draft;
-  state.conflict = Boolean(unsaved && draft.body !== unsaved.body);
+  state.conflict = Boolean(unsaved && (draft.body !== unsaved.body || draft.title !== unsaved.title));
   state.dirty = state.conflict;
   $('#body').value = unsaved?.body ?? draft.body;
+  $('#title').value = unsaved?.title ?? draft.title ?? '';
+  $('#composer-title').hidden = !$('#title').value;
   state.authenticated = true;
   $('#login').hidden = true;
   $('#app').hidden = false;
   $('#boot-status').hidden = true;
   $('#password').value = '';
-  draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : draft.body ? 'draft saved' : '');
+  draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
   await searchFromComposer(true);
 }
@@ -161,10 +169,18 @@ function renderEntry(entry) {
   const article = document.createElement('article'); article.className = 'thought'; article.tabIndex = 0; article.dataset.id = entry.id;
   const header = document.createElement('header'); header.className = 'thought-header';
   const time = document.createElement('time'); time.dateTime = entry.created_at;
-  time.textContent = new Date(entry.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  const date = new Date(entry.created_at);
+  time.title = date.toLocaleString();
+  const day = document.createElement('span'); day.textContent = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
+  const clock = document.createElement('span'); clock.textContent = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  time.append(day, clock);
   header.append(time);
-  if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = '· edited'; header.append(edited); }
+  if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; header.append(edited); }
   article.append(header);
+  if (entry.title) {
+    const title = document.createElement('h2'); title.className = 'thought-title';
+    title.append(bodyContent(entry.title, state.query)); article.append(title);
+  }
   const text = document.createElement('p'); text.className = 'thought-body';
   text.id = `thought-${entry.id}`;
   text.classList.toggle('collapsed', !state.expanded.has(entry.id));
@@ -200,7 +216,7 @@ function updateView() {
 function searchFromComposer(immediate = false) {
   clearTimeout(state.searchTimer);
   clearTimeout(state.relatedTimer);
-  state.query = $('#body').value.trim();
+  state.query = entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() }).trim();
   state.semantic = false;
   state.controller?.abort();
   state.generation++;
@@ -281,14 +297,17 @@ $('#login-form').addEventListener('submit', async event => {
   finally { $('#unlock').disabled = false; }
 });
 $('#body').addEventListener('input', changedDraft);
+$('#title').addEventListener('input', changedDraft);
+$('#add-title').addEventListener('click', () => { $('#composer-title').hidden = false; updateComposer(); $('#title').focus(); });
 $('#retry-draft').addEventListener('click', () => saveDraft().catch(() => {}));
-$('#body').addEventListener('keydown', event => {
+$('#composer').addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !$('#post').disabled) { event.preventDefault(); $('#composer').requestSubmit(); }
+  else if (event.target.id === 'title' && event.key === 'Enter') { event.preventDefault(); $('#body').focus(); }
 });
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
   if (state.posting || !$('#body').value.trim()) return;
-  state.posting = true; $('#body').disabled = true;
+  state.posting = true; $('#body').disabled = true; $('#title').disabled = true;
   clearTimeout(state.searchTimer); clearTimeout(state.relatedTimer); state.controller?.abort(); state.generation++;
   updateComposer(); notice();
   try {
@@ -296,16 +315,18 @@ $('#composer').addEventListener('submit', async event => {
     // clear the other device's draft because the version is checked in SQL.
     await saveDraft().catch(() => {});
     const body = $('#body').value;
-    if (!state.pendingPost || state.pendingPost.body !== body) state.pendingPost = { id: crypto.randomUUID(), body };
+    const title = $('#title').value;
+    if (!state.pendingPost || state.pendingPost.body !== body || state.pendingPost.title !== title) state.pendingPost = { id: crypto.randomUUID(), title, body };
     const data = await api('thoughts', { method: 'POST', body: JSON.stringify({ ...state.pendingPost, draft_version: state.draft.version }) });
     state.pendingPost = null; state.dirty = false; state.conflict = false; state.draft = data.draft;
-    $('#body').value = data.draft.body; draftStatus(data.draft.body ? 'draft saved' : '');
+    $('#body').value = data.draft.body; $('#title').value = data.draft.title || '';
+    $('#composer-title').hidden = !$('#title').value; draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
     await setView('all');
   } catch (error) { notice(error.message); }
-  finally { state.posting = false; $('#body').disabled = false; updateComposer(); }
+  finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
 });
 $('#clear-input').addEventListener('click', () => {
-  $('#body').value = ''; changedDraft(); $('#body').focus();
+  $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); $('#body').focus();
 });
 $('#more').addEventListener('click', () => { $('#more').textContent = 'load more'; loadFeed(state.entries.size > 0 && state.cursor !== null); });
 document.addEventListener('keydown', event => {
@@ -332,10 +353,10 @@ $('#feed').addEventListener('click', async event => {
       state.entries.set(entry.id, { ...entry, ...data.entry });
       if (state.view === 'saved' && !data.entry.bookmarked) await loadFeed();
       else target.closest('article').replaceWith(renderEntry({ ...entry, ...data.entry }));
-    } else if (action === 'copy') { await navigator.clipboard.writeText(entry.body); notice('copied.'); }
-    else if (action === 'edit') { $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
+    } else if (action === 'copy') { await navigator.clipboard.writeText(entryText(entry)); notice('copied.'); }
+    else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
-    else if (action === 'public') { $('#public-body').value = entry.body; $('#public-status').textContent = ''; $('#public-dialog').showModal(); }
+    else if (action === 'public') { $('#public-thought-title').value = entry.title || ''; $('#public-body').value = entry.body; $('#public-status').textContent = ''; $('#public-dialog').showModal(); }
   } catch (error) { target.disabled = false; notice(error.message); }
 });
 
@@ -343,7 +364,7 @@ $('#edit-form').addEventListener('submit', async event => {
   event.preventDefault();
   const submit = event.submitter; submit.disabled = true;
   try {
-    await api(`thoughts/${state.selected.id}`, { method: 'PATCH', body: JSON.stringify({ body: $('#edit-body').value, updated_at: state.selected.updated_at }) });
+    await api(`thoughts/${state.selected.id}`, { method: 'PATCH', body: JSON.stringify({ title: $('#edit-thought-title').value, body: $('#edit-body').value, updated_at: state.selected.updated_at }) });
     $('#edit-dialog').close(); await loadFeed();
   } catch (error) { $('#edit-error').textContent = error.message; }
   finally { submit.disabled = false; }
@@ -357,12 +378,12 @@ $('#delete-form').addEventListener('submit', async event => {
   finally { submit.disabled = false; }
 });
 $('#copy-public').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText($('#public-body').value); $('#public-status').textContent = 'copied.'; }
+  try { await navigator.clipboard.writeText(entryText({ title: $('#public-thought-title').value, body: $('#public-body').value })); $('#public-status').textContent = 'copied.'; }
   catch { $('#public-status').textContent = 'select the text to copy it.'; }
 });
 $('#download-public').addEventListener('click', () => {
   const date = new Date().toISOString().slice(0, 10);
-  download(`thought-${date}.md`, `---\ntitle: "Untitled"\ndate: "${date}"\npublished: false\n---\n\n${$('#public-body').value}\n`, 'text/markdown');
+  download(`thought-${date}.md`, `---\ntitle: ${JSON.stringify($('#public-thought-title').value.trim() || 'Untitled')}\ndate: "${date}"\npublished: false\n---\n\n${$('#public-body').value}\n`, 'text/markdown');
   $('#public-status').textContent = 'downloaded.';
 });
 $('#export').addEventListener('click', async () => {
@@ -378,6 +399,8 @@ $('#logout').addEventListener('click', async () => {
     state.entries.clear(); state.selected = null; state.pendingPost = null;
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
+    for (const input of document.querySelectorAll('.title-input')) input.value = '';
+    $('#composer-title').hidden = true;
     showLogin();
   } catch (error) { notice(error.message); }
 });

@@ -3,11 +3,13 @@
 A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and three-line
-thought previews with an open/close control. Typing recalls related past
-thoughts; clearing restores the timeline. Only an explicit post creates a new
-entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no 280-character limit (the
-storage limit is 20,000 characters). No analytics, trackers, browser-local
-thought storage, or external runtime assets.
+thought previews with an open/close control. Optional titles sit above the
+body; dates sit to the left of the timeline on desktop and mobile. Typing
+recalls related past thoughts; clearing restores the timeline. Only an explicit post creates a new
+entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
+280-character limit (the storage limit is 20,000 body characters and 160 title
+characters). No analytics, trackers, browser-local thought storage, or external
+runtime assets.
 
 The interface and backend live in `personalwebsite`. **Journal text is stored in
 Cloudflare D1, not Git or `site-content`.** `build.py` excludes this entire
@@ -53,7 +55,7 @@ the local preview password using a hidden prompt. Run `npm run test:browser`.
 Browser tests refuse remote URLs and use only synthetic local entries. Use a
 clean local draft before running them. Screenshots go to ignored `test-results/`.
 An existing Chromium binary can be selected with `CHROMIUM_PATH`. These tests
-cover autosave restoration, posting, bookmarks, accent-insensitive search,
+cover title/body autosave restoration, posting, bookmarks, accent-insensitive search,
 editing, safe rendering, separate public drafts, desktop/mobile layout,
 font loading, draft conflicts, and server-side session revocation. Shared-field
 checks cover pause-triggered semantic requests, stale response cancellation,
@@ -109,6 +111,11 @@ on the new deployment because every session is bound to the current hash.
 - D1 is access-controlled server storage, **not end-to-end encryption**. The
   owner of the Cloudflare account and Cloudflare infrastructure can access it.
   Do not describe the journal as a zero-knowledge vault.
+- Titles are optional. The writing field stays borderless; “add title” reveals
+  a separate inline title once writing begins. Title and body autosave together,
+  and both are included in search, copying, exports, and separate public drafts.
+  Posting saves privately in this journal. Public-draft actions still require
+  an explicit copy/download; posting does not send to another service.
 - Drafts autosave after 650ms and are shared between devices. A revision check
   prevents one device from silently overwriting another. A conflicting draft
   stays in the editor; it can still be copied or posted as a separate thought.
@@ -126,7 +133,7 @@ on the new deployment because every session is bound to the current hash.
 - SQLite FTS5 ranks prefix matches, normalizes accents, and ignores common
   function words when specific terms are present. Search requests use a POST
   body so a composed thought is not placed in a URL. Queries support the full
-  20,000-character writing limit; embedding batches never exceed eight chunks.
+  title and 20,000-character body; embedding batches never exceed eight chunks.
   Keyword results remain available without the AI binding or on provider
   failure. Results and timelines use 40-entry pages. Search highlighting uses
   the same term selection and never renders user text as HTML.
@@ -160,10 +167,12 @@ on the new deployment because every session is bound to the current hash.
   processing, not on-device inference. See [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
 - Typography matches the personal homepage: self-hosted Instrument Sans at
   14px with 1.55 line height, #333 reading text, and the same #fafafa background.
+  The header name uses the homepage’s 14px Fraunces at weight 500.
   The existing font subsets are reused with their OFL license. Square corners, solid fills, and visible rules
   separate menus and controls; the feed itself has no cards or boxed composer.
-  Its line marks saved chronology and points align with timestamps. The
-  writing/search field stays separate above the line, without a timestamp or
+  Its line marks saved chronology. Dates and times sit to its left, aligned
+  with each thought’s first line. On narrow screens the date column moves
+  inside the page to keep all timestamps visible. The writing/search field stays separate above the line, without a timestamp or
   timeline marker. There are no decorative effects or motion.
 
 For host setup, use the official [Workers static asset docs](https://developers.cloudflare.com/workers/static-assets/)
