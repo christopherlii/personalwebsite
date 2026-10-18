@@ -209,8 +209,8 @@ function updateView() {
     if (item.dataset.view === state.view) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   }
-  $('#view-title').textContent = state.query ? 'related thoughts' : state.view === 'saved' ? 'bookmarks' : 'thoughts';
-  $('#view-title').classList.toggle('sr-only', state.view === 'all' && !state.query);
+  $('#view-title').textContent = state.view === 'saved' ? 'bookmarks' : 'thoughts';
+  $('#view-title').classList.toggle('sr-only', state.view === 'all' || Boolean(state.query));
 }
 
 function searchFromComposer(immediate = false) {

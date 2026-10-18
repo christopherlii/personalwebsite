@@ -61,7 +61,7 @@ try {
   await setView('saved');
   await page.waitForFunction(id => Boolean(document.querySelector(`article[data-id="${id}"] button[aria-pressed=true]`)), root.id);
   await page.locator('#body').fill('cafe');
-  await page.waitForFunction(() => document.querySelector('#view-title').textContent === 'related thoughts' && document.querySelector('mark')?.textContent === 'café');
+  await page.waitForFunction(() => document.querySelector('#view-title').classList.contains('sr-only') && document.querySelector('mark')?.textContent === 'café');
   await page.locator('#clear-input').click();
   await idle(); await blankDraft();
 
