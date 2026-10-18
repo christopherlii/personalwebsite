@@ -7,6 +7,7 @@ import { indexTags, repairTagIndex } from './tags.mjs';
 import { normalizeTag } from './public/tags.js';
 import { photoApi, PhotoError } from './photos.mjs';
 import { TranscriptionError, transcribe } from './transcription.mjs';
+import { liveDictation } from './live-dictation.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -112,6 +113,13 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  if(path==='/api/dictation'){
+    if(request.method!=='GET')fail(405,'Method not allowed.');
+    if(request.headers.get('Origin')!==url.origin)fail(403,'Request not allowed.');
+    if(request.headers.get('Upgrade')?.toLowerCase()!=='websocket')fail(426,'Open a live dictation connection.');
+    await limit(env,'dictation:minute',20,60000);await limit(env,'dictation:hour',300,3600000);
+    return liveDictation(request,env,async()=>Boolean(await sessionFor(request,env)));
+  }
   if(path==='/api/transcribe'){
     if(request.method!=='POST')fail(405,'Method not allowed.');
     await limit(env,'dictation:minute',20,60000);
@@ -284,6 +292,7 @@ export default {
       const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof TranscriptionError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
+    if(response.status===101)return response;
     // CodeMirror mounts its base styles at runtime. Authorize only those
     // styles with a fresh nonce in the static shell, keeping inline scripts blocked.
     let styleNonce = '';
@@ -300,7 +309,7 @@ export default {
     output.headers.set('Referrer-Policy', 'no-referrer');
     output.headers.set('X-Content-Type-Options', 'nosniff');
     output.headers.set('X-Frame-Options', 'DENY');
-    output.headers.set('Content-Security-Policy', `default-src 'none'; script-src 'self'; style-src 'self'${styleNonce ? ` 'nonce-${styleNonce}'` : ''}; font-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
+    output.headers.set('Content-Security-Policy', `default-src 'none'; script-src 'self'; style-src 'self'${styleNonce ? ` 'nonce-${styleNonce}'` : ''}; font-src 'self'; connect-src 'self' ${url.protocol==='https:'?'wss:':'ws:'}//${url.host}; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
     return request.method === 'HEAD' ? new Response(null, output) : output;
   }
 };

@@ -72,7 +72,6 @@ try {
 
   const first = `${prefix}: basketball after a day of building things. café hopping tomorrow.\n\n${'a longer thought belongs here too. '.repeat(12)}`.trim();
   await fillComposer(first);
-  await page.locator('#add-title').click();
   await page.locator('#title').fill('a day of building');
   await page.waitForFunction(async () => document.querySelector('#composer').dataset.draftState==='saved' && (await (await fetch('/api/draft')).json()).body === document.querySelector('#body').value);
   await page.reload();
@@ -375,7 +374,6 @@ try {
   // Capture the quiet inline editor before posting, then its saved entry.
   await page.setViewportSize({ width: 1280, height: 900 });
   await fillComposer('sample thought: i remember ideas better when i leave myself a few words about why they mattered.');
-  await page.locator('#add-title').click();
   await page.locator('#title').fill('leaving a little context');
   await page.waitForFunction(async () => document.querySelector('#composer').dataset.draftState==='saved' && (await (await fetch('/api/draft')).json()).body === document.querySelector('#body').value);
   await idle();
@@ -407,7 +405,7 @@ try {
   assert.equal(await page.locator('#body').inputValue(), 'remember a book');
   assert.equal((await api('export')).data.entries.length, samples.length, 'typing/searching creates no timeline entry');
   await clearComposer();
-  await page.waitForFunction(() => document.querySelectorAll('.thought').length === 3 && document.querySelector('#compose-actions').hidden);
+  await page.waitForFunction(() => document.querySelectorAll('.thought').length === 3 && document.querySelector('#post').disabled);
   await blankDraft();
   assert.equal(await page.locator('#composer-section').evaluate(element => element.closest('.stream') === null), true, 'composer is separate from the timeline');
 

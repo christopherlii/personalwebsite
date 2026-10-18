@@ -201,40 +201,64 @@ only publish/update does. Unpublish removes public access and retains the draft.
 Copy/download remain available for Substack, X, or Markdown backups without
 posting to those services. Existing media and reading/favorites stay in Git.
 
-Dictation uses `getUserMedia` and `MediaRecorder`, so it does not depend on the
-browser vendor's `SpeechRecognition` service. Photo and dictate are quiet text buttons in both writing fields.
-The composer keeps photo, dictate, and add title together with post on the
-same baseline; the full editor places its tools below the writing. A single
-reserved feedback line keeps routine recording states from moving the feed. Capture starts only on an explicit
-click and requires microphone permission. Press stop to transcribe; post, save,
-and back also stop capture and wait for the final transcript. Each transcript
-is one undoable editor insertion. Existing typing, autosave, and conflict
-protections remain in place. Routine draft success/saving labels and the clear
-control are removed; draft failures and retry remain visible.
+The composer has a permanent optional title field above the writing. Its empty
+placeholder is muted “no title”; that phrase is never stored as a title.
+Photo, dictate, and post form one compact group on the right. Post stays visible
+and disabled until there is saved/typed body text. The title, writing, and
+controls use the existing homepage type and hover treatment.
 
-The authenticated, CSRF-protected `/api/transcribe` endpoint sends bounded audio
-to Cloudflare-hosted `@cf/openai/whisper-large-v3-turbo` using the existing AI
-binding. There is no new provider key or recording storage. The browser keeps
-recordings in memory only, stops at two minutes or 2 MB, releases microphone
-tracks before transcription, and accepts supported WebM/Opus, MP4, or Ogg
-recording. The endpoint enforces an actual 2 MB stream limit, checks container
-signatures, accepts WAV for fixtures, and bounds output text. Voice activity
-filtering reduces silence hallucinations. Rate limits are 20 requests/minute and
-300/hour. No audio, transcripts, or provider error details are logged. Cancel,
-hiding the tab, locking, and session expiry abort pending results. Permission,
-provider, empty-speech, timeout, and editor-limit failures preserve typed text;
-a failed transcription stops the action that was waiting for it. Starting
-capture and awaiting transcription have deadlines. A late microphone grant
-is immediately released after cancellation.
+Live dictation uses `getUserMedia`, `MediaRecorder`, and an owner-authenticated
+same-origin WebSocket at `/api/dictation`. Audio frames stream to Cloudflare-hosted
+`@cf/deepgram/nova-3` through the existing AI binding. Interim results appear as
+muted inline CodeMirror decorations, replacing earlier interim words in place;
+they are not Markdown source, autosaved text, search queries, or undo entries.
+Confirmed phrases become ordinary source immediately as individual undoable
+edits. Typing and moving the caret remain available while speaking. The empty
+writing placeholder recedes while an interim phrase is present.
 
-`npm run test:dictation` exercises real MediaRecorder with a synthetic microphone,
-without `SpeechRecognition`, and controlled transcription responses. It checks
-stop/post/save/back, track cleanup, autosave, undo, provider errors, late-result
-cancellation, reserved control geometry, and a 320px layout. A separate local
-Workers AI binding check transcribes generated speech through the real model.
-No physical microphone or private writing is used by automated checks.
-See the [model documentation](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/)
-and [MediaRecorder documentation](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder).
+Stop, post, save, and back stop capture, send its final audio frame, ask the
+model to finalize, and wait for the stream to finish. Any last visible interim
+words are retained at completion, or on a disconnected/erroring stream, rather
+than silently disappearing. Errors stop a dependent post/save/navigation action
+so that the retained text can be checked. Explicit cancel, session expiry, and
+hiding the tab clear pending interim words and reject late results; confirmed
+writing retains its existing autosave and conflict protections. Capture never
+restarts automatically. Physical microphone permission remains a browser/system
+setting.
+
+Audio and provider connections live only in memory. No recordings or provider
+message payloads are written to journal storage or logs. The upgrade requires
+the journal session, exact Origin, and WebSocket Upgrade headers. The relay
+accepts only bounded WebM/Ogg/MP4 audio frames and the stop control; model options
+are server-controlled, including `mip_opt_out`. Stream limits are 2 MB total,
+256 KiB per frame, two minutes of browser capture, and a 125-second server
+connection deadline including flush grace. Connection attempts retain the
+existing 20/minute and 300/hour rate limits. Sessions are checked again every
+15 seconds. Both sockets close together, and microphone tracks release as soon
+as capture ends. Slow connections, malformed payloads, duplicates, stale interim
+ranges, and oversized transcripts are guarded. Binary delivery is explicitly
+set to ArrayBuffer before accepting sockets, matching the configured Workers
+compatibility date. The CSP allows only the journal's own WebSocket origin.
+The older bounded `/api/transcribe` Whisper endpoint remains for cached clients;
+the current interface uses the live connection.
+
+Streaming uses the Workers AI audio quota and the
+[Nova-3 WebSocket rate](https://developers.cloudflare.com/workers-ai/models/nova-3/),
+which differs from the older batch Whisper rate. No paid plan upgrade or new
+provider key is configured by this change. See the
+[Workers WebSocket documentation](https://developers.cloudflare.com/workers/runtime-apis/websockets/),
+[Cloudflare voice provider implementation](https://github.com/cloudflare/agents/blob/main/packages/agents/src/voice/workers-ai.ts),
+and [Finalize control documentation](https://developers.deepgram.com/docs/finalize).
+
+`npm run test:dictation` uses a synthetic microphone and controlled WebSocket
+messages to verify live partial revisions, typing preservation, duplicate
+suppression, undo, title autosave/reload, final flush on stop/post/save/back,
+resource cleanup, disconnect preservation, hidden-tab cancellation, and mobile
+layout. Relay unit checks cover frame/control limits, sanitized results,
+completion, disconnects, and the server deadline. A separate isolated local
+Worker/AI binding check streams generated speech through the real authenticated
+relay and Nova-3 into the editor and local autosave. No real microphone or
+private writing is used by automated checks.
 
 ## Local preview
 
@@ -293,8 +317,8 @@ the local preview (`JOURNAL_TEST_URL` may select its port). API tests additional
 cover private access, export, rejected destinations and redirects, bounded
 metadata, and cached semantic retrieval without provider calls during lookup.
 Run `npm run test:dictation` for composer/reader insertion, autosave, undo/redo,
-final transcripts on stop/post/save/back, provider-failure handling, stale-result
-isolation, track cleanup, and a 320px layout. MediaRecorder uses Chromium's
+live interim/final words, final flush on stop/post/save/back, provider-failure
+handling, stale-result isolation, track cleanup, and a 320px layout. MediaRecorder uses Chromium's
 synthetic microphone; physical microphone permission still depends on the
 user's browser and system settings.
 

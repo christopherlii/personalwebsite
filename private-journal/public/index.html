@@ -38,19 +38,18 @@
     </header>
     <section id="composer-section" class="composer-section page-entrance" aria-label="write or search your thoughts">
       <form id="composer">
-        <div id="composer-title" hidden>
+        <div id="composer-title">
           <label for="title" class="sr-only">title (optional)</label>
-          <input id="title" class="title-input" placeholder="title" maxlength="160" autocomplete="off">
+          <input id="title" class="title-input" placeholder="no title" maxlength="160" autocomplete="off">
         </div>
         <div id="composer-editor"></div>
         <textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
         <div class="composer-toolbar">
           <div class="composer-tools">
             <button type="button" id="photo-composer" class="add-photo tool-button">photo</button>
-            <button id="dictate-composer" class="dictate-toggle tool-button" type="button" aria-pressed="false" aria-describedby="dictation-composer-status" title="Press stop to transcribe. Audio is processed by Cloudflare and is not saved in the journal.">dictate</button>
-            <button type="button" id="add-title">add title</button>
+            <button id="dictate-composer" class="dictate-toggle tool-button" type="button" aria-pressed="false" aria-describedby="dictation-composer-status" title="Live dictation. Audio is processed by Cloudflare and is not saved in the journal.">dictate</button>
           </div>
-          <div class="compose-actions" id="compose-actions" hidden><button class="post" type="submit" id="post" disabled>post ↗</button></div>
+          <div class="compose-actions" id="compose-actions"><button class="post" type="submit" id="post" disabled>post ↗</button></div>
         </div>
         <div class="writing-feedback">
           <span id="dictation-composer-status" role="status"></span>
@@ -87,10 +86,10 @@
     <article id="reader-content" tabindex="-1"></article>
     <form id="edit-form" hidden>
       <label for="edit-thought-title" class="sr-only">title (optional)</label>
-      <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
+      <input id="edit-thought-title" class="title-input" placeholder="no title" maxlength="160" autocomplete="off">
       <div id="live-editor"></div>
       <textarea id="edit-body" hidden aria-hidden="true" tabindex="-1"></textarea>
-      <div class="photo-tools dictation-controls"><button type="button" id="photo-reader" class="add-photo tool-button">photo</button><button type="button" id="dictate-reader" class="dictate-toggle tool-button" aria-pressed="false" aria-describedby="dictation-reader-status" title="Press stop to transcribe. Audio is processed by Cloudflare and is not saved in the journal." hidden>dictate</button></div>
+      <div class="photo-tools dictation-controls"><button type="button" id="photo-reader" class="add-photo tool-button">photo</button><button type="button" id="dictate-reader" class="dictate-toggle tool-button" aria-pressed="false" aria-describedby="dictation-reader-status" title="Live dictation. Audio is processed by Cloudflare and is not saved in the journal." hidden>dictate</button></div>
       <div class="writing-feedback"><span id="dictation-reader-status" role="status"></span></div>
     </form>
     <p id="reader-error" role="status"></p>
@@ -120,7 +119,7 @@
   <dialog id="public-dialog" aria-labelledby="public-title">
     <header><h2 id="public-title">public draft</h2><button type="button" data-close="public-dialog">close</button></header>
     <label for="public-thought-title" class="sr-only">public title</label>
-    <input id="public-thought-title" class="title-input" placeholder="title" maxlength="160" autocomplete="off" aria-required="true">
+    <input id="public-thought-title" class="title-input" placeholder="no title" maxlength="160" autocomplete="off" aria-required="true">
     <label for="public-body" class="sr-only">public draft text</label>
     <textarea id="public-body" rows="10" maxlength="20000"></textarea>
     <details class="publication-details">
