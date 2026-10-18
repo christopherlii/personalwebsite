@@ -1,0 +1,377 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync, readdirSync } from 'node:fs';
+import worker from '../worker.mjs';
+import { passwordHash, digest, COOKIE } from '../auth.mjs';
+import { ftsQuery } from '../search.mjs';
+import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic.mjs';
+
+const password = 'a-test-only-passphrase-that-is-not-a-secret';
+const salt = '12'.repeat(16);
+const config = `pbkdf2-sha256$100000$${salt}$${await passwordHash(password, salt)}`;
+
+function database() {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec('PRAGMA foreign_keys = ON;');
+  for (const file of readdirSync(new URL('../migrations/', import.meta.url)).sort()) sqlite.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
+  const prepare = sql => {
+    let args = [];
+    return {
+      bind(...values) { args = values.map(value => value instanceof ArrayBuffer ? new Uint8Array(value) : value); return this; },
+      async first() { return sqlite.prepare(sql).get(...args) || null; },
+      async all() { return { results: sqlite.prepare(sql).all(...args) }; },
+      async run() { sqlite.prepare(sql).run(...args); return { success: true }; },
+      execute() { return { results: sqlite.prepare(sql).all(...args) }; }
+    };
+  };
+  return { prepare, sqlite, async batch(statements) {
+    sqlite.exec('BEGIN');
+    try { const result = statements.map(statement => statement.execute()); sqlite.exec('COMMIT'); return result; }
+    catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+  } };
+}
+
+function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config }) {
+  let cookie = '';
+  return { env, setCookie(value) { cookie = value; }, async call(path, method = 'GET', body, headers = {}) {
+    const response = await worker.fetch(new Request(`https://journal.example${path}`, {
+      method, headers: { Cookie: cookie, Origin: 'https://journal.example', 'Content-Type': 'application/json', 'X-Journal': '1', ...headers },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    }), env);
+    if (response.headers.has('Set-Cookie')) cookie = response.headers.get('Set-Cookie').split(';')[0];
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = raw; }
+    return { status: response.status, headers: response.headers, data };
+  }, async login() { return this.call('/api/login', 'POST', { password }); } };
+}
+const thought = body => ({ id: crypto.randomUUID(), body });
+const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('publication editing and importing require owner authentication', async () => {
+  const c = client();
+  const id = crypto.randomUUID();
+  for (const [path, method, input] of [
+    [`/api/thoughts/${id}/publication`, 'GET'],
+    [`/api/thoughts/${id}/publication`, 'PUT', { draft: publicDraft(), version: 0 }],
+    [`/api/thoughts/${id}/publication/publish`, 'POST', { version: 1 }],
+    [`/api/thoughts/${id}/publication/unpublish`, 'POST', { version: 1 }],
+    ['/api/import', 'POST', {}],
+  ]) assert.equal((await c.call(path, method, input)).status, 401);
+  assert.deepEqual((await c.call('/public/posts/index.json')).data, []);
+  assert.equal((await c.call('/public/posts/index.json', 'POST', {})).status, 405);
+});
+
+test('public writing exposes only explicit published snapshots, with independent edits and unpublishing', async () => {
+  const owner = client(); await owner.login();
+  const visitor = client(owner.env);
+  const entry = (await owner.call('/api/thoughts', 'POST', { ...thought('a private memory that must stay private'), title: 'private title' })).data.entry;
+  const path = `/api/thoughts/${entry.id}/publication`;
+  const initial = await owner.call(path);
+  assert.equal(initial.data.draft.body, entry.body);
+  const saved = await owner.call(path, 'PUT', { draft: publicDraft(), version: 0 });
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await visitor.call('/public/export.json')).data, { posts: [] });
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).status, 404);
+  const published = await owner.call(path + '/publish', 'POST', { version: saved.data.version });
+  assert.equal(published.status, 200);
+  const index = await visitor.call('/public/posts/index.json');
+  assert.equal(index.headers.get('Access-Control-Allow-Origin'), '*');
+  assert.equal(index.headers.get('Cache-Control'), 'no-store');
+  assert.equal(index.data[0].file, 'a-public-note.md');
+  assert.equal(index.data[0].title, 'a public note');
+  assert.equal(Object.hasOwn(index.data[0], 'thought_id'), false);
+  assert.equal(Object.hasOwn(index.data[0], 'body'), false);
+  const publicText = (await visitor.call('/public/posts/a-public-note.md')).data;
+  assert.match(publicText, /the public version/);
+  assert.doesNotMatch(publicText, /private memory|private title/);
+  const rss = await visitor.call('/public/feed.xml');
+  assert.match(rss.headers.get('Content-Type'), /application\/rss\+xml/);
+  assert.match(rss.data, /a public note/);
+  assert.doesNotMatch(rss.data, /private memory/);
+  assert.equal((await owner.call(`/api/thoughts/${entry.id}`, 'DELETE', {})).status, 409, 'deleting a private entry cannot silently delete its published version');
+  await owner.call(`/api/thoughts/${entry.id}`, 'PATCH', { body: 'a changed private memory', updated_at: entry.updated_at });
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).data, publicText, 'journal edits remain private');
+  const draft = publicDraft('an unpublished revision'); draft.slug = 'a-new-address';
+  const revised = await owner.call(path, 'PUT', { draft, version: published.data.version });
+  assert.equal((await owner.call(path, 'PUT', { draft, version: published.data.version })).status, 409, 'another tab cannot overwrite a newer public draft');
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).data, publicText, 'saving public drafts does not update the snapshot');
+  assert.equal((await visitor.call('/public/posts/a-new-address.md')).status, 404);
+  assert.equal((await owner.call(path + '/publish', 'POST', { version: published.data.version })).status, 409);
+  const update = await owner.call(path + '/publish', 'POST', { version: revised.data.version });
+  assert.match((await visitor.call('/public/posts/a-new-address.md')).data, /an unpublished revision/);
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).status, 404);
+  const archive = (await owner.call('/api/export')).data;
+  assert.equal(archive.publications[0].draft.body, 'an unpublished revision');
+  assert.equal(archive.publications[0].published.slug, 'a-new-address');
+  assert.equal((await owner.call(path + '/unpublish', 'POST', { version: update.data.version })).status, 200);
+  assert.equal((await visitor.call('/public/posts/a-new-address.md')).status, 404);
+  assert.deepEqual((await visitor.call('/public/posts/index.json')).data, []);
+  assert.deepEqual((await visitor.call('/public/export.json')).data.posts, []);
+  assert.doesNotMatch((await visitor.call('/public/feed.xml')).data, /<item>/);
+  assert.equal((await owner.call(path)).data.draft.body, draft.body, 'unpublishing retains the editable draft');
+  assert.equal((await owner.call(`/api/thoughts/${entry.id}`, 'DELETE', {})).status, 200);
+});
+
+test('publication addresses are unique and validation prevents invalid metadata from reaching public routes', async () => {
+  const c = client(); await c.login();
+  const a = (await c.call('/api/thoughts', 'POST', thought('private a'))).data.entry;
+  const b = (await c.call('/api/thoughts', 'POST', thought('private b'))).data.entry;
+  const path = id => `/api/thoughts/${id}/publication`;
+  const one = await c.call(path(a.id), 'PUT', { draft: publicDraft(), version: 0 });
+  await c.call(path(a.id) + '/publish', 'POST', { version: one.data.version });
+  const two = await c.call(path(b.id), 'PUT', { draft: publicDraft('another public draft'), version: 0 });
+  assert.equal((await c.call(path(b.id) + '/publish', 'POST', { version: two.data.version })).status, 409);
+  assert.match((await c.call('/public/posts/a-public-note.md')).data, /the public version/);
+  for (const patch of [{ slug: '../private' }, { slug: 'x/y' }, { date: '2026-02-30' }, { date: 'invalid' }, { title: 'x'.repeat(161) }, { tags: 'not an array' }, { cover: 'file:///secret' }]) {
+    assert.equal((await c.call(path(b.id), 'PUT', { draft: { ...publicDraft(), ...patch }, version: two.data.version })).status, 400);
+  }
+  const empty = await c.call(path(b.id), 'PUT', { draft: { ...publicDraft(), title: '' }, version: two.data.version });
+  assert.equal((await c.call(path(b.id) + '/publish', 'POST', { version: empty.data.version })).status, 400);
+  assert.equal((await c.call('/public/posts/unknown.md')).status, 404);
+});
+
+test('existing writing import preserves publication status and metadata without replacing later edits', async () => {
+  const owner = client(); await owner.login();
+  const imports = [
+    { id: crypto.randomUUID(), source_key: 'site-content/posts/old-published.md', published: true, draft: { ...publicDraft('previously published text'), slug: 'old-published', date: '2024-01-17' } },
+    { id: crypto.randomUUID(), source_key: 'site-content/posts/old_draft.md', published: false, draft: { ...publicDraft('an old private draft'), slug: 'old_draft' } },
+  ];
+  for (const data of imports) assert.equal((await owner.call('/api/import', 'POST', data)).status, 201);
+  assert.equal((await owner.call('/api/import', 'POST', imports[0])).data.imported, false);
+  const visitor = client(owner.env);
+  assert.deepEqual((await visitor.call('/public/posts/index.json')).data.map(post => post.file), ['old-published.md']);
+  assert.equal((await visitor.call('/public/posts/old_draft.md')).status, 404);
+  assert.doesNotMatch(JSON.stringify((await visitor.call('/public/export.json')).data), /private draft/);
+  const draft = (await owner.call(`/api/thoughts/${imports[1].id}/publication`)).data;
+  assert.equal(draft.draft.coverPosition, 'center 40%');
+  assert.equal(draft.published, null);
+  const entry = (await owner.call('/api/thoughts')).data.entries.find(item => item.id === imports[0].id);
+  assert.equal(entry.source_date, '2024-01-17', 'date-only source metadata does not invent a visible time');
+  const revised = { ...imports[1].draft, body: 'a new private revision' };
+  await owner.call(`/api/thoughts/${imports[1].id}/publication`, 'PUT', { draft: revised, version: draft.version });
+  await owner.call('/api/import', 'POST', imports[1]);
+  assert.equal((await owner.call(`/api/thoughts/${imports[1].id}/publication`)).data.draft.body, 'a new private revision');
+  assert.equal((await owner.call('/api/export')).data.entries.length, 2);
+});
+
+test('every private read/write fails closed, including an unconfigured deployment', async () => {
+  const c = client();
+  for (const path of ['/api/thoughts', '/api/draft', '/api/export']) {
+    const result = await c.call(path);
+    assert.equal(result.status, 401);
+    assert.equal(result.headers.get('Cache-Control'), 'no-store');
+    assert.match(result.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
+    assert.equal(result.headers.get('X-Robots-Tag'), 'noindex, nofollow, noarchive');
+  }
+  assert.equal((await c.call('/api/thoughts', 'POST', thought('private'))).status, 401);
+  const missing = client({});
+  assert.deepEqual((await missing.call('/api/session')).data, { authenticated: false, ready: false });
+  assert.equal((await missing.call('/api/login', 'POST', { password })).status, 503);
+  assert.equal((await missing.call('/api/thoughts')).status, 503);
+});
+
+test('password login, CSRF protection, hashed sessions, logout, expiry, and password rotation', async () => {
+  const c = client();
+  assert.equal((await c.call('/api/login', 'POST', { password }, { Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await c.call('/api/login', 'POST', { password: 'wrong' })).status, 401);
+  const login = await c.login();
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('Set-Cookie');
+  assert.match(cookie, /HttpOnly; Secure; SameSite=Strict/);
+  assert.ok(cookie.startsWith(`${COOKIE}=`));
+  const token = cookie.split('=')[1].split(';')[0];
+  const session = await c.env.JOURNAL_DB.prepare('SELECT * FROM sessions').first();
+  assert.equal(session.token_hash, await digest(token));
+  assert.equal((await c.call('/api/thoughts', 'POST', thought('no'), { 'X-Journal': '' })).status, 403);
+  assert.equal((await c.call('/api/session')).data.authenticated, true);
+  c.env.JOURNAL_PASSWORD_HASH = `pbkdf2-sha256$100000$${salt}$${'a'.repeat(64)}`;
+  assert.equal((await c.call('/api/thoughts')).status, 401);
+  c.env.JOURNAL_PASSWORD_HASH = config;
+  await c.env.JOURNAL_DB.prepare('UPDATE sessions SET expires_at = 0').run();
+  assert.equal((await c.call('/api/thoughts')).status, 401);
+  await c.login();
+  assert.equal((await c.call('/api/logout', 'POST', {})).status, 200);
+  assert.equal((await c.call('/api/thoughts')).status, 401);
+});
+
+test('login attempts are limited in the database', async () => {
+  const c = client();
+  await c.env.JOURNAL_DB.prepare('INSERT INTO login_limits VALUES (?, 8, ?)').bind(`login:${await digest('local')}`, Date.now() + 900000).run();
+  assert.equal((await c.login()).status, 429);
+});
+
+test('thoughts survive sessions, post retries are idempotent, and drafts do not overwrite newer work', async () => {
+  const c = client(); await c.login();
+  const draft = await c.call('/api/draft', 'PUT', { body: 'a thought to keep', version: 0 });
+  assert.equal(draft.data.version, 1);
+  assert.equal((await c.call('/api/draft', 'PUT', { body: 'stale text', version: 0 })).status, 409);
+  const data = thought('a thought to keep');
+  const post = await c.call('/api/thoughts', 'POST', { ...data, draft_version: 1 });
+  assert.equal(post.status, 201);
+  assert.equal(post.data.draft.body, '');
+  assert.equal((await c.call('/api/thoughts', 'POST', data)).status, 200);
+  assert.equal((await c.call('/api/thoughts')).data.entries.length, 1);
+  await c.call('/api/logout', 'POST', {}); await c.login();
+  assert.equal((await c.call('/api/thoughts')).data.entries[0].body, data.body);
+  const version = (await c.call('/api/draft')).data.version;
+  await c.call('/api/draft', 'PUT', { body: 'a newer draft', version });
+  const old = await c.call('/api/thoughts', 'POST', { ...thought('old device text'), draft_version: version });
+  assert.equal(old.data.draft.body, 'a newer draft');
+});
+
+test('Unicode/prefix search, punctuation, bookmark filtering, editing, and deleted text indexing', async () => {
+  const c = client(); await c.login();
+  const a = (await c.call('/api/thoughts', 'POST', thought('café hopping after basketball'))).data.entry;
+  const b = (await c.call('/api/thoughts', 'POST', thought('finishing a book'))).data.entry;
+  assert.equal((await c.call('/api/thoughts?q=cafe')).data.entries[0].id, a.id);
+  assert.equal((await c.call('/api/thoughts?q=basket')).data.entries.length, 1);
+  const privateQuery = await c.call('/api/search', 'POST', { query: 'basketball '.repeat(100), saved: false, semantic: false });
+  assert.equal(privateQuery.status, 200);
+  assert.equal(privateQuery.data.entries[0].id, a.id);
+  assert.equal((await c.call('/api/thoughts?q=%22%20OR%20%2A')).status, 200);
+  assert.deepEqual((await c.call('/api/thoughts?q=%22%2A')).data.entries, []);
+  assert.equal(ftsQuery('café "x"* OR'), '"café"* OR "x"*');
+  assert.equal(ftsQuery('i want to remember a book'), '"want"* OR "remember"* OR "book"*');
+  await c.call(`/api/thoughts/${b.id}`, 'PATCH', { bookmarked: true });
+  assert.deepEqual((await c.call('/api/thoughts?saved=1')).data.entries.map(e => e.id), [b.id]);
+  await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'soccer instead', updated_at: a.updated_at });
+  assert.equal((await c.call('/api/thoughts?q=cafe')).data.entries.length, 0);
+  assert.equal((await c.call('/api/thoughts?q=soccer')).data.entries[0].id, a.id);
+  assert.equal((await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'stale change', updated_at: a.updated_at })).status, 409);
+  await c.call(`/api/thoughts/${a.id}`, 'DELETE', {});
+  assert.equal((await c.call('/api/thoughts?q=soccer')).data.entries.length, 0);
+});
+
+test('timeline pagination preserves independent thoughts and deletion removes only one entry', async () => {
+  const c = client(); await c.login();
+  for (let i = 0; i < 45; i++) await c.call('/api/thoughts', 'POST', thought(`thought ${i}`));
+  const page = (await c.call('/api/thoughts')).data;
+  const next = (await c.call(`/api/thoughts?cursor=${page.next}`)).data;
+  assert.equal(new Set([...page.entries, ...next.entries].map(e => e.id)).size, 45);
+  await c.call(`/api/thoughts/${page.entries[0].id}`, 'DELETE', {});
+  const remaining = (await c.call('/api/export')).data;
+  assert.equal(remaining.entries.length, 44);
+});
+
+test('optional titles persist with drafts, participate in search, and invalidate edited embeddings', async () => {
+  const c = client(); await c.login();
+  const input = { title: 'quiet mornings', body: 'a little space to think' };
+  const draft = (await c.call('/api/draft', 'PUT', { ...input, version: 0 })).data;
+  assert.equal((await c.call('/api/draft')).data.title, input.title);
+  const data = { ...thought(input.body), title: input.title, draft_version: draft.version };
+  const post = await c.call('/api/thoughts', 'POST', data);
+  assert.equal(post.status, 201);
+  assert.equal(post.data.draft.title, '');
+  assert.equal(post.data.draft.body, '');
+  assert.equal((await c.call('/api/thoughts', 'POST', data)).status, 200);
+  assert.equal((await c.call('/api/thoughts', 'POST', { ...data, title: 'changed title' })).status, 409);
+  assert.equal((await c.call('/api/thoughts?q=morning')).data.entries[0].title, input.title);
+  assert.equal((await c.call('/api/search', 'POST', { query: 'morning', saved: false, semantic: false })).data.entries[0].id, data.id);
+  const embedded = [];
+  c.env.AI = { async run(model, input) {
+    embedded.push(...input.text);
+    return { data: input.text.map(() => [1, ...Array(DIMENSIONS - 1).fill(0)]) };
+  } };
+  await indexEntry(post.data.entry, c.env);
+  assert.equal(embedded[0], `${input.title}\n\n${input.body}`, 'semantic content includes the title');
+  const edited = await c.call(`/api/thoughts/${data.id}`, 'PATCH', { title: 'evening walks', body: input.body, updated_at: post.data.entry.updated_at });
+  assert.equal(edited.status, 200);
+  assert.equal((await c.call('/api/thoughts?q=morning')).data.entries.length, 0);
+  assert.equal((await c.call('/api/thoughts?q=evening')).data.entries[0].id, data.id);
+  assert.equal(await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(data.id).first(), null);
+  await indexEntry(post.data.entry, c.env);
+  assert.equal(await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(data.id).first(), null, 'stale title cannot be indexed');
+  assert.equal((await c.call('/api/export')).data.entries[0].title, 'evening walks');
+  const version = (await c.call('/api/draft')).data.version;
+  await c.call('/api/draft', 'PUT', { title: 'another device title', body: input.body, version });
+  const conflict = await c.call('/api/thoughts', 'POST', { ...thought(input.body), title: input.title, draft_version: version + 1 });
+  assert.equal(conflict.data.draft.title, 'another device title', 'posting cannot clear a differently titled draft');
+  for (const title of ['x'.repeat(161), 'two\nlines', 42, null]) {
+    assert.equal((await c.call('/api/thoughts', 'POST', { ...thought('body'), title })).status, 400);
+  }
+  await c.call(`/api/thoughts/${data.id}`, 'DELETE', {});
+  assert.equal((await c.call('/api/thoughts?q=evening')).data.entries.length, 0);
+});
+
+test('title migration preserves existing entries, drafts, and their search index', () => {
+  const db = new DatabaseSync(':memory:');
+  const migrations = readdirSync(new URL('../migrations/', import.meta.url)).sort();
+  for (const name of migrations.slice(0, 2)) db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
+  db.exec("INSERT INTO thoughts(id, body, created_at, updated_at) VALUES ('old-id', 'an existing memory', '2026-01-01', '2026-01-01'); UPDATE draft SET body = 'unfinished text', version = 7;");
+  db.exec(readFileSync(new URL('../migrations/0003_titles.sql', import.meta.url), 'utf8'));
+  assert.equal(db.prepare('SELECT body FROM thoughts').get().body, 'an existing memory');
+  assert.equal(db.prepare('SELECT title FROM thoughts').get().title, '');
+  assert.equal(db.prepare("SELECT count(*) AS n FROM thoughts_fts WHERE thoughts_fts MATCH 'memory'").get().n, 1);
+  assert.deepEqual({ ...db.prepare('SELECT title, body, version FROM draft').get() }, { title: '', body: 'unfinished text', version: 7 });
+  db.close();
+});
+
+test('HTML stays data, input limits are enforced, and exports include the private draft', async () => {
+  const c = client(); await c.login();
+  assert.equal((await c.call('/api/thoughts', 'POST', thought('   '))).status, 400);
+  assert.equal((await c.call('/api/thoughts', 'POST', thought('x'.repeat(20001)))).status, 400);
+  const body = '<img src=x onerror=alert(1)> https://example.com';
+  await c.call('/api/thoughts', 'POST', thought(body));
+  await c.call('/api/draft', 'PUT', { body: 'not posted', version: 0 });
+  const exported = await c.call('/api/export');
+  assert.equal(exported.data.entries[0].body, body);
+  assert.equal(exported.data.draft.body, 'not posted');
+  assert.equal(exported.headers.get('Cache-Control'), 'no-store');
+});
+
+test('semantic transport, ranking, indexing reuse, and stale-vector invalidation', async () => {
+  // Deterministic vectors test our storage and retrieval pipeline, not the
+  // hosted model's real-world recall quality. Live model testing needs auth.
+  const calls = [];
+  const ai = { async run(model, input) {
+    calls.push(input.text);
+    return { data: input.text.map(text => {
+      const vector = Array(DIMENSIONS).fill(0);
+      if (/worn out|exhausted|tired/i.test(text)) vector[0] = 1;
+      else if (/soccer|sport/i.test(text)) vector[1] = 1;
+      else vector[2] = 1;
+      return vector;
+    }) };
+  } };
+  const c = client(); c.env.AI = ai; await c.login();
+  const a = (await c.call('/api/thoughts', 'POST', thought('i felt worn out after that week'))).data.entry;
+  const b = (await c.call('/api/thoughts', 'POST', thought('soccer on sunday'))).data.entry;
+  const search = await c.call('/api/search', 'POST', { query: 'exhausted', saved: false, cursor: 0 });
+  assert.equal(search.status, 200);
+  assert.equal(search.data.entries[0].id, a.id, 'vector match can recall an entry with no shared search words');
+  assert.equal(search.data.entries.some(entry => entry.id === b.id), false);
+  const previous = calls.length;
+  await c.call('/api/search', 'POST', { query: 'tired', saved: false, cursor: 0 });
+  assert.equal(calls.length, previous + 1, 'indexed thoughts are not embedded again on each search');
+  assert.deepEqual(calls.at(-1), ['tired']);
+  const longQuery = await c.call('/api/search', 'POST', { query: 'exhausted '.repeat(100), saved: false });
+  assert.equal(longQuery.status, 200, 'a composed thought can exceed a short search-bar query');
+  assert.equal(longQuery.data.entries[0].id, a.id);
+  const edited = await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'soccer all afternoon', updated_at: a.updated_at });
+  assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null);
+  await indexEntry(a, c.env);
+  assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null, 'old indexing job cannot restore an edited-away meaning');
+  await indexEntry(edited.data.entry, c.env);
+  assert.equal((await c.call('/api/search', 'POST', { query: 'exhausted', saved: false })).data.entries.length, 0);
+  await c.call(`/api/thoughts/${a.id}`, 'PATCH', { bookmarked: true });
+  assert.deepEqual((await c.call('/api/search', 'POST', { query: 'sport', saved: true })).data.entries.map(entry => entry.id), [a.id]);
+  await c.call(`/api/thoughts/${a.id}`, 'DELETE', {});
+  assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null);
+});
+
+test('semantic chunks preserve long Unicode inputs and provider failure is explicit', async () => {
+  const text = '漢字🌱 '.repeat(1200) + 'the final thought';
+  const chunks = chunksOf(text);
+  assert.ok(chunks.length > 1);
+  assert.ok(chunks.every(chunk => new TextEncoder().encode(chunk).length <= 400));
+  assert.ok(chunks.at(-1).endsWith('the final thought'));
+  assert.equal(maximumSimilarity([1, 0], new Float32Array([0, 1, 1, 0]), 2, 2), 1);
+  const c = client(); await c.login();
+  assert.equal((await c.call('/api/search', 'POST', { query: 'hello', saved: false })).status, 503);
+  c.env.AI = { async run() { throw new Error('private provider failure details'); } };
+  const failed = await c.call('/api/search', 'POST', { query: 'hello', saved: false });
+  assert.equal(failed.status, 502);
+  assert.equal(failed.data.error, 'Related search is unavailable.');
+});

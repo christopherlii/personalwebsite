@@ -1,0 +1,17 @@
+{
+  "name": "christopher-private-journal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/browser.mjs",
+    "db:local": "wrangler d1 migrations apply JOURNAL_DB --local",
+    "password": "node scripts/password.mjs",
+    "deploy": "wrangler deploy --env production"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1",
+    "@playwright/test": "1.64.1"
+  }
+}

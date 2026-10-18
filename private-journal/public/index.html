@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#fafafa">
+  <title>journal</title>
+  <link rel="stylesheet" href="/journal.css">
+  <script type="module" src="/journal.js"></script>
+</head>
+<body>
+  <section id="login" class="login" hidden>
+
+    <h1>journal</h1>
+    <form id="login-form">
+      <label for="password">password</label>
+      <input id="password" type="password" autocomplete="current-password" required maxlength="1024">
+      <button class="solid" id="unlock" type="submit">unlock</button>
+    </form>
+    <p id="login-message" role="status"></p>
+  </section>
+
+  <main id="app" class="journal" hidden>
+    <header class="page-header">
+      <span class="site-name">Christopher Li</span>
+      <div class="utilities">
+        <details id="journal-menu">
+          <summary aria-label="journal options">more</summary>
+          <nav class="entry-menu" aria-label="journal">
+            <button type="button" data-view="all" aria-current="page">all thoughts</button>
+            <button type="button" data-view="saved">bookmarks</button>
+            <button type="button" id="export">export</button>
+            <button type="button" id="logout">lock</button>
+          </nav>
+        </details>
+      </div>
+    </header>
+    <section id="composer-section" class="composer-section" aria-label="write or search your thoughts">
+      <form id="composer">
+        <div id="composer-title" hidden>
+          <label for="title" class="sr-only">title (optional)</label>
+          <input id="title" class="title-input" placeholder="title" maxlength="160" autocomplete="off">
+        </div>
+        <label for="body" class="sr-only">write or search your thoughts</label>
+        <textarea id="body" placeholder="write or search your thoughts…" maxlength="20000" rows="1"></textarea>
+        <div class="compose-actions" id="compose-actions" hidden>
+          <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
+          <div class="compose-buttons"><button type="button" id="add-title">add title</button><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
+        </div>
+      </form>
+    </section>
+    <div class="view-heading"><h1 id="view-title" class="sr-only">thoughts</h1></div>
+    <div class="stream">
+      <p id="notice" class="notice" role="status" hidden></p>
+      <div id="feed" aria-busy="false"></div>
+    </div>
+    <div class="feed-footer"><p id="feed-status" role="status">loading…</p><button type="button" id="more" hidden>load more</button></div>
+  </main>
+
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form id="edit-form">
+      <header><h2 id="edit-title">edit thought</h2><button type="button" data-close="edit-dialog" aria-label="close edit">close</button></header>
+      <label for="edit-thought-title" class="sr-only">title (optional)</label>
+      <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
+      <label for="edit-body" class="sr-only">thought</label>
+      <textarea id="edit-body" rows="8" maxlength="20000" required></textarea>
+      <p id="edit-error" role="status"></p>
+      <footer><button type="button" data-close="edit-dialog">cancel</button><button type="submit" class="solid">save</button></footer>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog" aria-labelledby="delete-title">
+    <form id="delete-form">
+      <h2 id="delete-title">delete this thought?</h2>
+      <p id="delete-error" role="status"></p>
+      <footer><button type="button" data-close="delete-dialog">keep</button><button type="submit" class="solid">delete</button></footer>
+    </form>
+  </dialog>
+  <dialog id="public-dialog" aria-labelledby="public-title">
+    <header><h2 id="public-title">public draft</h2><button type="button" data-close="public-dialog">close</button></header>
+    <label for="public-thought-title" class="sr-only">public title (optional)</label>
+    <input id="public-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
+    <label for="public-body" class="sr-only">public draft text</label>
+    <textarea id="public-body" rows="10" maxlength="20000"></textarea>
+    <details class="publication-details">
+      <summary>details</summary>
+      <div class="publication-fields">
+        <label>address<input id="public-slug" maxlength="100" autocomplete="off"></label>
+        <label>date<input id="public-date" type="date"></label>
+        <label class="wide">description<input id="public-description" maxlength="1000"></label>
+        <label class="wide">tags<input id="public-tags" maxlength="2400"></label>
+        <label class="wide">cover image<input id="public-cover" maxlength="1000"></label>
+        <label>cover position<input id="public-cover-position" maxlength="100"></label>
+      </div>
+    </details>
+    <p id="public-status" role="status"></p>
+    <footer class="public-actions">
+      <details><summary aria-label="public draft options">…</summary><div class="entry-menu"><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></div></details>
+      <a id="view-public" target="_blank" rel="noopener noreferrer" hidden>view on site ↗</a>
+      <button type="button" id="save-public">save draft</button>
+      <button type="button" id="publish-public">publish to site ↗</button>
+    </footer>
+  </dialog>
+  <p id="boot-status" class="boot" role="status">opening journal…</p>
+</body>
+</html>

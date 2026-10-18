@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "christopher-private-journal",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "JOURNAL_DB",
+      "database_name": "christopher-private-journal",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": {
+    "enabled": false
+  },
+  "env": {
+    "production": {
+      "name": "christopher-private-journal",
+      "ai": {
+        "binding": "AI"
+      },
+      "d1_databases": [
+        {
+          "binding": "JOURNAL_DB",
+          "database_name": "christopher-private-journal",
+          "database_id": "51a14589-d09a-4d04-8455-959c4a64f255",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "workers_dev": true
+    }
+  },
+  "account_id": "6516e50660e9529882c768c8fbec1787"
+}
