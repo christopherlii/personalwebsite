@@ -1,9 +1,12 @@
 import { searchTerms } from './search-terms.js';
 import { markdown } from './markdown.js';
+import { createLiveEditor } from './live-editor.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
-Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerPreview: false });
+Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null });
+let readerEditor = null;
+function clearReaderEditor() { readerEditor?.destroy(); readerEditor = null; $('#live-editor').replaceChildren(); }
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -172,11 +175,10 @@ function readerControls() {
   const busy = Boolean(state.readerSaving);
   $('#reader-edit').hidden = editing || !state.readerEntry;
   $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
-  $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing; $('#reader-preview').hidden = !editing;
-  $('#reader-preview').textContent = state.readerPreview ? 'source' : 'preview';
-  $('#reader-preview').setAttribute('aria-pressed', String(state.readerPreview));
-  $('#edit-form').hidden = !editing || state.readerPreview;
-  $('#reader-content').hidden = editing && !state.readerPreview;
+  $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
+  $('#edit-form').hidden = !editing;
+  $('#reader-content').hidden = editing;
+  readerEditor?.setReadOnly(busy);
   for (const control of document.querySelectorAll('.reader-actions button, #edit-form input, #edit-form textarea')) control.disabled = busy;
   $('#reader-save').disabled = busy || !$('#edit-body').value.trim();
   const bookmarked = Boolean(state.readerEntry?.bookmarked);
@@ -195,7 +197,7 @@ function updateEntry(entry) {
   }
 }
 function stopEditing() {
-  state.readerEditing = false; state.readerDirty = false; state.readerPreview = false;
+  state.readerEditing = false; state.readerDirty = false; clearReaderEditor();
   $('#reader-error').textContent = ''; renderReader(); readerControls();
 }
 async function saveReader() {
@@ -227,7 +229,7 @@ async function showRoute() {
   if (!id) {
     const wasReading = !$('#reader').hidden;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
-    state.readerEntry = null; state.readerEditing = false; state.readerPreview = false;
+    state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
     $('#app').hidden = false; document.title = 'journal';
     if (!state.entries.size && !state.timelineHidden) await searchFromComposer(true);
     if (wasReading) window.scrollTo(0, state.feedScroll);
@@ -235,21 +237,20 @@ async function showRoute() {
   }
   if (state.readerDirty && id === state.readerEntry?.id) {
     closeMenus(); $('#app').hidden = true; $('#reader').hidden = false;
-    if (state.readerPreview) renderReader({ title: $('#edit-thought-title').value, body: $('#edit-body').value });
     readerControls(); return;
   }
   try {
     const { entry } = await api(`thoughts/${id}`);
     if (generation !== state.readerGeneration || !state.authenticated) return;
     state.readerEntry = entry; state.selected = entry;
-    state.readerEditing = false; state.readerPreview = false;
+    state.readerEditing = false; clearReaderEditor();
     renderReader(); readerControls();
     $('#reader-error').textContent = '';
     document.title = 'journal';
   } catch (error) {
     if (generation !== state.readerGeneration || !state.authenticated) return;
     $('#reader-content').replaceChildren(); $('#reader-error').textContent = error.message;
-    state.readerEntry = null; state.readerEditing = false; state.readerPreview = false; readerControls();
+    state.readerEntry = null; state.readerEditing = false; clearReaderEditor(); readerControls();
   }
   if (!$('#app').hidden) state.feedScroll = window.scrollY;
   closeMenus(); $('#app').hidden = true; $('#reader').hidden = false;
@@ -461,7 +462,7 @@ $('#toggle-timeline').addEventListener('click', () => {
   searchFromComposer(true);
 });
 document.addEventListener('keydown', event => {
-  if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); (state.readerEditing ? $('#edit-body') : $('#body')).focus(); }
+  if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (state.readerEditing) readerEditor?.focus(); else $('#body').focus(); }
 });
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
 for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => item.dataset.close === 'public-dialog' ? closePublication() : $(`#${item.dataset.close}`).close());
@@ -494,17 +495,22 @@ $('#reader-edit').addEventListener('click', () => {
   closeMenus();
   $('#edit-thought-title').value = state.readerEntry.title || '';
   $('#edit-body').value = state.readerEntry.body;
-  state.readerEditing = true; state.readerDirty = false; state.readerPreview = false;
-  $('#reader-error').textContent = ''; readerControls(); $('#edit-body').focus({ preventScroll: true });
+  state.readerEditing = true; state.readerDirty = false;
+  $('#reader-error').textContent = ''; readerControls(); clearReaderEditor();
+  readerEditor = createLiveEditor($('#live-editor'), {
+    value: state.readerEntry.body,
+    nonce: document.querySelector('meta[name=editor-style-nonce]').content,
+    onChange(value) { $('#edit-body').value = value; changedReader(); },
+    onLimit() { $('#reader-error').textContent = 'Thoughts can contain up to 20,000 characters.'; }
+  });
+  readerEditor.focus();
 });
-$('#edit-form').addEventListener('input', () => {
+function changedReader() {
   state.readerDirty = $('#edit-thought-title').value !== state.readerEntry.title || $('#edit-body').value !== state.readerEntry.body;
   readerControls();
-});
-$('#reader-preview').addEventListener('click', () => {
-  state.readerPreview = !state.readerPreview;
-  if (state.readerPreview) renderReader({ title: $('#edit-thought-title').value, body: $('#edit-body').value });
-  readerControls();
+}
+$('#edit-form').addEventListener('input', event => {
+  if (event.target.id === 'edit-thought-title') changedReader();
 });
 $('#reader-cancel').addEventListener('click', stopEditing);
 $('#reader-bookmark').addEventListener('click', async () => {
