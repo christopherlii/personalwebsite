@@ -13,10 +13,12 @@ runtime assets.
 
 The interface and backend live in `personalwebsite`. **Journal text is stored in
 Cloudflare D1, not Git or `site-content`.** `build.py` excludes this entire
-directory from the public GitHub Pages artifact. Published writing continues to
-live in `christopherlii/site-content`; the journal's public-draft action makes a
-separate editable copy that can be copied to Substack or downloaded as unpublished
-Markdown for `site-content/posts/`. It does not publish or email anything.
+directory from the public GitHub Pages artifact. After deployment/import,
+`writing-source.json` points the public site at published database snapshots.
+Public-draft saves and private journal edits never update the live snapshot;
+only publish/update does. Unpublish removes public access and retains the draft.
+Copy/download remain available for Substack, X, or Markdown backups without
+posting to those services. Existing media and reading/favorites stay in Git.
 
 ## Local preview
 
@@ -64,13 +66,17 @@ responses are controlled test fixtures, not live model quality verification.
 
 ## Deploy after connecting a Cloudflare account
 
-No production resources or secrets are included. The zero database UUIDs in
-`wrangler.jsonc` are deliberately placeholders. The local environment has no AI
-binding; the production environment enables Cloudflare Workers AI. Workers preview URLs and the
-workers.dev hostname are disabled until hosting is configured.
+Production is deployed at
+`https://christopher-private-journal.christopherlii.workers.dev` with D1 and
+Workers AI. The production database ID is configured; the top-level zero ID
+stays local-only. No credentials are committed. Request observability and
+preview URLs are disabled. The public site's DNS remains unchanged.
+The unlisted `/journal/` route redirects to the Worker.
+
+For a new account or deployment:
 
 1. Run `npx wrangler login` and `npx wrangler d1 create christopher-private-journal`.
-   Replace both `database_id` values in `wrangler.jsonc` with the returned ID.
+   Replace only the production `database_id` in `wrangler.jsonc` with the returned ID.
 2. Choose either a custom journal hostname in an existing Cloudflare zone via
    `routes: [{ "pattern": "journal.christopherli.dev", "custom_domain": true }]`,
    or enable `workers_dev` and use the account's workers.dev URL. Set this in
@@ -98,12 +104,46 @@ Keep the production password in a password manager. To rotate it, run the same
 secret command and deploy again. Existing sessions immediately fail validation
 on the new deployment because every session is bound to the current hash.
 
+## Switch the public writing source
+
+The live source is the Worker. Four existing Markdown posts were imported,
+preserving one published post and three private drafts. For a new deployment,
+keep `writing-source.json` on `/posts` until the Worker is verified. Preview the
+existing content import, then authenticate with an owner-only password file:
+
+```sh
+python3 scripts/import-content.py
+python3 scripts/import-content.py --apply --origin https://YOUR-JOURNAL-HOST --password-file /PRIVATE/PATH/owner-password.txt
+```
+
+Import preserves addresses, dates, metadata, and original published/draft
+statuses. Re-running skips source keys and never overwrites newer database
+edits. Date-only imports do not display an invented time. Verify the anonymous
+index contains exactly the originally published writing before switching.
+
+Set `writing-source.json` to:
+
+```json
+{"posts":"https://YOUR-JOURNAL-HOST/public/posts","feed":"https://YOUR-JOURNAL-HOST/public/feed.xml"}
+```
+
+The public renderer fetches this index and article bodies without credentials.
+The daily build uses its published export for the legacy RSS file and stops on
+remote errors instead of falling back to stale Git posts. It excludes old
+Markdown bodies and the old index. Existing media stays in site-content; an
+article referencing an image previously withheld with a draft needs the next
+site build to make that image available. Public image URLs also work directly.
+Owner JSON export and per-draft Markdown download provide writing backups.
+
 ## Privacy and behavior
 
 - Every journal API read/write is authenticated server-side, apart from the
   login and session-status endpoints. Missing database/password configuration
   fails closed. The HTML/JS contain no entries or credentials.
-- PBKDF2-SHA256 uses a random salt and 600,000 iterations. Random 256-bit session
+- PBKDF2-SHA256 uses a random salt and 100,000 iterations, the production
+  [Workers runtime ceiling](https://github.com/cloudflare/workerd/issues/1346).
+  The deployed owner password is randomly generated with 192 bits of entropy;
+  use a password-manager-generated password when rotating it. Random 256-bit session
   tokens are stored only as SHA-256 digests; cookies are Secure, HttpOnly,
   SameSite=Strict, host-only, and expire after seven days. Logout deletes the
   server-side session. Login attempts are limited per IP digest and globally in
@@ -114,8 +154,11 @@ on the new deployment because every session is bound to the current hash.
 - Titles are optional. The writing field stays borderless; “add title” reveals
   a separate inline title once writing begins. Title and body autosave together,
   and both are included in search, copying, exports, and separate public drafts.
-  Posting saves privately in this journal. Public-draft actions still require
-  an explicit copy/download; posting does not send to another service.
+  Posting saves privately in this journal. Public drafts have revision checks
+  and explicit publish, update, and unpublish actions. Private thought edits do
+  not modify an existing public draft or published snapshot. Publishing needs
+  a title, text, and an address unique among published posts. Unpublish an
+  entry before deleting it.
 - Dates, times, and entry controls appear on hover, keyboard focus, or touch.
   Copy is available directly below each note; open/close appears when its body
   needs truncation. Touch selection persists through expansion, keyboard focus
@@ -125,7 +168,7 @@ on the new deployment because every session is bound to the current hash.
   stays in the editor; it can still be copied or posted as a separate thought.
   An unload warning protects pending writes. No entries are saved in
   localStorage or a service worker cache.
-- All responses are `no-store` and `noindex`; request observability is disabled.
+- All responses are `no-store`; private routes are `noindex`. Request observability is disabled.
   Avoid enabling request/body logging for production. These headers are not
   the access control; login is.
 - The writing field also searches. Typing shows keyword results after 150ms;
@@ -160,7 +203,12 @@ on the new deployment because every session is bound to the current hash.
   in model usage; this excludes Worker/database hosting. Indexing text is an
   additional cost when writing or editing. Check current [model pricing](https://developers.cloudflare.com/workers-ai/models/bge-small-en-v1.5/)
   and [account limits](https://developers.cloudflare.com/workers-ai/platform/pricing/).
-- JSON export includes all entries, timestamps, bookmarks, and the
+- Anonymous GET/HEAD routes under `/public/` serve only published snapshots:
+  `posts/index.json`, `posts/<address>.md`, `feed.xml`, and `export.json`. They
+  allow credential-free CORS and use `no-store`. Private endpoints stay behind
+  owner authentication and reject cross-origin writes. Unpublishing removes
+  active public routes; readers may have retained earlier public copies.
+- JSON export includes all entries, timestamps, bookmarks, publications, and the
   current draft. Export periodically to an owner-controlled private backup.
   Deleting an entry removes it from active search; provider backups may retain
   previous data under their own policies.

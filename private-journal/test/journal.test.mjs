@@ -9,7 +9,7 @@ import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
 const salt = '12'.repeat(16);
-const config = `pbkdf2-sha256$600000$${salt}$${await passwordHash(password, salt)}`;
+const config = `pbkdf2-sha256$100000$${salt}$${await passwordHash(password, salt)}`;
 
 function database() {
   const sqlite = new DatabaseSync(':memory:');
@@ -40,10 +40,121 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config })
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     }), env);
     if (response.headers.has('Set-Cookie')) cookie = response.headers.get('Set-Cookie').split(';')[0];
-    return { status: response.status, headers: response.headers, data: await response.json() };
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = raw; }
+    return { status: response.status, headers: response.headers, data };
   }, async login() { return this.call('/api/login', 'POST', { password }); } };
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
+const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('publication editing and importing require owner authentication', async () => {
+  const c = client();
+  const id = crypto.randomUUID();
+  for (const [path, method, input] of [
+    [`/api/thoughts/${id}/publication`, 'GET'],
+    [`/api/thoughts/${id}/publication`, 'PUT', { draft: publicDraft(), version: 0 }],
+    [`/api/thoughts/${id}/publication/publish`, 'POST', { version: 1 }],
+    [`/api/thoughts/${id}/publication/unpublish`, 'POST', { version: 1 }],
+    ['/api/import', 'POST', {}],
+  ]) assert.equal((await c.call(path, method, input)).status, 401);
+  assert.deepEqual((await c.call('/public/posts/index.json')).data, []);
+  assert.equal((await c.call('/public/posts/index.json', 'POST', {})).status, 405);
+});
+
+test('public writing exposes only explicit published snapshots, with independent edits and unpublishing', async () => {
+  const owner = client(); await owner.login();
+  const visitor = client(owner.env);
+  const entry = (await owner.call('/api/thoughts', 'POST', { ...thought('a private memory that must stay private'), title: 'private title' })).data.entry;
+  const path = `/api/thoughts/${entry.id}/publication`;
+  const initial = await owner.call(path);
+  assert.equal(initial.data.draft.body, entry.body);
+  const saved = await owner.call(path, 'PUT', { draft: publicDraft(), version: 0 });
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await visitor.call('/public/export.json')).data, { posts: [] });
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).status, 404);
+  const published = await owner.call(path + '/publish', 'POST', { version: saved.data.version });
+  assert.equal(published.status, 200);
+  const index = await visitor.call('/public/posts/index.json');
+  assert.equal(index.headers.get('Access-Control-Allow-Origin'), '*');
+  assert.equal(index.headers.get('Cache-Control'), 'no-store');
+  assert.equal(index.data[0].file, 'a-public-note.md');
+  assert.equal(index.data[0].title, 'a public note');
+  assert.equal(Object.hasOwn(index.data[0], 'thought_id'), false);
+  assert.equal(Object.hasOwn(index.data[0], 'body'), false);
+  const publicText = (await visitor.call('/public/posts/a-public-note.md')).data;
+  assert.match(publicText, /the public version/);
+  assert.doesNotMatch(publicText, /private memory|private title/);
+  const rss = await visitor.call('/public/feed.xml');
+  assert.match(rss.headers.get('Content-Type'), /application\/rss\+xml/);
+  assert.match(rss.data, /a public note/);
+  assert.doesNotMatch(rss.data, /private memory/);
+  assert.equal((await owner.call(`/api/thoughts/${entry.id}`, 'DELETE', {})).status, 409, 'deleting a private entry cannot silently delete its published version');
+  await owner.call(`/api/thoughts/${entry.id}`, 'PATCH', { body: 'a changed private memory', updated_at: entry.updated_at });
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).data, publicText, 'journal edits remain private');
+  const draft = publicDraft('an unpublished revision'); draft.slug = 'a-new-address';
+  const revised = await owner.call(path, 'PUT', { draft, version: published.data.version });
+  assert.equal((await owner.call(path, 'PUT', { draft, version: published.data.version })).status, 409, 'another tab cannot overwrite a newer public draft');
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).data, publicText, 'saving public drafts does not update the snapshot');
+  assert.equal((await visitor.call('/public/posts/a-new-address.md')).status, 404);
+  assert.equal((await owner.call(path + '/publish', 'POST', { version: published.data.version })).status, 409);
+  const update = await owner.call(path + '/publish', 'POST', { version: revised.data.version });
+  assert.match((await visitor.call('/public/posts/a-new-address.md')).data, /an unpublished revision/);
+  assert.equal((await visitor.call('/public/posts/a-public-note.md')).status, 404);
+  const archive = (await owner.call('/api/export')).data;
+  assert.equal(archive.publications[0].draft.body, 'an unpublished revision');
+  assert.equal(archive.publications[0].published.slug, 'a-new-address');
+  assert.equal((await owner.call(path + '/unpublish', 'POST', { version: update.data.version })).status, 200);
+  assert.equal((await visitor.call('/public/posts/a-new-address.md')).status, 404);
+  assert.deepEqual((await visitor.call('/public/posts/index.json')).data, []);
+  assert.deepEqual((await visitor.call('/public/export.json')).data.posts, []);
+  assert.doesNotMatch((await visitor.call('/public/feed.xml')).data, /<item>/);
+  assert.equal((await owner.call(path)).data.draft.body, draft.body, 'unpublishing retains the editable draft');
+  assert.equal((await owner.call(`/api/thoughts/${entry.id}`, 'DELETE', {})).status, 200);
+});
+
+test('publication addresses are unique and validation prevents invalid metadata from reaching public routes', async () => {
+  const c = client(); await c.login();
+  const a = (await c.call('/api/thoughts', 'POST', thought('private a'))).data.entry;
+  const b = (await c.call('/api/thoughts', 'POST', thought('private b'))).data.entry;
+  const path = id => `/api/thoughts/${id}/publication`;
+  const one = await c.call(path(a.id), 'PUT', { draft: publicDraft(), version: 0 });
+  await c.call(path(a.id) + '/publish', 'POST', { version: one.data.version });
+  const two = await c.call(path(b.id), 'PUT', { draft: publicDraft('another public draft'), version: 0 });
+  assert.equal((await c.call(path(b.id) + '/publish', 'POST', { version: two.data.version })).status, 409);
+  assert.match((await c.call('/public/posts/a-public-note.md')).data, /the public version/);
+  for (const patch of [{ slug: '../private' }, { slug: 'x/y' }, { date: '2026-02-30' }, { date: 'invalid' }, { title: 'x'.repeat(161) }, { tags: 'not an array' }, { cover: 'file:///secret' }]) {
+    assert.equal((await c.call(path(b.id), 'PUT', { draft: { ...publicDraft(), ...patch }, version: two.data.version })).status, 400);
+  }
+  const empty = await c.call(path(b.id), 'PUT', { draft: { ...publicDraft(), title: '' }, version: two.data.version });
+  assert.equal((await c.call(path(b.id) + '/publish', 'POST', { version: empty.data.version })).status, 400);
+  assert.equal((await c.call('/public/posts/unknown.md')).status, 404);
+});
+
+test('existing writing import preserves publication status and metadata without replacing later edits', async () => {
+  const owner = client(); await owner.login();
+  const imports = [
+    { id: crypto.randomUUID(), source_key: 'site-content/posts/old-published.md', published: true, draft: { ...publicDraft('previously published text'), slug: 'old-published', date: '2024-01-17' } },
+    { id: crypto.randomUUID(), source_key: 'site-content/posts/old_draft.md', published: false, draft: { ...publicDraft('an old private draft'), slug: 'old_draft' } },
+  ];
+  for (const data of imports) assert.equal((await owner.call('/api/import', 'POST', data)).status, 201);
+  assert.equal((await owner.call('/api/import', 'POST', imports[0])).data.imported, false);
+  const visitor = client(owner.env);
+  assert.deepEqual((await visitor.call('/public/posts/index.json')).data.map(post => post.file), ['old-published.md']);
+  assert.equal((await visitor.call('/public/posts/old_draft.md')).status, 404);
+  assert.doesNotMatch(JSON.stringify((await visitor.call('/public/export.json')).data), /private draft/);
+  const draft = (await owner.call(`/api/thoughts/${imports[1].id}/publication`)).data;
+  assert.equal(draft.draft.coverPosition, 'center 40%');
+  assert.equal(draft.published, null);
+  const entry = (await owner.call('/api/thoughts')).data.entries.find(item => item.id === imports[0].id);
+  assert.equal(entry.source_date, '2024-01-17', 'date-only source metadata does not invent a visible time');
+  const revised = { ...imports[1].draft, body: 'a new private revision' };
+  await owner.call(`/api/thoughts/${imports[1].id}/publication`, 'PUT', { draft: revised, version: draft.version });
+  await owner.call('/api/import', 'POST', imports[1]);
+  assert.equal((await owner.call(`/api/thoughts/${imports[1].id}/publication`)).data.draft.body, 'a new private revision');
+  assert.equal((await owner.call('/api/export')).data.entries.length, 2);
+});
 
 test('every private read/write fails closed, including an unconfigured deployment', async () => {
   const c = client();
@@ -75,7 +186,7 @@ test('password login, CSRF protection, hashed sessions, logout, expiry, and pass
   assert.equal(session.token_hash, await digest(token));
   assert.equal((await c.call('/api/thoughts', 'POST', thought('no'), { 'X-Journal': '' })).status, 403);
   assert.equal((await c.call('/api/session')).data.authenticated, true);
-  c.env.JOURNAL_PASSWORD_HASH = `pbkdf2-sha256$600000$${salt}$${'a'.repeat(64)}`;
+  c.env.JOURNAL_PASSWORD_HASH = `pbkdf2-sha256$100000$${salt}$${'a'.repeat(64)}`;
   assert.equal((await c.call('/api/thoughts')).status, 401);
   c.env.JOURNAL_PASSWORD_HASH = config;
   await c.env.JOURNAL_DB.prepare('UPDATE sessions SET expires_at = 0').run();

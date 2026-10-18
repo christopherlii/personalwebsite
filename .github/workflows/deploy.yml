@@ -1,6 +1,6 @@
-# Content lives in the private christopherlii/site-content repo. This joins it
-# with the code here and publishes the result, so the public history only ever
-# shows code. Content goes live at the next daily run — every day deploys
+# Media, reading, and favorites live in private christopherlii/site-content.
+# Writing is read from published journal snapshots selected by writing-source.json.
+# Public history only shows code. Media goes live at the next daily run — every day deploys
 # whether or not anything changed, so the run list never says when something
 # was published. Avoid manual runs for content; they stand out.
 name: deploy

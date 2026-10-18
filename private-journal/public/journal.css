@@ -446,7 +446,51 @@ dialog footer {
   margin-top:24px
 }
 dialog .public-actions {
-  justify-content:space-between
+  flex-wrap:wrap;
+  gap:18px
+}
+.public-actions>details {
+  margin-right:auto
+}
+.public-actions>a {
+  font-size:11px;
+  color:var(--muted)
+}
+.public-actions .entry-menu {
+  top:auto;
+  bottom:100%;
+  left:0;
+  right:auto
+}
+.publication-details {
+  margin-top:20px
+}
+.publication-details>summary {
+  color:var(--muted)
+}
+.publication-fields {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-top:12px
+}
+.publication-fields label {
+  display:block;
+  font-size:11px;
+  color:var(--muted)
+}
+.publication-fields .wide {
+  grid-column:1/-1
+}
+.publication-fields input {
+  display:block;
+  width:100%;
+  padding:6px 0;
+  background:var(--bg);
+  border:0;
+  border-bottom:1px solid var(--track);
+  color:var(--body);
+  font-size:13px
 }
 .sr-only {
   position:absolute;

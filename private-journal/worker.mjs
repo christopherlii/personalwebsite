@@ -1,6 +1,7 @@
 import { digest, hex, sessionFor, sessionCookie, SESSION_SECONDS, validPasswordConfig, verifyPassword } from './auth.mjs';
 import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
 import { indexEntry, semanticSearch } from './semantic.mjs';
+import { PublicationError, publicationApi, publicWriting } from './publications.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -23,7 +24,7 @@ async function readBody(request) {
     const { done, value } = await reader.read();
     if (done) break;
     length += value.length;
-    if (length > 90000) { await reader.cancel(); fail(413, 'This thought is too long.'); }
+    if (length > 180000) { await reader.cancel(); fail(413, 'This thought is too long.'); }
     chunks.push(value);
   }
   const bytes = new Uint8Array(length);
@@ -97,6 +98,8 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  const publication = await publicationApi(request, env, path, readBody);
+  if (publication) return publication;
   if (path === '/api/logout' && request.method === 'POST') {
     await env.JOURNAL_DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(session.token_hash).run();
     return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
@@ -168,15 +171,19 @@ async function api(request, env, url, context) {
       return json({ entry: result });
     }
     if (request.method === 'DELETE') {
+      if (await env.JOURNAL_DB.prepare('SELECT thought_id FROM publications WHERE thought_id = ? AND published IS NOT NULL').bind(id).first()) fail(409, 'Unpublish this entry before deleting it.');
       const result = await env.JOURNAL_DB.prepare('DELETE FROM thoughts WHERE id = ? RETURNING id').bind(id).first();
       if (!result) fail(404, 'Thought not found.');
       return json({ ok: true });
     }
   }
   if (path === '/api/export' && request.method === 'GET') {
-    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, created_at, updated_at FROM thoughts ORDER BY seq').all();
+    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, created_at, updated_at, source_date FROM thoughts ORDER BY seq').all();
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
-    return json({ format: 'christopher-journal-v1', exported_at: new Date().toISOString(), entries: results, draft }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
+    const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
+    return json({ format: 'christopher-journal-v2', exported_at: new Date().toISOString(), entries: results, draft,
+      publications: publications.results.map(row => ({ ...row, draft: JSON.parse(row.draft), published: row.published ? JSON.parse(row.published) : null }))
+    }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
   fail(404, 'Not found.');
 }
@@ -187,19 +194,22 @@ export default {
     let response;
     try {
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) fail(400, 'HTTPS is required.');
-      if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
+      if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
+      else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
       else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
       else fail(404, 'Not found.');
     } catch (error) {
-      response = json({ error: error instanceof HttpError ? error.message : 'The journal is unavailable. Try again later.' }, error instanceof HttpError ? error.status : 500);
+      const expected = error instanceof HttpError || error instanceof PublicationError;
+      response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     const output = new Response(response.body, response);
     output.headers.set('Cache-Control', 'no-store');
-    output.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    if (!url.pathname.startsWith('/public/')) output.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    else output.headers.set('Access-Control-Allow-Origin', '*');
     output.headers.set('Referrer-Policy', 'no-referrer');
     output.headers.set('X-Content-Type-Options', 'nosniff');
     output.headers.set('X-Frame-Options', 'DENY');
     output.headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
-    return output;
+    return request.method === 'HEAD' ? new Response(null, output) : output;
   }
 };

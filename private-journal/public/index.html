@@ -82,8 +82,24 @@
     <input id="public-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
     <label for="public-body" class="sr-only">public draft text</label>
     <textarea id="public-body" rows="10" maxlength="20000"></textarea>
+    <details class="publication-details">
+      <summary>details</summary>
+      <div class="publication-fields">
+        <label>address<input id="public-slug" maxlength="100" autocomplete="off"></label>
+        <label>date<input id="public-date" type="date"></label>
+        <label class="wide">description<input id="public-description" maxlength="1000"></label>
+        <label class="wide">tags<input id="public-tags" maxlength="2400"></label>
+        <label class="wide">cover image<input id="public-cover" maxlength="1000"></label>
+        <label>cover position<input id="public-cover-position" maxlength="100"></label>
+      </div>
+    </details>
     <p id="public-status" role="status"></p>
-    <footer class="public-actions"><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button></footer>
+    <footer class="public-actions">
+      <details><summary aria-label="public draft options">…</summary><div class="entry-menu"><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></div></details>
+      <a id="view-public" target="_blank" rel="noopener noreferrer" hidden>view on site ↗</a>
+      <button type="button" id="save-public">save draft</button>
+      <button type="button" id="publish-public">publish to site ↗</button>
+    </footer>
   </dialog>
   <p id="boot-status" class="boot" role="status">opening journal…</p>
 </body>

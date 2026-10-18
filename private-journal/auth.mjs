@@ -10,13 +10,15 @@ export async function digest(value) {
   return hex(await crypto.subtle.digest('SHA-256', encoder.encode(value)));
 }
 
-export async function passwordHash(password, salt, iterations = 600000) {
+// Workers production caps WebCrypto PBKDF2 at 100,000 iterations; local workerd does not.
+// https://github.com/cloudflare/workerd/issues/1346
+export async function passwordHash(password, salt, iterations = 100000) {
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
   return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: encoder.encode(salt), iterations, hash: 'SHA-256' }, key, 256));
 }
 
 export function validPasswordConfig(value) {
-  return /^pbkdf2-sha256\$600000\$[a-f0-9]{32}\$[a-f0-9]{64}$/.test(value || '');
+  return /^pbkdf2-sha256\$100000\$[a-f0-9]{32}\$[a-f0-9]{64}$/.test(value || '');
 }
 
 export async function verifyPassword(password, config) {

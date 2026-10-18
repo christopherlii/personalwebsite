@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { publicSitePreview } from './public-site.mjs';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
 const origin = process.env.JOURNAL_TEST_URL || 'http://localhost:8787';
 if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname)) throw new Error('Browser tests may only write to a local journal.');
@@ -33,7 +34,11 @@ try {
   await idle();
   assert.equal(await page.evaluate(() => document.cookie.includes('journal')), false, 'session cookie is HttpOnly');
   const prior = await api('thoughts?q=journal%20browser%20test');
-  for (const entry of prior.data.entries) if (entry.body.startsWith('journal browser test ')) await api(`thoughts/${entry.id}`, 'DELETE', {});
+  for (const entry of prior.data.entries) if (entry.body.startsWith('journal browser test ')) {
+    const publication = (await api(`thoughts/${entry.id}/publication`)).data;
+    if (publication.published) await api(`thoughts/${entry.id}/publication/unpublish`, 'POST', { version: publication.version });
+    await api(`thoughts/${entry.id}`, 'DELETE', {});
+  }
   const initial = await api('draft');
   if (initial.data.body || initial.data.title) throw new Error('Use a clean local database: browser tests will not overwrite an existing draft.');
 
@@ -82,13 +87,58 @@ try {
   assert.equal(await article.locator('.thought-title img').count(), 0, 'title HTML is text too');
   await entryMenu(article);
   await article.locator('[data-action=public]').click();
+  await page.locator('#public-dialog').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#public-body').inputValue(), edited);
   await page.locator('#public-body').fill('a separate public draft');
   await page.locator('#public-thought-title').fill('public version');
+  await page.locator('#public-dialog .public-actions > details > summary').click();
   await page.locator('#copy-public').click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'public version\n\na separate public draft');
   await page.locator('[data-close=public-dialog]').click();
+  await page.locator('#public-dialog').waitFor({ state: 'hidden' });
   assert.equal((await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries.find(e => e.id === root.id).body, edited, 'public draft does not edit journal');
+
+  await entryMenu(article); await article.locator('[data-action=public]').click();
+  await page.locator('#public-dialog').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#public-body').inputValue(), 'a separate public draft', 'public draft is saved independently');
+  await page.locator('#publish-public').click();
+  await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
+  const publicSite = await publicSitePreview(context, origin);
+  await publicSite.emulateMedia({ reducedMotion: 'reduce' });
+  await publicSite.goto('https://site-preview.test/#thoughts');
+  await publicSite.getByRole('link', { name: /public version/ }).waitFor();
+  await publicSite.getByRole('link', { name: /public version/ }).click();
+  await publicSite.locator('.article-body').filter({ hasText: 'a separate public draft' }).waitFor();
+  await publicSite.waitForFunction(() => !document.documentElement.classList.contains('route-pending'));
+  await publicSite.locator('.article-body').scrollIntoViewIfNeeded();
+  assert.equal(await publicSite.locator('.article-body').textContent().then(text => text.trim()), 'a separate public draft');
+  await publicSite.screenshot({ path: `${artifacts}/public-site-post.png`, fullPage: true });
+  await page.locator('#public-body').fill('a still private revision');
+  await page.locator('#save-public').click();
+  await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'unpublished changes');
+  await publicSite.reload();
+  await publicSite.locator('.article-body').filter({ hasText: 'a separate public draft' }).waitFor();
+  assert.equal(await publicSite.locator('.article-body').textContent().then(text => text.trim()), 'a separate public draft', 'saved edits stay private on the real public frontend');
+  await page.screenshot({ path: `${artifacts}/publishing-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: `${artifacts}/publishing-mobile.png`, fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator('#publish-public').click();
+  await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
+  await publicSite.reload();
+  await publicSite.locator('.article-body').filter({ hasText: 'a still private revision' }).waitFor();
+  const publicOptions = page.locator('#public-dialog .public-actions > details');
+  if (!await publicOptions.getAttribute('open').then(value => value !== null)) await publicOptions.locator('summary').click();
+  await page.locator('#unpublish').click();
+  await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'unpublished');
+  await publicSite.goto('https://site-preview.test/#thoughts');
+  await publicSite.reload();
+  await publicSite.locator('#thoughts-full-list .empty-note').waitFor();
+  assert.equal(await publicSite.locator('.thought-row').count(), 0, 'unpublishing removes writing from the public site');
+  await publicSite.close();
+  await page.locator('[data-close=public-dialog]').click();
+  await page.locator('#public-dialog').waitFor({ state: 'hidden' });
 
   // Clearly labeled sample text for review screenshots, separate from the
   // hostile-input and conflict fixtures used to exercise the implementation.

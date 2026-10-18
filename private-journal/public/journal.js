@@ -1,7 +1,7 @@
 import { searchTerms } from './search-terms.js';
 
 const $ = selector => document.querySelector(selector);
-const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, active: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
+const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, active: null, draftTimer: null, searchTimer: null, relatedTimer: null, expanded: new Set(), observers: [], semanticAvailable: false, semantic: false };
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) { $('#draft-status').textContent = message; }
@@ -117,6 +117,7 @@ async function enter() {
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
   await searchFromComposer(true);
+  if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
 
 function button(label, action, entry) {
@@ -169,12 +170,13 @@ function renderEntry(entry) {
   const article = document.createElement('article'); article.className = 'thought'; article.tabIndex = 0; article.dataset.id = entry.id;
   article.classList.toggle('is-active', state.active === entry.id);
   const header = document.createElement('header'); header.className = 'thought-header';
-  const time = document.createElement('time'); time.dateTime = entry.created_at;
-  const date = new Date(entry.created_at);
-  time.title = date.toLocaleString();
+  const time = document.createElement('time'); time.dateTime = entry.source_date || entry.created_at;
+  const date = new Date(entry.source_date ? `${entry.source_date}T12:00:00` : entry.created_at);
+  time.title = entry.source_date ? date.toLocaleDateString() : date.toLocaleString();
   const day = document.createElement('span'); day.textContent = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
   const clock = document.createElement('span'); clock.textContent = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase();
-  time.append(day, clock);
+  time.append(day);
+  if (!entry.source_date) time.append(clock);
   header.append(time);
   if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; header.append(edited); }
   article.append(header);
@@ -335,7 +337,7 @@ document.addEventListener('keydown', event => {
   if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); $('#body').focus(); }
 });
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
-for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => $(`#${item.dataset.close}`).close());
+for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => item.dataset.close === 'public-dialog' ? closePublication() : $(`#${item.dataset.close}`).close());
 
 document.addEventListener('pointerdown', event => {
   if (!['touch', 'pen'].includes(event.pointerType)) return;
@@ -376,7 +378,7 @@ $('#feed').addEventListener('click', async event => {
       setTimeout(() => { target.textContent = 'copy'; }, 1200);
     } else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
-    else if (action === 'public') { $('#public-thought-title').value = entry.title || ''; $('#public-body').value = entry.body; $('#public-status').textContent = ''; $('#public-dialog').showModal(); }
+    else if (action === 'public') { await openPublication(entry); }
   } catch (error) { target.disabled = false; notice(error.message); }
 });
 
@@ -397,26 +399,101 @@ $('#delete-form').addEventListener('submit', async event => {
   } catch (error) { $('#delete-error').textContent = error.message; }
   finally { submit.disabled = false; }
 });
+function publicInput() {
+  const tags = $('#public-tags').value;
+  return {
+    slug: $('#public-slug').value, title: $('#public-thought-title').value, body: $('#public-body').value,
+    date: $('#public-date').value,
+    tags: tags === state.publication.draft.tags.join(', ') ? state.publication.draft.tags : tags.split(',').map(tag => tag.trim()).filter(Boolean),
+    description: $('#public-description').value, cover: $('#public-cover').value, coverPosition: $('#public-cover-position').value
+  };
+}
+function publicationControls() {
+  const published = state.publication?.published;
+  $('#unpublish').hidden = !published;
+  $('#view-public').hidden = !published;
+  if (published) $('#view-public').href = `https://christopherli.dev/#thought/${published.slug}`;
+  $('#publish-public').textContent = published ? 'update site ↗' : 'publish to site ↗';
+}
+function publicBusy(value) {
+  state.publicBusy = value;
+  for (const control of $('#public-dialog').querySelectorAll('input,textarea,button')) control.disabled = value;
+}
+async function openPublication(entry) {
+  const data = await api(`thoughts/${entry.id}/publication`);
+  if (state.selected?.id !== entry.id) return;
+  state.publication = data; state.publicationId = entry.id; state.publicDirty = false;
+  const draft = data.draft;
+  if (!data.version && !entry.source_date) {
+    const date = new Date(entry.created_at);
+    draft.date = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+  $('#public-thought-title').value = draft.title;
+  $('#public-body').value = draft.body;
+  $('#public-slug').value = draft.slug;
+  $('#public-date').value = draft.date;
+  $('#public-tags').value = draft.tags.join(', ');
+  $('#public-description').value = draft.description;
+  $('#public-cover').value = draft.cover;
+  $('#public-cover-position').value = draft.coverPosition;
+  $('#public-status').textContent = data.published ? JSON.stringify(data.draft) === JSON.stringify(data.published) ? 'published' : 'unpublished changes' : data.version ? 'draft saved' : '';
+  publicationControls();
+  $('#public-dialog').showModal();
+}
+async function savePublication() {
+  if (state.publicBusy) throw new Error('Wait for the current save to finish.');
+  if (!state.publication) return;
+  if (!state.publicDirty && state.publication.version) return;
+  publicBusy(true); $('#public-status').textContent = 'saving…';
+  try {
+    state.publication = await api(`thoughts/${state.publicationId}/publication`, { method: 'PUT', body: JSON.stringify({ draft: publicInput(), version: state.publication.version }) });
+    state.publicDirty = false; publicationControls();
+    $('#public-status').textContent = state.publication.published ? JSON.stringify(state.publication.draft) === JSON.stringify(state.publication.published) ? 'published' : 'unpublished changes' : 'draft saved';
+  } catch (error) { $('#public-status').textContent = error.message; throw error; }
+  finally { publicBusy(false); }
+}
+async function closePublication() {
+  if (state.publicBusy) return;
+  try { if (state.publicDirty) await savePublication(); $('#public-dialog').close(); }
+  catch { /* Keep the editable text visible when saving fails. */ }
+}
+$('#public-dialog').addEventListener('input', () => { state.publicDirty = true; $('#public-status').textContent = 'unsaved'; });
+$('#public-dialog').addEventListener('cancel', event => { event.preventDefault(); closePublication(); });
+$('#save-public').addEventListener('click', () => savePublication().catch(() => {}));
+async function changePublication(action) {
+  if (state.publicBusy) return;
+  try {
+    await savePublication();
+    publicBusy(true); $('#public-status').textContent = action === 'publish' ? 'publishing…' : 'unpublishing…';
+    state.publication = await api(`thoughts/${state.publicationId}/publication/${action}`, { method: 'POST', body: JSON.stringify({ version: state.publication.version }) });
+    publicationControls();
+    $('#public-status').textContent = action === 'publish' ? 'published' : 'unpublished';
+  } catch (error) { $('#public-status').textContent = error.message; }
+  finally { publicBusy(false); }
+}
+$('#publish-public').addEventListener('click', () => changePublication('publish'));
+$('#unpublish').addEventListener('click', () => changePublication('unpublish'));
 $('#copy-public').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(entryText({ title: $('#public-thought-title').value, body: $('#public-body').value })); $('#public-status').textContent = 'copied.'; }
   catch { $('#public-status').textContent = 'select the text to copy it.'; }
 });
 $('#download-public').addEventListener('click', () => {
-  const date = new Date().toISOString().slice(0, 10);
-  download(`thought-${date}.md`, `---\ntitle: ${JSON.stringify($('#public-thought-title').value.trim() || 'Untitled')}\ndate: "${date}"\npublished: false\n---\n\n${$('#public-body').value}\n`, 'text/markdown');
+  const { slug, body, ...metadata } = publicInput();
+  download(`${slug}.md`, `---\n${Object.entries({ ...metadata, published: false }).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n${body}\n`, 'text/markdown');
   $('#public-status').textContent = 'downloaded.';
 });
 $('#export').addEventListener('click', async () => {
-  try { await saveDraft(); const data = await api('export'); download(`journal-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json'); }
+  try { await saveDraft(); if (state.publicDirty) await savePublication(); const data = await api('export'); download(`journal-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json'); }
   catch (error) { notice(error.message); }
 });
 $('#logout').addEventListener('click', async () => {
   if (state.posting) return;
   try {
     await saveDraft();
+    if (state.publicDirty) await savePublication();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
     await api('logout', { method: 'POST', body: '{}' });
-    state.entries.clear(); state.selected = null; state.pendingPost = null; state.active = null;
+    state.entries.clear(); state.selected = null; state.publication = null; state.publicationId = null; state.publicDirty = false; state.pendingPost = null; state.active = null;
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
@@ -426,7 +503,7 @@ $('#logout').addEventListener('click', async () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && state.dirty) saveDraft().catch(() => {}); });
 window.addEventListener('beforeunload', event => {
-  if (state.dirty || state.saving || state.posting) { event.preventDefault(); event.returnValue = ''; }
+  if (state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy) { event.preventDefault(); event.returnValue = ''; }
 });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 

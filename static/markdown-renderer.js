@@ -550,20 +550,35 @@ class Site {
     return { attributes, body: match[2] };
   }
 
-  // The index carries every post's metadata (build.py), so lists render
+  async writingSource() {
+    if (!this._writingSource) this._writingSource = (async () => {
+      const response = await fetch('/writing-source.json', { cache: 'no-store', credentials: 'omit' });
+      if (!response.ok) return { posts: '/posts', feed: '/feed.xml' };
+      const source = await response.json();
+      if (source.posts !== '/posts' && !/^https:\/\/[^/]+\/public\/posts$/.test(source.posts)) throw new Error('Invalid writing source.');
+      if (source.feed !== '/feed.xml' && !/^https:\/\/[^/]+\/public\/feed\.xml$/.test(source.feed)) throw new Error('Invalid writing feed.');
+      const feed = document.querySelector('link[rel="alternate"][type="application/rss+xml"]');
+      if (feed) feed.href = source.feed;
+      return source;
+    })();
+    return this._writingSource;
+  }
+
+  // The index carries every published post's metadata, so lists render
   // without downloading a single post body — bodies load on demand in
   // loadPostBody. Plain-filename entries (the old index format) still work.
   async loadPosts() {
     try {
       let entries = [];
       try {
-        const resp = await fetch('/posts/index.json');
+        const source = await this.writingSource();
+        const resp = await fetch(`${source.posts}/index.json`, { cache: 'no-store', credentials: 'omit' });
         if (resp.ok) entries = await resp.json();
       } catch (_) {}
 
       this.posts = entries
         .map(e => (typeof e === 'string' ? { file: e } : e))
-        .filter(e => e.file && e.file.endsWith('.md'))
+        .filter(e => typeof e.file === 'string' && /^[a-z0-9_-]+\.md$/.test(e.file))
         .map(e => ({
           filename: e.file.replace('.md', ''),
           title: e.title || e.file.replace('.md', '').replace(/-/g, ' '),
@@ -584,7 +599,9 @@ class Site {
     if (post._loading) return post._loading;
     post._loading = (async () => {
       try {
-        const resp = await fetch(`/posts/${post.filename}.md`);
+        const source = await this.writingSource();
+        const resp = await fetch(`${source.posts}/${post.filename}.md`, { cache: 'no-store', credentials: 'omit' });
+        if (!resp.ok) throw new Error('Post unavailable.');
         const raw = await resp.text();
         const { body } = this.parseFrontMatter(raw);
         if (!post.words) post.words = body.split(/\s+/).length;
