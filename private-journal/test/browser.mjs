@@ -76,7 +76,7 @@ try {
   assert.equal(await page.locator('#body').inputValue(), first, 'draft survives reload');
   assert.equal(await page.locator('#title').inputValue(), 'a day of building', 'title survives reload');
   await page.locator('#post').click();
-  await page.waitForFunction(text => [...document.querySelectorAll('.thought-body')].some(p => p.textContent === text), first);
+  await page.waitForFunction(text => [...document.querySelectorAll('#feed .thought-body')].some(p => p.textContent.startsWith(text)), first.split('\n')[0]);
   const root = (await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries[0]; ids.push(root.id);
   const article = page.locator(`article[data-id="${root.id}"]`);
 
@@ -93,14 +93,17 @@ try {
   await page.mouse.move(0, 0);
   await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .entry-footer`)).opacity === '0', root.id);
   await article.hover();
-  assert.equal(await article.locator('.thought-body').evaluate(element => element.scrollHeight > element.clientHeight), true);
+  const initialPreview = await article.locator('.thought-body').textContent();
+  assert.equal(await article.locator('.thought-body').evaluate(element => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(element.textContent)].length), 280);
+  assert.ok(initialPreview.endsWith('…'));
+  assert.equal(await article.locator('.thought-body').evaluate(element => getComputedStyle(element).webkitLineClamp), 'none', 'the character preview is not clipped to three lines');
   assert.equal(await article.locator('[data-action=expand]').count(), 0, 'thoughts have no inline expansion');
   await article.locator('[data-action=read]').click();
   await page.locator('#reader').waitFor({ state: 'visible' });
   assert.equal((await page.locator('#reader .thought-body p').allTextContents()).join('\n\n'), first, 'open navigates to the complete writing');
   assert.equal(await page.locator('#reader-back').textContent(), 'back');
   await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' });
-  assert.equal(await article.locator('.thought-body').evaluate(element => element.classList.contains('collapsed')), true, 'back returns to the unchanged preview');
+  assert.equal(await article.locator('.thought-body').textContent(), initialPreview, 'back returns to the unchanged preview');
   await openReader(article); await readerMenu();
   await page.locator('#reader-bookmark').click();
   await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'true');
@@ -114,6 +117,23 @@ try {
   await backToFeed();
   await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'no bookmarks yet.');
   await setView('all'); await idle();
+  const previewEdgeCases = await page.evaluate(async () => {
+    const { markdownPreview } = await import('./markdown.js');
+    const emoji = '👩🏽‍💻';
+    const exact = markdownPreview(`**${emoji.repeat(280)}**`);
+    const longer = markdownPreview(`**${emoji.repeat(281)}**`);
+    const link = markdownPreview(`[${'x'.repeat(300)}](https://example.com)`);
+    const unsafe = markdownPreview('<img src=x onerror=alert(1)> [unsafe](javascript:alert%281%29)');
+    return { exact: exact.textContent, longer: longer.textContent, bold: longer.querySelector('strong')?.textContent,
+      link: link.querySelector('a')?.textContent, href: link.querySelector('a')?.href,
+      unsafe: unsafe.querySelectorAll('img,script,a').length };
+  });
+  assert.equal(previewEdgeCases.exact, '👩🏽‍💻'.repeat(280), 'the limit counts visible characters without splitting emoji');
+  assert.equal(previewEdgeCases.longer, '👩🏽‍💻'.repeat(279) + '…');
+  assert.equal(previewEdgeCases.bold, previewEdgeCases.longer, 'truncation preserves formatting');
+  assert.equal(previewEdgeCases.link, 'x'.repeat(279) + '…');
+  assert.equal(previewEdgeCases.href, 'https://example.com/');
+  assert.equal(previewEdgeCases.unsafe, 0, 'feed previews retain the safe Markdown rules');
   await fillComposer('cafe');
   await page.waitForFunction(() => document.querySelector('#view-title').classList.contains('sr-only') && document.querySelector('mark')?.textContent === 'café');
   await page.locator('#clear-input').click();
@@ -152,7 +172,9 @@ try {
   assert.equal(await page.locator('#public-body').inputValue(), 'a separate public draft', 'public draft is saved independently');
   await page.locator('#publish-public').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
-  assert.equal(await page.locator('#reader-status .entry-published').textContent(), 'published');
+  assert.equal(await page.locator('#reader-content .thought-title .entry-published').textContent(), 'published');
+  assert.equal(await page.locator('#reader-status .entry-published').count(), 0, 'publication status sits beside the title');
+  assert.equal(await article.locator('.thought-title .entry-published').count(), 1);
   assert.equal(await article.locator('.entry-published').count(), 1, 'publishing updates the existing feed entry');
   const publicSite = await publicSitePreview(context, origin);
   await publicSite.emulateMedia({ reducedMotion: 'reduce' });
@@ -183,7 +205,7 @@ try {
   if (await publicOptions.getAttribute('aria-expanded') !== 'true') await publicOptions.click();
   await page.locator('#unpublish').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'unpublished');
-  assert.equal(await page.locator('#reader-status .entry-published').count(), 0);
+  assert.equal(await page.locator('#reader-content .entry-published').count(), 0);
   assert.equal(await article.locator('.entry-published').count(), 0, 'unpublishing removes the feed indicator');
   await publicSite.goto('https://site-preview.test/#thoughts');
   await publicSite.reload();
@@ -223,6 +245,10 @@ try {
   }
   await api(`thoughts/${ids[1]}`, 'PATCH', { bookmarked: true });
   await setView('all'); await idle();
+  const markdownPreview = page.locator(`article[data-id="${ids[0]}"] .thought-preview`);
+  assert.ok(await markdownPreview.locator('strong').count(), 'the feed renders Markdown emphasis');
+  assert.ok(await markdownPreview.locator('ul').count(), 'the feed preserves list structure');
+  assert.ok((await markdownPreview.textContent()).endsWith('…'));
   await page.evaluate(() => document.fonts.ready);
   await settled();
   await page.screenshot({ path: `${artifacts}/desktop.png`, fullPage: true });
@@ -393,7 +419,7 @@ try {
     if (!payload.semantic) return route.continue();
     semanticCalls.push(payload.query);
     if (payload.query === 'older query') await new Promise(resolve => setTimeout(resolve, 1500));
-    await route.fulfill({ json: { entries: [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: payload.query === 'a thought about stories' ? 40 : null, indexing: false } }).catch(() => {});
+    await route.fulfill({ json: { entries: payload.query === 'nothing relevant here' ? [] : [payload.query === 'older query' ? sampleEntries[0] : sampleEntries[1]], next: payload.query === 'a thought about stories' ? 40 : null, indexing: false } }).catch(() => {});
   });
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#body').inputValue(), '', 'semantic checks start with a fully cleared draft');
@@ -417,6 +443,10 @@ try {
   await page.waitForTimeout(1800);
   assert.equal(await page.locator('.thought').getAttribute('data-id'), ids[1], 'a stale result cannot replace the newer query');
   assert.equal(await page.locator('#body').inputValue(), 'newer query');
+  await fillComposer('nothing relevant here');
+  await page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelectorAll('.thought').length === 0);
+  assert.equal(await page.locator('#feed-status').textContent(), '', 'no relevant results leaves a blank feed');
+  assert.equal(await page.locator('#more').isVisible(), false);
   assert.equal((await api('export')).data.entries.length, samples.length);
   await fillComposer('an explicitly saved thought');
   await page.locator('#composer-editor .cm-content').press('Enter');
@@ -443,7 +473,6 @@ try {
   // Reload after explicitly discarding this synthetic conflict, then test lock.
   page.on('dialog', dialog => dialog.accept());
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
-  await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
   assert.equal((await api('thoughts')).status, 401, 'locking revokes server session');
@@ -464,7 +493,6 @@ try {
   assert.ok(mountedRequests.includes('/journal/api/thoughts'));
   assert.ok(!mountedRequests.some(path => path.startsWith('/api/')), 'mounted UI never calls the origin root API');
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
-  await page.locator('#journal-menu-toggle').click();
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
   console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));

@@ -1,6 +1,7 @@
 import './vendor/marked.min.js';
 import { thoughtLinks } from './thought-links.js';
 import { textTags } from './tags.js';
+import { photoReference, photoSource } from './photo-links.js';
 
 const parser = new globalThis.marked.Marked({ gfm: true, breaks: false, extensions: [{
   name: 'thoughtLink', level: 'inline', start: source => source.indexOf('[['),
@@ -54,6 +55,10 @@ function nodes(tokens, allowTags = true) {
       case 'hr': case 'br': result.append(element(token.type)); break;
       case 'html': result.append(document.createTextNode(token.text)); break;
       case 'link': case 'image': {
+        const photo=token.type==='image'&&photoReference(decode(token.href));
+        if(photo){
+          const img=element('img');img.width=photo.width;img.height=photo.height;img.alt=decode(token.text||'photo');img.loading='lazy';img.decoding='async';img.className='journal-photo';img.src=photoSource(photo);result.append(img);break;
+        }
         const href = safeLink(token.href);
         const content = token.type === 'image' ? document.createTextNode(decode(token.text || token.href)) : token.tokens ? nodes(token.tokens,false) : document.createTextNode(decode(token.text || ''));
         if (!href) { result.append(content); break; }
@@ -100,4 +105,23 @@ function nodes(tokens, allowTags = true) {
 export function markdown(body) {
   try { return nodes(parser.lexer(body)); }
   catch { return document.createTextNode(body); }
+}
+
+const characters = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+export function markdownPreview(body, limit = 280) {
+  const fragment = document.createDocumentFragment(); fragment.append(markdown(body));
+  if ([...characters.segment(fragment.textContent)].length <= limit) return fragment;
+  let remaining = limit - 1; // Reserve the final character for the ellipsis.
+  const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const segments = [...characters.segment(node.data)];
+    if (segments.length < remaining) { remaining -= segments.length; continue; }
+    const offset = remaining ? segments[remaining - 1].index + segments[remaining - 1].segment.length : 0;
+    // Trim the rendered DOM rather than Markdown source, preserving valid
+    // emphasis, lists, and links even when the preview ends inside a block.
+    const tail = document.createRange(); tail.setStart(node, offset); tail.setEnd(fragment, fragment.childNodes.length); tail.deleteContents();
+    node.data = node.data.trimEnd() + '…';
+    break;
+  }
+  return fragment;
 }

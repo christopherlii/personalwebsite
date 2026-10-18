@@ -2,12 +2,14 @@
 
 A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
-has a borderless writing/search field above a faint timeline, and three-line
+has a borderless writing/search field above a faint timeline, and 280-character
 thought previews with an open link to a separate reading page. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
-A muted heart identifies bookmarked thoughts and a published link identifies
-live site snapshots. These remain visible beside the date area and in the
-writing page toolbar. Draft saves do not imply publication; unpublish removes
+A muted heart identifies bookmarked thoughts beside the date area and in the
+writing page toolbar. A square green published tag sits beside the thought's
+title in the feed and reader and links to its live site snapshot. An untitled
+private note uses its published title for this heading; publishing requires a
+title. Draft saves do not imply publication; unpublish removes
 the label. Timeline, keyword search, semantic search, and individual reads
 return the current publication slug, joined in one bounded query per page.
 The header, reading-page, and public-draft menus appear in reserved space without
@@ -30,7 +32,12 @@ before returning; save errors or version conflicts keep the editor visible.
 Unsaved source and editor history also survive reauthentication in the same tab.
 Reload/close warns while edits are unsaved. Publishing stays an explicit,
 separate public draft, and delete still requires confirmation.
-Previews never expand inline.
+Feed previews render the same safe Markdown as the reading page, preserving
+paragraphs, lists, emphasis, and links. The 280-character limit counts rendered
+text (Unicode grapheme clusters), including the truncation ellipsis, rather
+than Markdown markers or private link IDs. Clipping the DOM keeps formatting
+valid. Previews have no line clamp and never expand inline; copy retains the
+complete original source, and open shows the complete writing.
 Reading links require the same
 session and work on reload and under `/journal/`.
 Only an explicit post creates a new
@@ -42,8 +49,9 @@ runtime assets.
 Markdown uses the existing site's vendored Marked 15.0.12 lexer (MIT), copied
 unchanged to `public/vendor/marked.min.js`. `public/markdown.js` constructs DOM
 nodes from tokens instead of injecting parsed HTML. Raw HTML remains literal
-text, links allow only HTTP(S)/mailto, and Markdown images become links rather
-than automatic external requests. The live editor uses the Lezer Markdown tree
+text, links allow only HTTP(S)/mailto, and external Markdown images become links
+rather than automatic external requests. Uploaded journal photos render inline.
+The live editor uses the Lezer Markdown tree
 to decorate the exact source, not a conversion through editable HTML. Headings,
 emphasis, lists, quotes, code, links, and tasks format in place. Inactive tables
 render as tables; clicking one reveals that table's Markdown for editing.
@@ -66,6 +74,54 @@ the caret skips it. Reading and feed previews show the label. The authenticated
 current thought; it does not call an AI model. Search uses link labels instead
 of target IDs. Public drafts and published snapshots retain only the linked
 words, so private destinations are never published by following a link.
+
+## Photos
+
+The quiet photo control, pasting an image file, or dropping one into either
+writing field uploads a raster photo and inserts ordinary image Markdown.
+Uploads are attached to a mapped editor selection, so typing while the request
+is pending does not replace newer text. Each image insertion is one undoable
+edit. Photos remain rendered on the active line without a source/preview
+expansion. The feed uses 160px-high thumbnails; the reading page displays the
+image at the available width. Saved dimensions reserve its space before loading.
+Posting, saving, and navigation wait for the current upload batch to finish;
+an unload warning protects pending uploads. The existing draft and editor
+conflict protections continue to apply.
+
+JPEG, PNG, and WebP inputs are decoded and re-encoded in the browser, stripping
+original EXIF metadata. The long edge is reduced to at most 2048 pixels and
+output to at most 1,000,000 bytes. WebP is preferred, with the browser's PNG
+fallback supported. At most ten images are accepted in one batch; original
+files above 25 MB are rejected before decoding. The upload API enforces its
+actual byte limit, validates the raster signature and dimensions, and rejects
+SVG/HTML. It accepts only owner-authenticated, same-origin writes, with bounded
+requests and immutable UUID addresses. Photos are not sent to an AI model, and
+image source URLs are removed from composed search text and semantic passages.
+
+`0007_photos.sql` stores the resized bytes and metadata in the existing private
+D1 database, keeping this small personal-journal deployment self-contained.
+The 1 MB upload cap stays below D1's [2 MB row limit](https://developers.cloudflare.com/d1/platform/limits/).
+Photos share the database's storage allowance with writing and embeddings; a
+photo-heavy archive should move the byte storage to R2 behind the same stable
+API addresses. The current OAuth connection cannot list R2 buckets, so this
+release does not depend on a new R2 setup. No original full-resolution copy is
+kept by the journal.
+
+Private `/api/photos/<id>` requests require the journal session. Public drafts
+keep the original private references. Only explicit publish turns real Markdown
+image references into public photo URLs and checks that the uploaded objects
+exist; examples inside code do not publish photos. Anonymous photo reads check
+the current published snapshots. Unpublishing removes access unless another
+published snapshot still uses that image. Removing Markdown does not erase the
+underlying photo or an older public snapshot. The owner export includes a photo
+manifest, not the binary contents; back up image files separately through their
+authenticated addresses. Every image response is `no-store` and `nosniff`.
+
+`npm run test:photos` uses generated local raster fixtures to check file selection,
+browser resizing, typing during upload, undo/redo, draft restoration, thumbnails,
+stable live rendering, paste/drop, save during upload, mobile layout, private
+access, explicit publication/unpublish, and export metadata. No real photos or
+production notes are used in these checks.
 
 ## Tags
 
@@ -145,6 +201,21 @@ only publish/update does. Unpublish removes public access and retains the draft.
 Copy/download remain available for Substack, X, or Markdown backups without
 posting to those services. Existing media and reading/favorites stay in Git.
 
+Dictation uses the browser's `SpeechRecognition` / `webkitSpeechRecognition`
+service from the small dictate control in the composer or full-page editor.
+It starts only on an explicit click and requires microphone permission. Each
+final recognized phrase enters the current selection as an undoable edit and
+follows the existing draft/save behavior. Stop flushes the last returned phrase
+before posting, saving, or changing the reading route. Cancel, locking,
+session expiry, and hiding the tab end capture; it never restarts automatically.
+The journal stores no audio and adds no transcription endpoint or provider key.
+Browser speech support and service availability vary; errors retain existing
+text. The browser may send audio to its vendor's speech service, so this is not
+an on-device or Cloudflare-only audio-processing guarantee. See the
+[browser speech-recognition documentation](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
+Automated checks inject recognition events; they verify insertion and lifecycle,
+not real microphone permission or recognition accuracy on a user's browser.
+
 ## Local preview
 
 Use Node 24+ (the API tests use `node:sqlite`) and Python 3 for the build test.
@@ -201,6 +272,11 @@ removal confirmation, related items, edit stability, and mobile layout against
 the local preview (`JOURNAL_TEST_URL` may select its port). API tests additionally
 cover private access, export, rejected destinations and redirects, bounded
 metadata, and cached semantic retrieval without provider calls during lookup.
+Run `npm run test:dictation` for composer/reader insertion, autosave, undo/redo,
+final phrases on stop/post/save/back, microphone-denial handling, stale-result
+isolation, and a 320px layout. Recognition events are injected; the test never
+opens a microphone. A real permission and speech-service check still needs a
+supported browser on the user's device.
 
 ## Deploy after connecting a Cloudflare account
 
@@ -315,9 +391,11 @@ Owner JSON export and per-draft Markdown download provide writing backups.
 - All responses are `no-store`; private routes are `noindex`. Request observability is disabled.
   Avoid enabling request/body logging for production. These headers are not
   the access control; login is.
-- The writing field also searches. Typing shows keyword results after 150ms;
-  after a 750ms pause it requests semantic results when the AI binding is
-  configured. Earlier requests are canceled and stale responses cannot replace
+- The writing field also searches. After a 750ms pause it requests semantic
+  results when the AI binding is
+  configured. The previous list remains intact until the complete response
+  arrives; an empty result clears the feed without an empty-state label.
+  Earlier requests are canceled and stale responses cannot replace
   newer results. Input, selection, and draft content stay separate from result
   rendering. Clearing restores the timeline; switching bookmark views preserves
   what is being written. No typing/search request creates a timeline entry.
@@ -326,7 +404,8 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   body so a composed thought is not placed in a URL. Queries support the full
   title and 20,000-character body; embedding batches never exceed eight chunks.
   Keyword results remain available without the AI binding or on provider
-  failure. Results and timelines use 40-entry pages. Search highlighting uses
+  failure and require every meaningful search term, rather than any one word.
+  Results and timelines use 40-entry pages. Search highlighting uses
   the same term selection and never renders user text as HTML.
 - Semantic search uses Cloudflare-hosted `@cf/baai/bge-small-en-v1.5` (384
   dimensions). Thoughts are embedded on creation/edit and normalized Float32
@@ -334,19 +413,34 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   most 400 UTF-8 bytes; it is never silently truncated. The first search repairs
   missing indexing jobs in bounded batches. Edits invalidate vectors in a SQL
   trigger; stale async jobs cannot replace the new content. Deletes cascade.
-- A semantic query embeds only the query once the archive is indexed. The
-  server scans stored vectors in bounded pages, takes each thought's best chunk
-  similarity, and merges the top 200 semantic and keyword candidates by
-  reciprocal rank. It does not send the archive to the model again on every
-  query. This suits a personal journal; a large archive should move retrieval
-  to a vector index rather than assuming constant search latency. The 0.45
-  cosine cutoff is a retrieval heuristic, not a probability or validated
-  accuracy guarantee. Search requests are limited to 120 per minute.
+- Once the archive is indexed, a semantic query embeds the query and scans
+  stored vectors in bounded pages. Short queries (one chunk, at most 400 UTF-8
+  bytes) retrieve up to 40 candidate thoughts from the top 200 vector and FTS
+  matches. One Cloudflare `@cf/baai/bge-reranker-base` call checks the query
+  against each thought's best semantic passage and best word-matching passage
+  (at most two 400-byte passages per thought). Direct matches require a reranker
+  score of at least 0.4. Paraphrases can qualify with a score of at least 0.02
+  only when embedding similarity is also at least 0.65. Both must reach 20% of
+  the highest reranker score; no minimum result count is filled. Results are
+  ordered by relevance, with newer thoughts breaking ties. Neither a word
+  match nor a top-k position can bypass these checks. The cutoffs are heuristics
+  checked against synthetic examples, not probabilities or archive-wide guarantees.
+  Longer composed queries still embed every chunk; they require cosine
+  similarity of at least 0.65 and do not add word-only results. They are not
+  silently truncated for the reranker. This suits a personal journal; a large
+  archive should move retrieval to a vector index rather than assuming constant
+  latency. Search requests are limited to 120 per minute.
 - Cloudflare lists the model at $0.0202 per million input tokens, before any
   free allocation. For example, embedding a 20-token query is about $0.000000404
   in model usage; this excludes Worker/database hosting. Indexing text is an
   additional cost when writing or editing. Check current [model pricing](https://developers.cloudflare.com/workers-ai/models/bge-small-en-v1.5/)
   and [account limits](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+  The short-query relevance check adds one bounded inference call at the
+  [reranker's listed $0.00311 per million input tokens](https://developers.cloudflare.com/workers-ai/models/bge-reranker-base/).
+  Live-model verification used five synthetic notes: “start of blog” and a
+  paraphrase returned only the two opening-blog notes, while an unrelated
+  spaceship query returned none. This is a regression example, not an archive-wide
+  recall evaluation or a guarantee for every query.
 - Anonymous GET/HEAD routes under `/public/` serve only published snapshots:
   `posts/index.json`, `posts/<address>.md`, `feed.xml`, and `export.json`. They
   allow credential-free CORS and use `no-store`. Private endpoints stay behind
@@ -358,7 +452,8 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   previous data under their own policies.
 - No Jev or OpenAI key is required. Semantic indexing sends each thought to
   Cloudflare Workers AI when it is created/edited; searches send the current writing/search text after the typing pause, even
-  before it is posted.
+  before it is posted. Short searches additionally send the selected candidate
+  passages to the Cloudflare reranker; they do not send the entire archive.
   This stays within the selected Cloudflare backend but is still model
   processing, not on-device inference. See [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
 - Typography matches the personal homepage: self-hosted Instrument Sans at

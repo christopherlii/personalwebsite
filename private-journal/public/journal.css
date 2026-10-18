@@ -243,6 +243,9 @@ textarea::placeholder {
 .compose-buttons>button {
   font-size:11px
 }
+.dictation-controls { display:flex; align-items:baseline; gap:12px; min-height:24px; margin-top:8px; font-size:11px; color:var(--muted) }
+.dictate-toggle { min-width:44px; text-align:left; font-size:11px; color:var(--muted) }
+.dictate-toggle[aria-pressed=true] { color:#9c3535 }
 #clear-input {
   color:var(--muted)
 }
@@ -274,10 +277,15 @@ textarea::placeholder {
 .thought-date { display:flex; flex-direction:column; align-items:flex-end }
 .entry-state { display:inline-flex; align-items:center; gap:8px; font-size:10px; line-height:1.5; color:var(--muted); white-space:nowrap }
 .thought-header>.entry-state { width:max-content }
-.entry-published { text-decoration:none }
+.entry-published { display:inline-block; padding:2px 6px; background:#e7f1e8; color:#2e6b3f; font:400 10px/1.5 var(--font-body); text-decoration:none; white-space:nowrap; border-radius:0 }
 .entry-published:hover { text-decoration:underline; text-underline-offset:3px }
 .entry-heart { font-size:11px; line-height:1 }
 .thought-title {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  column-gap:10px;
+  row-gap:4px;
   margin:0 0 6px;
   font:500 14px/1.55 var(--font-body);
   overflow-wrap:anywhere
@@ -286,14 +294,6 @@ textarea::placeholder {
   font:14px/1.55 var(--font-body);
   white-space:pre-wrap;
   overflow-wrap:anywhere
-}
-.thought-body.collapsed {
-  white-space:normal;
-  display:-webkit-box;
-  -webkit-box-orient:vertical;
-  -webkit-line-clamp:3;
-  line-clamp:3;
-  overflow:hidden
 }
 .thought-body a {
   color:#0b243e;
@@ -461,6 +461,10 @@ textarea::placeholder {
 }
 .markdown-body .task-item { list-style:none }
 .markdown-body input[type=checkbox] { margin-left:-20px; accent-color:var(--fg) }
+.markdown-body.thought-preview { line-height:1.55 }
+.thought-preview p,.thought-preview ul,.thought-preview ol,.thought-preview blockquote,.thought-preview pre,.thought-preview .table-scroll { margin-bottom:.7em }
+.thought-preview>:last-child { margin-bottom:0 }
+.thought-preview pre code { white-space:pre-wrap; overflow-wrap:anywhere }
 details {
   position:relative
 }
@@ -696,8 +700,10 @@ dialog .public-actions {
     padding:0 26px 0 24px
   }
   .page-header {
-    margin-left:22px
+    margin-left:22px;
+    column-gap:12px
   }
+  .utilities { gap:12px }
   .thought {
     padding-left:22px
   }
@@ -775,4 +781,10 @@ dialog .public-actions {
 #active-tag { max-width:100%; overflow-wrap:anywhere }
 .tag-filter>a { color:var(--muted); font-size:11px; text-decoration:none }
 .tag-filter>a:hover { text-decoration:underline; text-underline-offset:3px }
+.add-photo { width:46px; text-align:left; color:var(--muted) }
+.photo-tools { margin:0 0 12px; min-height:28px }
+.journal-photo { display:block; max-width:100%; height:auto; margin:12px 0; border:0 }
+.thought-preview .journal-photo { max-height:160px; width:auto; object-fit:contain; object-position:left }
+.cm-photo { display:inline-block; width:100%; vertical-align:top }
+.cm-photo .journal-photo { max-height:300px; width:auto; object-fit:contain; object-position:left }
 @media(pointer:coarse) { #reading-url { font-size:16px } .reading-actions button,.reading-filters button,#reading-save { min-height:44px } }

@@ -27,13 +27,13 @@
       <div class="utilities">
         <button type="button" id="toggle-timeline" aria-expanded="true" aria-controls="timeline">hide timeline</button>
         <button type="button" id="journal-menu-toggle" data-menu aria-label="journal options" aria-expanded="false" aria-controls="journal-menu">more</button>
+        <button type="button" id="logout">lock</button>
       </div>
       <nav id="journal-menu" class="entry-menu journal-menu" aria-label="journal" hidden>
         <button type="button" data-view="all" aria-current="page">all thoughts</button>
         <button type="button" data-view="saved">bookmarks</button>
         <a href="#reading">read later</a>
         <button type="button" id="export">export</button>
-        <button type="button" id="logout">lock</button>
       </nav>
     </header>
     <section id="composer-section" class="composer-section page-entrance" aria-label="write or search your thoughts">
@@ -44,6 +44,7 @@
         </div>
         <div id="composer-editor"></div>
         <textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
+        <div class="dictation-controls"><button type="button" id="photo-composer" class="add-photo">photo</button><button id="dictate-composer" class="dictate-toggle" type="button" aria-pressed="false" aria-describedby="dictation-composer-status" title="Uses your browser’s speech service">dictate</button><span id="dictation-composer-status" role="status"></span></div>
         <div class="compose-actions" id="compose-actions" hidden>
           <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
           <div class="compose-buttons"><button type="button" id="add-title">add title</button><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
@@ -65,6 +66,7 @@
     <header class="reader-toolbar">
       <div class="reader-context"><a id="reader-back" href="#" aria-label="back to timeline">back</a><span id="reader-status" class="entry-state"></span></div>
       <div class="reader-actions">
+        <button type="button" id="dictate-reader" class="dictate-toggle" aria-pressed="false" title="Uses your browser’s speech service" hidden>dictate</button>
         <button type="button" id="reader-cancel" hidden>cancel</button>
         <button type="submit" form="edit-form" id="reader-save" hidden>save</button>
         <button type="button" id="reader-edit">edit</button>
@@ -80,6 +82,7 @@
     <form id="edit-form" hidden>
       <label for="edit-thought-title" class="sr-only">title (optional)</label>
       <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
+      <div class="photo-tools"><button type="button" id="photo-reader" class="add-photo">photo</button></div>
       <div id="live-editor"></div>
       <textarea id="edit-body" hidden aria-hidden="true" tabindex="-1"></textarea>
     </form>
@@ -109,8 +112,8 @@
   </dialog>
   <dialog id="public-dialog" aria-labelledby="public-title">
     <header><h2 id="public-title">public draft</h2><button type="button" data-close="public-dialog">close</button></header>
-    <label for="public-thought-title" class="sr-only">public title (optional)</label>
-    <input id="public-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
+    <label for="public-thought-title" class="sr-only">public title</label>
+    <input id="public-thought-title" class="title-input" placeholder="title" maxlength="160" autocomplete="off" aria-required="true">
     <label for="public-body" class="sr-only">public draft text</label>
     <textarea id="public-body" rows="10" maxlength="20000"></textarea>
     <details class="publication-details">
@@ -133,6 +136,7 @@
       <nav id="public-menu" class="entry-menu" aria-label="public draft actions" hidden><button type="button" id="copy-public">copy text</button><button type="button" id="download-public">download markdown</button><button type="button" id="unpublish" hidden>unpublish</button></nav>
     </footer>
   </dialog>
+  <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
   <p id="boot-status" class="boot" role="status"></p>
 </body>
 </html>

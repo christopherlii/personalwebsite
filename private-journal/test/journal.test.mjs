@@ -5,11 +5,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { passwordHash, digest, COOKIE } from '../auth.mjs';
 import { ftsQuery } from '../search.mjs';
-import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity } from '../semantic.mjs';
+import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity, RERANKER } from '../semantic.mjs';
 import { thoughtLink, thoughtLinks, plainThoughtLinks } from '../public/thought-links.js';
 import { readingURL, readingMetadata, fetchReadingMetadata, indexReading, relatedToThought } from '../reading.mjs';
 import { tagNames, markdownTags } from '../public/tags.js';
 import { indexTags } from '../tags.mjs';
+import { imageInfo } from '../photos.mjs';
+import { photoSource } from '../public/photo-links.js';
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
 const salt = '12'.repeat(16);
@@ -41,9 +43,10 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
   return { env, setCookie(value) { cookie = value; }, async call(path, method = 'GET', body, headers = {}) {
     const response = await worker.fetch(new Request(`${origin}${path}`, {
       method, headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json', 'X-Journal': '1', ...headers },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      ...(body === undefined ? {} : { body: body instanceof Uint8Array ? body : JSON.stringify(body) })
     }), env);
     if (response.headers.has('Set-Cookie')) cookie = response.headers.get('Set-Cookie').split(';')[0];
+    if(response.headers.get('Content-Type')?.startsWith('image/'))return{status:response.status,headers:response.headers,data:new Uint8Array(await response.arrayBuffer())};
     const raw = await response.text();
     let data;
     try { data = JSON.parse(raw); } catch { data = raw; }
@@ -52,6 +55,40 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('photo uploads are private, bounded, immutable, export metadata, and become public only through published writing',async()=>{
+  const c=client(),id=crypto.randomUUID(),path=`/api/photos/${id}`;
+  const png=new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=','base64'));
+  const headers={'Content-Type':'image/png'};
+  assert.equal((await c.call(path,'PUT',png,headers)).status,401);await c.login();
+  assert.equal((await c.call(path,'PUT',png,{...headers,Origin:'https://elsewhere.example'})).status,403);
+  const uploaded=await c.call(path,'PUT',png,headers);assert.equal(uploaded.status,201);assert.equal(uploaded.data.photo.width,1);
+  assert.deepEqual((await c.call(path)).data,png);assert.equal((await c.call(path,'PUT',png,headers)).status,200);
+  const changed=png.slice();changed[19]=2;assert.equal((await c.call(path,'PUT',changed,headers)).status,409);
+  assert.equal((await c.call(`/api/photos/${crypto.randomUUID()}`,'PUT',new Uint8Array(1000001),headers)).status,413);
+  assert.equal((await c.call(`/api/photos/${crypto.randomUUID()}`,'PUT',new TextEncoder().encode('<svg></svg>'),{'Content-Type':'image/svg+xml'})).status,415);
+  assert.equal((await c.call(`/api/photos/${crypto.randomUUID()}`,'PUT',new Uint8Array([255,216,255,255,255,255]),{'Content-Type':'image/jpeg'})).status,415);
+  const source=`![photo](${photoSource(uploaded.data.photo)})`;
+  const entry=(await c.call('/api/thoughts','POST',thought(source))).data.entry;
+  assert.equal((await c.call(path,'DELETE')).status,409);
+  const guest=client(c.env),publicPath=`/public/photos/${id}`;
+  assert.equal((await guest.call(path)).status,401);assert.equal((await guest.call(publicPath)).status,404);
+  const publication=`/api/thoughts/${entry.id}/publication`;
+  const draft=(await c.call(publication,'PUT',{draft:publicDraft(source),version:0})).data;
+  const published=(await c.call(publication+'/publish','POST',{version:draft.version})).data;
+  assert.equal((await guest.call(publicPath)).status,200);assert.equal((await guest.call(path)).status,401);
+  assert.ok((await guest.call('/public/posts/a-public-note.md')).data.includes(`https://christopherli.dev/journal/public/photos/${id}`));
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.body,source,'publishing preserves the private source');
+  const manifest=(await c.call('/api/export')).data.photos[0];assert.equal(manifest.id,id);assert.equal(Object.hasOwn(manifest,'data'),false);
+  await c.call(publication+'/unpublish','POST',{version:published.version});assert.equal((await guest.call(publicPath)).status,404);
+  const after=await c.call(publication);
+  const codeOnly=await c.call(publication,'PUT',{draft:publicDraft('`'+source+'`\n\n`https://christopherli.dev/journal'+publicPath+'`'),version:after.data.version});
+  const codePublished=await c.call(publication+'/publish','POST',{version:codeOnly.data.version});
+  assert.equal((await guest.call(publicPath)).status,404,'literal private syntax and public-address examples cannot expose a photo');
+  await c.call(publication+'/unpublish','POST',{version:codePublished.data.version});
+  await c.call(`/api/thoughts/${entry.id}`,'DELETE');assert.equal((await c.call(path,'DELETE')).status,200);
+  assert.equal((await c.call(path)).status,404);assert.equal(imageInfo(new Uint8Array([1,2,3])),null);
+});
 
 test('tags respect Markdown contexts, Unicode, case, nesting, and exact source positions', () => {
   const source='# Heading\n\n#Ideas #IDEAS #life/notes #café #1984\n\n> quote #one\n> more #two\n\n- item #three\n\n| a | b |\n|---|---|\n|#four|#five|\n\n`#code` \\#escaped [link #hidden](https://example.com/#url)\n\n```\n#fenced\n```\n\n<div>#html</div>';
@@ -184,6 +221,7 @@ test('thought status reflects live publication snapshots across reads, search, a
   assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.published_slug, null, 'an unpublished draft is not published');
   const live = await c.call(path + '/publish', 'POST', { version: saved.data.version });
   assert.equal((await c.call('/api/thoughts')).data.entries[0].published_slug, 'a-public-note');
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.published_title, 'a public note', 'an untitled private thought retains the required published name');
   assert.equal((await c.call('/api/thoughts?q=status')).data.entries[0].published_slug, 'a-public-note');
   assert.equal((await c.call('/api/search', 'POST', { query: 'status', saved: false, semantic: false })).data.entries[0].published_slug, 'a-public-note');
   const bookmarked = (await c.call(`/api/thoughts/${entry.id}`, 'PATCH', { bookmarked: true })).data.entry;
@@ -446,6 +484,8 @@ test('Unicode/prefix search, punctuation, bookmark filtering, editing, and delet
   assert.deepEqual((await c.call('/api/thoughts?q=%22%2A')).data.entries, []);
   assert.equal(ftsQuery('café "x"* OR'), '"café"* OR "x"*');
   assert.equal(ftsQuery('i want to remember a book'), '"want"* OR "remember"* OR "book"*');
+  assert.equal(ftsQuery('start of blog', true), '"start"* AND "blog"*');
+  assert.deepEqual((await c.call('/api/search', 'POST', { query: 'basketball book', saved: false, semantic: false })).data.entries, [], 'keyword fallback cannot include a thought matching just one word');
   await c.call(`/api/thoughts/${b.id}`, 'PATCH', { bookmarked: true });
   assert.deepEqual((await c.call('/api/thoughts?saved=1')).data.entries.map(e => e.id), [b.id]);
   await c.call(`/api/thoughts/${a.id}`, 'PATCH', { body: 'soccer instead', updated_at: a.updated_at });
@@ -538,6 +578,9 @@ test('semantic transport, ranking, indexing reuse, and stale-vector invalidation
   // hosted model's real-world recall quality. Live model testing needs auth.
   const calls = [];
   const ai = { async run(model, input) {
+    if (model === RERANKER) return { response: input.contexts.map(({ text }, id) => ({ id, score:
+      /worn out|exhausted|tired/i.test(input.query) ? /worn out|exhausted|tired/i.test(text) ? 0.9 : 0.01 : /soccer|sport/i.test(text) ? 0.9 : 0.01
+    })) };
     calls.push(input.text);
     return { data: input.text.map(text => {
       const vector = Array(DIMENSIONS).fill(0);
@@ -571,6 +614,47 @@ test('semantic transport, ranking, indexing reuse, and stale-vector invalidation
   assert.deepEqual((await c.call('/api/search', 'POST', { query: 'sport', saved: true })).data.entries.map(entry => entry.id), [a.id]);
   await c.call(`/api/thoughts/${a.id}`, 'DELETE', {});
   assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null);
+});
+
+test('short semantic search filters weak word matches, ranks relevance, and can return no thoughts', async () => {
+  const c = client(); await c.login();
+  c.env.AI = { async run(model, input) {
+    if (model === RERANKER) return { response: input.contexts.map(({ text }, id) => ({ id, score:
+      /start of blog|beginning to write publicly/.test(input.query) && /first (post|entry)/i.test(text) ?
+        input.query === 'start of blog' ? /first post/i.test(text) ? 0.95 : 0.8 : /first post/i.test(text) ? 0.06 : 0.03 : 0.01
+    })) };
+    return { data: input.text.map(() => [1, ...Array(DIMENSIONS - 1).fill(0)]) };
+  } };
+  const older = (await c.call('/api/thoughts', 'POST', thought('start practicing basketball after school'))).data.entry;
+  const incidental = (await c.call('/api/thoughts', 'POST', thought('read a book review on a blog'))).data.entry;
+  const strongest = (await c.call('/api/thoughts', 'POST', thought('my first post: beginning a place to share my thoughts'))).data.entry;
+  const recent = (await c.call('/api/thoughts', 'POST', thought('my first entry about why i want to write publicly'))).data.entry;
+  const result = await c.call('/api/search', 'POST', { query: 'start of blog', saved: false });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data.entries.map(entry => entry.id), [strongest.id, recent.id], 'neither recency nor an incidental word can force a weak result into the feed');
+  assert.ok(!result.data.entries.some(entry => [older.id, incidental.id].includes(entry.id)));
+  assert.deepEqual((await c.call('/api/search', 'POST', { query: 'beginning to write publicly', saved: false })).data.entries.map(entry => entry.id), [strongest.id, recent.id], 'a lower-scoring paraphrase requires agreement from semantic retrieval');
+  const empty = await c.call('/api/search', 'POST', { query: 'repairing a spaceship', saved: false });
+  assert.deepEqual(empty.data.entries, [], 'even identical candidate vectors cannot force results past the relevance check');
+  assert.equal(empty.data.next, null);
+});
+
+test('short-query relevance checks use matching passages near the end of long essays', async () => {
+  const c = client(); await c.login();
+  let checkedTail = false;
+  c.env.AI = { async run(model, input) {
+    if (model === RERANKER) {
+      checkedTail = input.contexts.some(context => context.text.includes('first post'));
+      assert.ok(input.contexts.length <= 2);
+      assert.ok(input.contexts.every(context => new TextEncoder().encode(context.text).length <= 400));
+      return { response: input.contexts.map(({ text }, id) => ({ id, score: text.includes('first post') ? 0.95 : 0.001 })) };
+    }
+    return { data: input.text.map(text => /first post|start of blog/.test(text) ? [1, ...Array(DIMENSIONS - 1).fill(0)] : [0, 1, ...Array(DIMENSIONS - 2).fill(0)]) };
+  } };
+  const essay = (await c.call('/api/thoughts', 'POST', thought('a memory of walking home after class. '.repeat(100) + '\n\nmy first post: beginning a personal blog.'))).data.entry;
+  const result = await c.call('/api/search', 'POST', { query: 'start of blog', saved: false });
+  assert.deepEqual(result.data.entries.map(entry => entry.id), [essay.id]);
+  assert.equal(checkedTail, true);
 });
 
 test('semantic chunks preserve long Unicode inputs and provider failure is explicit', async () => {

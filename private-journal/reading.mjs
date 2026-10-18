@@ -1,6 +1,7 @@
 import { ftsQuery } from './search.mjs';
 import { chunksOf, DIMENSIONS, MODEL, maximumSimilarity } from './semantic.mjs';
 import { plainThoughtLinks } from './public/thought-links.js';
+import { plainPhotoLinks } from './public/photo-links.js';
 
 export class ReadingError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -121,7 +122,7 @@ function vectorArray(blob) {
 export async function relatedToThought(id, env) {
   const entry = await env.JOURNAL_DB.prepare('SELECT title,body FROM thoughts WHERE id = ?').bind(id).first();
   if (!entry) fail(404,'Thought not found.');
-  const terms = ftsQuery(plainThoughtLinks(`${entry.title}\n${entry.body}`));
+  const terms = ftsQuery(plainPhotoLinks(plainThoughtLinks(`${entry.title}\n${entry.body}`)));
   const thoughts = new Map(), reading = new Map();
   if (terms) {
     const own = await env.JOURNAL_DB.prepare(`SELECT t.id FROM thoughts t JOIN thoughts_fts ON thoughts_fts.rowid=t.seq WHERE thoughts_fts MATCH ? AND t.id != ? ORDER BY bm25(thoughts_fts) LIMIT 12`).bind(terms,id).all();

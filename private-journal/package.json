@@ -9,6 +9,8 @@
     "test:links": "node test/browser-links.mjs",
     "test:reading": "node test/browser-reading.mjs",
     "test:tags": "node test/browser-tags.mjs",
+    "test:dictation": "node test/browser-dictation.mjs",
+    "test:photos": "node test/browser-photos.mjs",
     "db:local": "wrangler d1 migrations apply JOURNAL_DB --local",
     "password": "node scripts/password.mjs",
     "deploy": "wrangler deploy --env production",

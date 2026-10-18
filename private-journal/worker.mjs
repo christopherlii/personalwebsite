@@ -5,6 +5,7 @@ import { PublicationError, publicationApi, publicWriting } from './publications.
 import { ReadingError, readingApi, relatedToThought } from './reading.mjs';
 import { indexTags, repairTagIndex } from './tags.mjs';
 import { normalizeTag } from './public/tags.js';
+import { photoApi, PhotoError } from './photos.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -60,14 +61,14 @@ async function limit(env, key, maximum, milliseconds) {
 
 async function withPublicationState(entries, env) {
   if (!entries.length) return entries;
-  const { results } = await env.JOURNAL_DB.prepare(`SELECT thought_id, published_slug FROM publications
+  const { results } = await env.JOURNAL_DB.prepare(`SELECT thought_id, published_slug, json_extract(published, '$.title') AS published_title FROM publications
     WHERE published IS NOT NULL AND thought_id IN (${entries.map(() => '?').join(',')})`).bind(...entries.map(entry => entry.id)).all();
-  const published = new Map(results.map(row => [row.thought_id, row.published_slug]));
-  return entries.map(entry => ({ ...entry, published_slug: published.get(entry.id) || null }));
+  const published = new Map(results.map(row => [row.thought_id, row]));
+  return entries.map(entry => ({ ...entry, published_slug: published.get(entry.id)?.published_slug || null, published_title: published.get(entry.id)?.published_title || null }));
 }
 
 async function listThoughts(env, query, saved, cursor, tag = null) {
-  const terms = ftsQuery(query);
+  const terms = ftsQuery(query, true);
   if (query && !terms) return { entries: [], next: null };
   let sql = `SELECT ${thoughtSelect} FROM thoughts t`;
   const where = [], args = [];
@@ -110,6 +111,8 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  if(path.startsWith('/api/photos/')&&request.method==='PUT')await limit(env,'photos:global',30,60*1000);
+  const photo=await photoApi(request,env,path);if(photo)return photo;
   if (path === '/api/reading' && request.method === 'POST') await limit(env, 'reading:global', 30, 60 * 1000);
   const reading = await readingApi(request, env, path, readBody, context);
   if (reading) return reading;
@@ -190,7 +193,7 @@ async function api(request, env, url, context) {
     const result = await env.JOURNAL_DB.batch(statements);
     await indexTags(result[0].results[0],env);
     if (env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
-    return json({ entry: { ...result[0].results[0], published_slug: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
+    return json({ entry: { ...result[0].results[0], published_slug: null, published_title: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
@@ -230,8 +233,10 @@ async function api(request, env, url, context) {
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();
+    const photos=await env.JOURNAL_DB.prepare('SELECT id,mime,width,height,bytes,created_at FROM photos ORDER BY created_at').all();
     return json({ format: 'christopher-journal-v2', exported_at: new Date().toISOString(), entries: results, draft,
       reading: reading.results,
+      photos:photos.results,
       publications: publications.results.map(row => ({ ...row, draft: JSON.parse(row.draft), published: row.published ? JSON.parse(row.published) : null }))
     }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
@@ -265,11 +270,11 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     // CodeMirror mounts its base styles at runtime. Authorize only those
