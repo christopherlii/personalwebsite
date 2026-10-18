@@ -43,7 +43,9 @@ complete original source, and open shows the complete writing.
 Reading links require the same
 session and work on reload and under `/journal/`.
 Only an explicit post creates a new
-entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Entries have no
+entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Tapping Shift
+twice within 400ms locks the journal like the lock button; a tap only counts
+when no other key is pressed while Shift is held. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
 characters). No analytics, trackers, browser-local thought storage, or external
 runtime assets.

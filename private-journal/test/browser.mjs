@@ -510,6 +510,20 @@ try {
   assert.equal(await page.locator('#feed').textContent(), '', 'locking clears displayed thoughts');
   await page.locator('#password').fill(password); await page.locator('#unlock').click();
   await page.locator('#app').waitFor({ state: 'visible' });
+  // Double-tapping Shift locks; capitals and slow taps never do.
+  await page.locator('#title').click();
+  for (const letter of ['I', 'M']) { await page.keyboard.down('Shift'); await page.keyboard.press(letter); await page.keyboard.up('Shift'); }
+  await page.keyboard.press('Shift'); await page.waitForTimeout(500); await page.keyboard.press('Shift');
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#login').isHidden(), true, 'typing capitals and slow Shift taps do not lock');
+  await page.locator('#title').fill(''); await page.locator('#title').dispatchEvent('input');
+  await page.waitForFunction(async () => (await (await fetch('./api/draft')).json()).title === '');
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Shift'); await page.keyboard.press('Shift');
+  await page.locator('#login').waitFor({ state: 'visible' });
+  assert.equal((await api('thoughts')).status, 401, 'double Shift locks like the lock button');
+  await page.locator('#password').fill(password); await page.locator('#unlock').click();
+  await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
   // The same UI must keep every request under /journal/ when mounted there.
@@ -526,7 +540,7 @@ try {
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});
