@@ -194,7 +194,7 @@ function renderEntry(entry) {
   expand.setAttribute('aria-controls', text.id); footer.append(expand);
   const actions = document.createElement('div'); actions.className = 'thought-actions';
   const details = document.createElement('details');
-  const summary = document.createElement('summary'); summary.textContent = 'more'; summary.setAttribute('aria-label', 'more actions for thought');
+  const summary = document.createElement('summary'); summary.textContent = '…'; summary.setAttribute('aria-label', 'more actions for thought');
   const menu = document.createElement('div'); menu.className = 'entry-menu';
   const bookmark = button(entry.bookmarked ? 'bookmarked' : 'bookmark', 'bookmark', entry);
   bookmark.setAttribute('aria-pressed', String(Boolean(entry.bookmarked)));

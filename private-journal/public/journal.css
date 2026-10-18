@@ -257,7 +257,7 @@ textarea::placeholder {
   font-variant-numeric:tabular-nums
 }
 .thought-title {
-  margin:0 36px 6px 0;
+  margin:0 0 6px;
   font:500 14px/1.55 var(--font-body);
   overflow-wrap:anywhere
 }
@@ -295,12 +295,13 @@ textarea::placeholder {
   color:var(--muted)
 }
 .thought-actions {
-  position:absolute;
-  right:0;
-  top:-6px
+  position:relative
 }
 .thought-actions summary {
-  font-size:10px;
+  min-width:24px;
+  font-size:14px;
+  line-height:1;
+  text-align:left;
   color:var(--muted)
 }
 details {
