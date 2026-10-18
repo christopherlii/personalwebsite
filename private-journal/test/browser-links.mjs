@@ -1,0 +1,94 @@
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { thoughtLink } from '../public/thought-links.js';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
+const origin = process.env.JOURNAL_TEST_URL || 'http://localhost:8787';
+if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname)) throw new Error('Link tests may only write to a local journal.');
+if (!process.env.JOURNAL_TEST_PASSWORD) throw new Error('Set JOURNAL_TEST_PASSWORD.');
+const artifacts = process.env.JOURNAL_TEST_ARTIFACTS || 'test-results/links';
+await mkdir(artifacts, { recursive: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+page.setDefaultTimeout(12000);
+const errors = []; page.on('pageerror', error => errors.push(error.message));
+const ids = []; let ownsDraft = false;
+const api = (path, method = 'GET', body) => page.evaluate(async ({ path, method, body }) => {
+  const response = await fetch(`/api/${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Journal': '1' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const data = await response.json(); if (!response.ok) throw new Error(data.error); return data;
+}, { path, method, body });
+const setText = async (selector, value) => {
+  const editor = page.locator(selector); await editor.click(); await editor.press('ControlOrMeta+a');
+  if (value) await page.keyboard.insertText(value); else await editor.press('Backspace');
+};
+const saved = () => page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
+try {
+  await page.goto(origin); await page.locator('#password').fill(process.env.JOURNAL_TEST_PASSWORD); await page.locator('#unlock').click();
+  await page.locator('#app').waitFor({ state: 'visible' });
+  const draft = await api('draft'); assert.equal(draft.body, ''); assert.equal(draft.title, ''); ownsDraft = true;
+  const target = (await api('thoughts', 'POST', { id: crypto.randomUUID(), title: 'ideas on a walk', body: 'sample thought: walking gives an unfinished idea room to grow.' })).entry; ids.push(target.id);
+  const untitled = (await api('thoughts', 'POST', { id: crypto.randomUUID(), body: 'sample thought: quiet moments sometimes make a connection clear.' })).entry; ids.push(untitled.id);
+  await setText('#composer-editor .cm-content', 'i keep returning to [[walk');
+  await page.locator('.cm-tooltip-autocomplete li').filter({ hasText: target.title }).waitFor();
+  const feedBefore = await page.locator('#timeline').boundingBox();
+  await page.screenshot({ path: `${artifacts}/link-picker-desktop.png`, fullPage: true });
+  await page.locator('#composer-editor .cm-content').press('Escape');
+  assert.deepEqual(await page.locator('#timeline').boundingBox(), feedBefore, 'the picker never moves the timeline');
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.locator('#composer-editor .cm-content').press('Control+Space');
+  await page.locator('.cm-tooltip-autocomplete li').filter({ hasText: target.title }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: `${artifacts}/link-picker-mobile.png`, fullPage: true });
+  await page.locator('.cm-tooltip-autocomplete li').filter({ hasText: target.title }).click();
+  const sourceText = `i keep returning to ${thoughtLink(target)}`;
+  await page.waitForFunction(value => document.querySelector('#body').value === value, sourceText);
+  assert.ok(!(await page.locator('#composer-editor .cm-content').textContent()).includes(target.id), 'stable target IDs stay hidden in the editor');
+  await saved(); await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#body').inputValue(), sourceText, 'link targets survive draft reload');
+  assert.ok(!(await page.locator('#composer-editor .cm-content').textContent()).includes(target.id));
+  const created = page.waitForResponse(response => response.url().endsWith('/api/thoughts') && response.request().method() === 'POST');
+  await page.locator('#composer-editor .cm-content').press('ControlOrMeta+Enter');
+  const source = (await (await created).json()).entry; ids.push(source.id);
+  assert.equal(source.body, sourceText, 'completion and the post shortcut preserve exact source');
+  const article = page.locator(`article[data-id="${source.id}"]`); await article.waitFor();
+  assert.equal(await article.locator('[data-thought-link]').textContent(), target.title);
+  assert.ok(!(await article.locator('.thought-body').textContent()).includes(target.id), 'feed preview contains a label, never the internal ID');
+  await article.hover(); await article.locator('[data-action=read]').click(); await page.locator('#reader-content [data-thought-link]').waitFor();
+  await page.locator('#reader-content [data-thought-link]').click(); await page.locator('#reader .thought-title').filter({ hasText: target.title }).waitFor();
+  await page.locator('#reader-back').click(); await page.locator('#reader-content [data-thought-link]').waitFor();
+  await page.goForward(); await page.locator('#reader .thought-title').filter({ hasText: target.title }).waitFor();
+  await page.locator('#reader-back').click(); await page.locator('#reader-content [data-thought-link]').waitFor();
+  await api(`thoughts/${target.id}`, 'PATCH', { title: 'a renamed thought', body: target.body, updated_at: target.updated_at });
+  await page.reload(); await page.locator('#reader-content [data-thought-link]').click();
+  await page.locator('#reader .thought-title').filter({ hasText: 'a renamed thought' }).waitFor();
+  await page.locator('#reader-back').click(); await page.locator('#reader-edit').click();
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+End'); await page.keyboard.insertText('\n\nand [[quiet');
+  await page.locator('.cm-tooltip-autocomplete li').filter({ hasText: 'quiet moments' }).waitFor();
+  await page.locator('#live-editor .cm-content').press('Enter');
+  await page.waitForFunction(id => document.querySelector('#edit-body').value.includes(id), untitled.id);
+  assert.ok(!(await page.locator('#live-editor .cm-content').textContent()).includes(untitled.id));
+  await page.screenshot({ path: `${artifacts}/linked-writing-mobile.png`, fullPage: true });
+  await page.locator('#reader-save').click(); await page.locator('#reader-edit').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#reader-content [data-thought-link]').count(), 2);
+  await page.locator('#reader-edit').click();
+  await page.locator('#live-editor .cm-thought-link').first().click({ modifiers: ['ControlOrMeta'] });
+  await page.locator('#reader .thought-title').filter({ hasText: 'a renamed thought' }).waitFor();
+  await page.locator('#reader-back').click(); await page.locator('#reader-edit').click();
+  const text = (await page.locator('#edit-body').inputValue()) + `\n\n\`${thoughtLink(target)}\`\n\n\`\`\`\n${thoughtLink(target)}\n\`\`\``;
+  await setText('#live-editor .cm-content', text); await page.locator('#reader-save').click(); await page.locator('#reader-edit').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#reader-content [data-thought-link]').count(), 2, 'link syntax in code stays literal');
+  await api(`thoughts/${target.id}`, 'DELETE');
+  await page.locator(`#reader-content [data-thought-link="${target.id}"]`).click();
+  await page.waitForFunction(() => document.querySelector('#reader-error').textContent === 'Thought not found.');
+  await page.locator('#reader-back').click(); await page.locator('#reader-content [data-thought-link]').first().waitFor();
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ passed: true, checks: ['composer and editor completion', 'untitled thoughts', 'exact source and draft restore', 'hidden stable targets', 'rename-safe links', 'navigation/back/forward', 'literal code', 'deleted targets', 'stationary picker', '320px layout'], screenshots: artifacts }));
+} catch (error) {
+  await page.screenshot({ path: `${artifacts}/failure.png`, fullPage: true }).catch(() => {}); throw error;
+} finally {
+  if (ownsDraft) {
+    const draft = await api('draft').catch(() => null);
+    if (draft) await api('draft', 'PUT', { title: '', body: '', version: draft.version }).catch(() => {});
+  }
+  for (const id of ids) await api(`thoughts/${id}`, 'DELETE').catch(() => {});
+  await browser.close();
+}

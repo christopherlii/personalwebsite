@@ -375,26 +375,26 @@ textarea::placeholder {
   min-height:55svh;
   font:14px/1.7 var(--font-body)
 }
-#live-editor .cm-editor { background:var(--bg); color:var(--body) }
-#live-editor .cm-editor.cm-focused { outline:none }
-#live-editor .cm-scroller { font:inherit; overflow:visible }
-#live-editor .cm-content { padding:0; min-height:55svh; caret-color:var(--fg) }
-#live-editor .cm-line { padding:0 }
-#live-editor .cm-md-heading { font-weight:500; line-height:1.4 }
-#live-editor .cm-md-h1 { font-size:18px }
-#live-editor .cm-md-h2 { font-size:16px }
-#live-editor .cm-md-strong { font-weight:600 }
-#live-editor .cm-md-emphasis { font-style:italic }
-#live-editor .cm-md-strike { text-decoration:line-through }
-#live-editor .cm-md-marker { color:var(--muted); font-weight:400 }
-#live-editor .cm-md-link { color:#0b243e; text-decoration:underline; text-underline-offset:3px }
-#live-editor .cm-md-quote { border-left:1px solid var(--track); padding-left:18px; color:var(--muted) }
-#live-editor .cm-md-code-line { background:#eee; padding:0 12px }
-#live-editor .cm-md-inline-code { background:#eee }
-#live-editor .cm-md-task { margin:0 2px 0 0; vertical-align:middle; accent-color:var(--fg) }
-#live-editor .cm-md-bullet { display:inline-block; min-width:12px }
-#live-editor .cm-md-table { padding:8px 0 }
-#live-editor .cm-md-table .table-scroll { margin-bottom:0 }
+:is(#live-editor,#composer-editor) .cm-editor { background:var(--bg); color:var(--body) }
+:is(#live-editor,#composer-editor) .cm-editor.cm-focused { outline:none }
+:is(#live-editor,#composer-editor) .cm-scroller { font:inherit; overflow:visible }
+:is(#live-editor,#composer-editor) .cm-content { padding:0; min-height:55svh; caret-color:var(--fg) }
+:is(#live-editor,#composer-editor) .cm-line { padding:0 }
+:is(#live-editor,#composer-editor) .cm-md-heading { font-weight:500; line-height:1.4 }
+:is(#live-editor,#composer-editor) .cm-md-h1 { font-size:18px }
+:is(#live-editor,#composer-editor) .cm-md-h2 { font-size:16px }
+:is(#live-editor,#composer-editor) .cm-md-strong { font-weight:600 }
+:is(#live-editor,#composer-editor) .cm-md-emphasis { font-style:italic }
+:is(#live-editor,#composer-editor) .cm-md-strike { text-decoration:line-through }
+:is(#live-editor,#composer-editor) .cm-md-marker { color:var(--muted); font-weight:400 }
+:is(#live-editor,#composer-editor) .cm-md-link { color:#0b243e; text-decoration:underline; text-underline-offset:3px }
+:is(#live-editor,#composer-editor) .cm-md-quote { border-left:1px solid var(--track); padding-left:18px; color:var(--muted) }
+:is(#live-editor,#composer-editor) .cm-md-code-line { background:#eee; padding:0 12px }
+:is(#live-editor,#composer-editor) .cm-md-inline-code { background:#eee }
+:is(#live-editor,#composer-editor) .cm-md-task { margin:0 2px 0 0; vertical-align:middle; accent-color:var(--fg) }
+:is(#live-editor,#composer-editor) .cm-md-bullet { display:inline-block; min-width:12px }
+:is(#live-editor,#composer-editor) .cm-md-table { padding:8px 0 }
+:is(#live-editor,#composer-editor) .cm-md-table .table-scroll { margin-bottom:0 }
 #edit-form .title-input {
   margin-bottom:18px
 }
@@ -737,3 +737,14 @@ dialog .public-actions {
     transition:none!important
   }
 }
+
+#composer-editor { font:14px/1.55 var(--font-body) }
+#composer-editor .cm-content { min-height:22px }
+#composer-editor .cm-scroller { max-height:45svh; overflow-y:auto }
+.cm-tooltip.cm-tooltip-autocomplete { border:0; border-top:1px solid var(--track); background:var(--bg); color:var(--body); box-shadow:none; max-width:min(540px,calc(100vw - 32px)); font:12px/1.5 var(--font-body) }
+.cm-tooltip-autocomplete ul { font:inherit!important; max-width:100%!important; min-width:0!important }
+.cm-tooltip-autocomplete ul li { display:flex; gap:16px; align-items:baseline; padding:10px 8px!important; white-space:normal!important }
+.cm-tooltip-autocomplete ul li[aria-selected=true] { background:#eee!important; color:var(--fg)!important }
+.cm-tooltip-autocomplete .cm-completionLabel { overflow-wrap:anywhere }
+.cm-tooltip-autocomplete .cm-completionDetail { margin-left:auto; font-style:normal; font-size:11px; color:var(--muted); white-space:nowrap }
+.cm-completionInfo { display:none }

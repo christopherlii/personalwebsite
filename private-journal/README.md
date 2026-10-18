@@ -50,6 +50,23 @@ render as tables; clicking one reveals that table's Markdown for editing.
 Task checkboxes update the source through normal undoable editor transactions.
 Obsidian-specific plugin syntax and embedded files are not implemented.
 
+Both the quick-writing field and full-page editor support internal links.
+Type `[[` and choose an existing thought, searching its title or body; untitled
+thoughts use their opening text. The picker floats over the page without moving
+the timeline. Read mode opens links directly; Cmd/Ctrl-click follows a link
+while editing and saves the current thought first. Back returns to the previous
+thought. Renaming a destination does not break the link; the chosen label stays
+as written. A deleted destination shows a not-found state with back available.
+Code spans and fenced code stay literal in the reading view.
+
+Links store `[[UUID|label]]` in Markdown, JSON exports, and copied source.
+The live editor hides the stable target ID, including on the active line, and
+the caret skips it. Reading and feed previews show the label. The authenticated
+`/api/link-suggestions` endpoint returns at most eight FTS matches, excluding the
+current thought; it does not call an AI model. Search uses link labels instead
+of target IDs. Public drafts and published snapshots retain only the linked
+words, so private destinations are never published by following a link.
+
 `npm run build:editor` bundles the pinned CodeMirror dependencies into
 `public/live-editor.js` and assembles licenses for every bundled dependency.
 Both generated assets are committed and rebuilt before `npm run dev` or
@@ -112,6 +129,11 @@ responses are controlled test fixtures, not live model quality verification.
 The browser workflow also covers hiding/restoring the timeline, fading controls
 after clicks, fixed geometry while menus open on desktop and mobile, and
 complete private reading links on reload.
+Run `npm run test:links` against the same local server for link completion in
+both writing fields, untitled targets, exact draft restoration, hidden IDs,
+rename-safe links, back/forward navigation, literal code, deleted destinations,
+stationary picker geometry, and a 320px mobile layout. It uses only synthetic
+local thoughts and removes its own fixtures afterward.
 
 ## Deploy after connecting a Cloudflare account
 

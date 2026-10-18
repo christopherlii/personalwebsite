@@ -1,4 +1,14 @@
 import './vendor/marked.min.js';
+import { thoughtLinks } from './thought-links.js';
+
+const parser = new globalThis.marked.Marked({ gfm: true, breaks: false, extensions: [{
+  name: 'thoughtLink', level: 'inline', start: source => source.indexOf('[['),
+  tokenizer(source) {
+    if (!source.startsWith('[[')) return;
+    const link = thoughtLinks(source)[0];
+    if (link?.from === 0) return { type: 'thoughtLink', raw: link.raw, id: link.id, text: link.label };
+  }
+}] });
 
 // Use the site's existing Marked lexer, but build DOM nodes rather than HTML.
 // Raw HTML stays visible text; Markdown cannot create scripts or attributes.
@@ -23,6 +33,10 @@ function nodes(tokens) {
   for (const token of tokens) {
     const children = () => token.tokens ? nodes(token.tokens) : document.createTextNode(decode(token.text || ''));
     switch (token.type) {
+      case 'thoughtLink': {
+        const link = element('a', document.createTextNode(token.text)); link.href = `#thought/${token.id}`;
+        link.dataset.thoughtLink = token.id; result.append(link); break;
+      }
       case 'space': case 'def': break;
       case 'heading': result.append(element(`h${token.depth}`, children())); break;
       case 'paragraph': result.append(element('p', children())); break;
@@ -77,6 +91,6 @@ function nodes(tokens) {
   return result;
 }
 export function markdown(body) {
-  try { return nodes(globalThis.marked.lexer(body, { gfm: true, breaks: false })); }
+  try { return nodes(parser.lexer(body)); }
   catch { return document.createTextNode(body); }
 }

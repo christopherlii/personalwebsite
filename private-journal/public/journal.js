@@ -1,11 +1,22 @@
 import { searchTerms } from './search-terms.js';
 import { markdown } from './markdown.js';
 import { createLiveEditor } from './live-editor.js';
+import { thoughtLinks, plainThoughtLinks } from './thought-links.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
-Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null });
+Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerHistory: null });
 let readerEditor = null;
+let composerEditor = null;
+function navigateThought(id) {
+  const current = readerId(); if (id === current) return;
+  history.pushState({ journalNavigation: true, previousThought: current || null }, '', `#thought/${id}`);
+  showRoute();
+}
+async function findThoughts(query, signal, exclude = '') {
+  const result = await api(`link-suggestions?q=${encodeURIComponent(query)}${exclude ? `&exclude=${exclude}` : ''}`, { signal });
+  return result.entries;
+}
 function clearReaderEditor() { readerEditor?.destroy(); readerEditor = null; $('#live-editor').replaceChildren(); }
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
@@ -36,7 +47,7 @@ document.addEventListener('keydown', event => {
 });
 function showLogin(message = '') {
   closeMenus();
-  if (state.readerDirty && state.readerEntry) history.replaceState(null, '', `#thought/${state.readerEntry.id}`);
+  if (state.readerDirty && state.readerEntry) history.replaceState(state.readerHistory, '', `#thought/${state.readerEntry.id}`);
   state.authenticated = false;
   state.generation++;
   state.controller?.abort();
@@ -78,6 +89,8 @@ function download(filename, content, type) {
 }
 
 function updateComposer() {
+  composerEditor?.setValue($('#body').value);
+  composerEditor?.setReadOnly(state.posting);
   $('#post').disabled = !$('#body').value.trim() || state.posting;
   $('#compose-actions').hidden = !$('#body').value && !$('#title').value && !state.conflict && $('#retry-draft').hidden;
   $('#clear-input').hidden = !$('#body').value && !$('#title').value;
@@ -147,6 +160,14 @@ async function enter() {
   $('#app').hidden = Boolean(readerId());
   $('#boot-status').hidden = true;
   $('#password').value = '';
+  if (!composerEditor) composerEditor = createLiveEditor($('#composer-editor'), {
+    value: $('#body').value, nonce: document.querySelector('meta[name=editor-style-nonce]').content,
+    emptyText: 'write or search your thoughts…',
+    onSubmit() { if (!$('#post').disabled) $('#composer').requestSubmit(); },
+    findThoughts: (query, signal) => findThoughts(query, signal), onOpenThought: navigateThought,
+    onChange(value) { $('#body').value = value; changedDraft(); },
+    onLimit() { notice('Thoughts can contain up to 20,000 characters.'); }
+  });
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
   if (readerId()) await showRoute();
@@ -218,11 +239,13 @@ async function showRoute() {
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
   const id = readerId();
+  $('#reader-back').href = history.state?.previousThought ? `#thought/${history.state.previousThought}` : '#';
   if (state.readerDirty && id !== state.readerEntry?.id) {
     try { await saveReader(); }
     catch (error) {
       if (generation !== state.readerGeneration) return;
-      history.replaceState(null, '', `#thought/${state.readerEntry.id}`);
+      history.replaceState(state.readerHistory, '', `#thought/${state.readerEntry.id}`);
+      $('#reader-back').href = state.readerHistory?.previousThought ? `#thought/${state.readerHistory.previousThought}` : '#';
       $('#reader-error').textContent = error.message; return;
     }
     if (generation !== state.readerGeneration) return;
@@ -231,6 +254,7 @@ async function showRoute() {
     const wasReading = !$('#reader').hidden;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
+    state.readerHistory = null;
     $('#app').hidden = false; document.title = 'journal';
     if (!state.entries.size && !state.timelineHidden) await searchFromComposer(true);
     if (wasReading) window.scrollTo(0, state.feedScroll);
@@ -244,6 +268,7 @@ async function showRoute() {
     const { entry } = await api(`thoughts/${id}`);
     if (generation !== state.readerGeneration || !state.authenticated) return;
     state.readerEntry = entry; state.selected = entry;
+    state.readerHistory = history.state;
     state.readerEditing = false; clearReaderEditor();
     renderReader(); readerControls();
     $('#reader-error').textContent = '';
@@ -258,6 +283,12 @@ async function showRoute() {
   window.scrollTo(0, 0); $('#reader-content').focus({ preventScroll: true });
 }
 window.addEventListener('hashchange', showRoute);
+$('#reader-back').addEventListener('click', event => { if (history.state?.journalNavigation) { event.preventDefault(); history.back(); } });
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[data-thought-link]');
+  if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault(); navigateThought(link.dataset.thoughtLink);
+});
 
 function bodyContent(body, query) {
   const fragment = document.createDocumentFragment();
@@ -286,13 +317,18 @@ function bodyContent(body, query) {
     fragment.append(document.createTextNode(value.slice(end)));
   };
   // The timeline stays a plain-text preview, including search highlights.
-  const links = /https?:\/\/[^\s<>]+/gu;
+  const links = [...body.matchAll(/https?:\/\/[^\s<>]+/gu)].map(match => ({ from: match.index, to: match.index + match[0].length, text: match[0] }));
+  links.push(...thoughtLinks(body).map(link => ({ ...link, text: link.label })));
+  links.sort((a, b) => a.from - b.from);
   let end = 0;
-  for (const match of body.matchAll(links)) {
-    appendText(body.slice(end, match.index));
+  for (const link of links) {
+    if (link.from < end) continue;
+    appendText(body.slice(end, link.from));
     const a = document.createElement('a');
-    a.textContent = match[0]; a.href = match[0]; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    fragment.append(a); end = match.index + match[0].length;
+    a.textContent = link.text;
+    if (link.id) { a.href = `#thought/${link.id}`; a.dataset.thoughtLink = link.id; }
+    else { a.href = link.text; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+    fragment.append(a); end = link.to;
   }
   appendText(body.slice(end));
   return fragment;
@@ -354,7 +390,7 @@ function updateView() {
 
 function searchFromComposer(immediate = false) {
   clearTimeout(state.searchTimer);
-  state.query = entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() }).trim();
+  state.query = plainThoughtLinks(entryText({ title: $('#title').value.trim(), body: $('#body').value.trim() })).trim();
   state.controller?.abort();
   state.generation++;
   $('#feed').setAttribute('aria-busy', 'false');
@@ -444,7 +480,7 @@ $('#add-title').addEventListener('click', () => { $('#composer-title').hidden = 
 $('#retry-draft').addEventListener('click', () => saveDraft().catch(() => {}));
 $('#composer').addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !$('#post').disabled) { event.preventDefault(); $('#composer').requestSubmit(); }
-  else if (event.target.id === 'title' && event.key === 'Enter') { event.preventDefault(); $('#body').focus(); }
+  else if (event.target.id === 'title' && event.key === 'Enter') { event.preventDefault(); composerEditor?.focus(); }
 });
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
@@ -468,7 +504,7 @@ $('#composer').addEventListener('submit', async event => {
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
 });
 $('#clear-input').addEventListener('click', () => {
-  $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); $('#body').focus();
+  $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); composerEditor?.focus();
 });
 $('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true' && state.query === state.renderedQuery && state.view === state.renderedView) loadFeed(state.entries.size > 0 && state.cursor !== null); });
 $('#toggle-timeline').addEventListener('click', () => {
@@ -479,7 +515,7 @@ $('#toggle-timeline').addEventListener('click', () => {
   searchFromComposer(true);
 });
 document.addEventListener('keydown', event => {
-  if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (state.readerEditing) readerEditor?.focus(); else $('#body').focus(); }
+  if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (state.readerEditing) readerEditor?.focus(); else composerEditor?.focus(); }
 });
 for (const item of document.querySelectorAll('[data-view]')) item.addEventListener('click', () => setView(item.dataset.view));
 for (const item of document.querySelectorAll('[data-close]')) item.addEventListener('click', () => item.dataset.close === 'public-dialog' ? closePublication() : $(`#${item.dataset.close}`).close());
@@ -517,6 +553,7 @@ $('#reader-edit').addEventListener('click', () => {
   readerEditor = createLiveEditor($('#live-editor'), {
     value: state.readerEntry.body,
     nonce: document.querySelector('meta[name=editor-style-nonce]').content,
+    findThoughts: (query, signal) => findThoughts(query, signal, state.readerEntry.id), onOpenThought: navigateThought,
     onChange(value) { $('#edit-body').value = value; changedReader(); },
     onLimit() { $('#reader-error').textContent = 'Thoughts can contain up to 20,000 characters.'; }
   });
@@ -562,7 +599,7 @@ $('#delete-form').addEventListener('submit', async event => {
 function publicInput() {
   const tags = $('#public-tags').value;
   return {
-    slug: $('#public-slug').value, title: $('#public-thought-title').value, body: $('#public-body').value,
+    slug: $('#public-slug').value, title: $('#public-thought-title').value, body: plainThoughtLinks($('#public-body').value),
     date: $('#public-date').value,
     tags: tags === state.publication.draft.tags.join(', ') ? state.publication.draft.tags : tags.split(',').map(tag => tag.trim()).filter(Boolean),
     description: $('#public-description').value, cover: $('#public-cover').value, coverPosition: $('#public-cover-position').value
@@ -660,6 +697,7 @@ $('#logout').addEventListener('click', async () => {
     state.entries.clear(); state.selected = null; state.publication = null; state.publicationId = null; state.publicDirty = false; state.pendingPost = null;
     $('#feed').replaceChildren();
     for (const area of document.querySelectorAll('textarea')) area.value = '';
+    composerEditor?.setValue('');
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     $('#composer-title').hidden = true;
     showLogin();
