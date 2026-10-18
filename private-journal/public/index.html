@@ -31,9 +31,8 @@
       </div>
       <nav id="journal-menu" class="entry-menu journal-menu" aria-label="journal" hidden>
         <button type="button" data-view="all" aria-current="page">all thoughts</button>
-        <button type="button" data-view="saved">bookmarks</button>
+        <button type="button" data-view="saved">saved</button>
         <a href="#reading">read later</a>
-        <button type="button" id="export">export</button>
       </nav>
     </header>
     <section id="composer-section" class="composer-section page-entrance" aria-label="write or search your thoughts">
@@ -69,15 +68,16 @@
   </main>
   <main id="reader" class="reader" hidden>
     <header class="reader-toolbar">
-      <div class="reader-context"><a id="reader-back" href="#" aria-label="back to timeline">back</a><span id="reader-status" class="entry-state"></span></div>
+      <div class="reader-context"><a id="reader-back" href="#" aria-label="back to timeline">back</a></div>
       <div class="reader-actions">
         <button type="button" id="reader-cancel" hidden>cancel</button>
         <button type="submit" form="edit-form" id="reader-save" hidden>save</button>
+        <button type="button" id="reader-bookmark" aria-pressed="false">save</button>
+        <button type="button" id="reader-like" aria-pressed="false">like</button>
         <button type="button" id="reader-edit">edit</button>
         <button type="button" id="reader-menu-toggle" data-menu aria-label="thought options" aria-expanded="false" aria-controls="reader-menu">…</button>
       </div>
       <nav id="reader-menu" class="entry-menu reader-menu" aria-label="thought actions" hidden>
-        <button type="button" id="reader-bookmark" aria-pressed="false">bookmark</button>
         <button type="button" id="reader-public">publish…</button>
         <button type="button" id="reader-delete">delete…</button>
       </nav>
