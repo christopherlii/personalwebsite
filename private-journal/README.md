@@ -87,7 +87,8 @@ Workers AI. The production database ID is configured; the top-level zero ID
 stays local-only. No credentials are committed. Request observability and
 preview URLs are disabled. The Worker also supports `/journal/`, with a Cloudflare route configured for
 `christopherli.dev/journal*`. The zone is prepared on the Free plan but remains
-pending until the registrar uses its assigned nameservers. Until activation,
+pending activation. The registrar saved its assigned Cloudflare nameservers on
+October 18, 2026; propagation and the edge certificate are still pending. Until activation,
 the GitHub Pages `/journal/` fallback redirects to the workers.dev hostname.
 See [domain-setup.md](domain-setup.md) for the reviewed records and activation.
 

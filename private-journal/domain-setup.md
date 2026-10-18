@@ -15,8 +15,14 @@ to that mount; authentication and the current database/password are unchanged.
   the Cloudflare route supersedes it after activation.
 - Nameservers assigned by Cloudflare: `carter.ns.cloudflare.com` and
   `nucum.ns.cloudflare.com`.
-- Existing delegation remains `ns-cloud-e1.googledomains.com` through
-  `ns-cloud-e4.googledomains.com` until the registrar is updated.
+- With the owner's explicit approval, Squarespace saved the two Cloudflare
+  nameservers on October 18, 2026 at 12:25 a.m. America/Los_Angeles. Its dashboard
+  confirmed the update. The previous delegation was `ns-cloud-e1.googledomains.com`
+  through `ns-cloud-e4.googledomains.com`.
+- Registry/public DNS still showed the previous nameservers immediately after
+  saving. Cloudflare's nameserver check is running; Universal SSL has no issued
+  certificate yet. All seven records remain DNS-only until activation and TLS
+  are verified. The public homepage still returns 200 from GitHub Pages.
 
 ## DNS review
 
@@ -51,7 +57,7 @@ Pages already has a valid certificate for the personal domain.
    any additional records before proceeding.
 2. Verify all records remain DNS-only and origin TLS is Full (strict). The
    pending zone does not yet have an active edge certificate.
-3. With the owner's approval, replace the four Google Domains nameservers in
+3. Completed with the owner's approval: replace the four Google Domains nameservers in
    Squarespace with the two assigned Cloudflare nameservers. No registrar
    transfer or paid Cloudflare plan is required.
 4. Wait for Cloudflare activation and an Active Universal SSL certificate, then
