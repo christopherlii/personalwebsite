@@ -80,14 +80,23 @@ test('the journal runs under its domain path with the same authenticated API and
   assert.equal((await c.call('/journal/api/thoughts')).status, 401);
 });
 
-test('the broad Cloudflare route leaves other public-site paths at their origin', async t => {
+test('public-site paths retain their origin without forwarding the journal session cookie', async t => {
   const paths = [];
-  t.mock.method(globalThis, 'fetch', async request => { paths.push(new URL(request.url).pathname); return new Response('public site'); });
+  t.mock.method(globalThis, 'fetch', async request => {
+    paths.push(new URL(request.url).pathname);
+    assert.equal(request.headers.get('Cookie'), 'theme=light');
+    return new Response('public site');
+  });
   for (const path of ['/journalism', '/journal-other', '/']) {
-    const result = await worker.fetch(new Request('https://christopherli.dev' + path), {});
+    const result = await worker.fetch(new Request('https://christopherli.dev' + path, { headers: { Cookie: `theme=light; ${COOKIE}=synthetic-session-token` } }), {});
     assert.equal(await result.text(), 'public site');
   }
   assert.deepEqual(paths, ['/journalism', '/journal-other', '/']);
+  t.mock.method(globalThis, 'fetch', async request => {
+    assert.equal(request.headers.has('Cookie'), false);
+    return new Response('public site');
+  });
+  await worker.fetch(new Request('https://christopherli.dev/', { headers: { Cookie: `${COOKIE}=synthetic-session-token` } }), {});
 });
 
 test('publication editing and importing require owner authentication', async () => {

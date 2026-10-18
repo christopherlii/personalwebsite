@@ -1,4 +1,4 @@
-import { digest, hex, sessionFor, sessionCookie, SESSION_SECONDS, validPasswordConfig, verifyPassword } from './auth.mjs';
+import { COOKIE, digest, hex, sessionFor, sessionCookie, SESSION_SECONDS, validPasswordConfig, verifyPassword } from './auth.mjs';
 import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
 import { indexEntry, semanticSearch } from './semantic.mjs';
 import { PublicationError, publicationApi, publicWriting } from './publications.mjs';
@@ -197,8 +197,15 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
     const journalPath = url.pathname === '/journal' || url.pathname.startsWith('/journal/');
-    // A route ending /journal* also catches /journalism; leave those origin paths alone.
-    if (url.hostname === 'christopherli.dev' && !journalPath) return fetch(request);
+    // Public pages still come from GitHub Pages. The host-only journal cookie
+    // uses Path=/, so remove it before forwarding any public-page request.
+    if (url.hostname === 'christopherli.dev' && !journalPath) {
+      const headers = new Headers(request.headers);
+      const cookies = (headers.get('Cookie') || '').split(';').map(value => value.trim()).filter(value => value && value.split('=')[0] !== COOKIE);
+      if (cookies.length) headers.set('Cookie', cookies.join('; '));
+      else headers.delete('Cookie');
+      return fetch(new Request(request, { headers }));
+    }
     let response;
     try {
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) fail(400, 'HTTPS is required.');

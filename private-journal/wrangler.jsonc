@@ -38,7 +38,7 @@
       "workers_dev": true,
       "routes": [
         {
-          "pattern": "christopherli.dev/journal*",
+          "pattern": "christopherli.dev/*",
           "zone_id": "f9f4663f2c9a415c689bed42271f0eac"
         }
       ]
