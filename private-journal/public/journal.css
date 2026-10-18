@@ -508,6 +508,9 @@ summary::-webkit-details-marker {
   padding:10px 12px;
   font-size:16px
 }
+/* Dots drawn by CSS on a plain text field, so browsers and password
+   managers never offer to save or fill the journal password. */
+.masked { -webkit-text-security:disc }
 .solid {
   background:#222;
   border:1px solid #222;

@@ -47,7 +47,10 @@ entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Tapping Shift
 twice within 400ms locks the journal like the lock button; a tap only counts
 when no other key is pressed while Shift is held. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
-characters). No analytics, trackers, browser-local thought storage, or external
+characters). The password field is a plain text input masked with CSS and
+marked off for autofill and password managers, so browsers never offer to save
+or fill it; browsers without CSS masking fall back to a password input with
+`new-password`. No analytics, trackers, browser-local thought storage, or external
 runtime assets.
 
 Markdown uses the existing site's vendored Marked 15.0.12 lexer (MIT), copied
