@@ -32,11 +32,11 @@ function database() {
   } };
 }
 
-function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config }) {
+function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config }, origin = 'https://journal.example') {
   let cookie = '';
   return { env, setCookie(value) { cookie = value; }, async call(path, method = 'GET', body, headers = {}) {
-    const response = await worker.fetch(new Request(`https://journal.example${path}`, {
-      method, headers: { Cookie: cookie, Origin: 'https://journal.example', 'Content-Type': 'application/json', 'X-Journal': '1', ...headers },
+    const response = await worker.fetch(new Request(`${origin}${path}`, {
+      method, headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json', 'X-Journal': '1', ...headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) })
     }), env);
     if (response.headers.has('Set-Cookie')) cookie = response.headers.get('Set-Cookie').split(';')[0];
@@ -48,6 +48,35 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config })
 }
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
+
+test('the journal runs under its domain path with the same authenticated API and assets', async () => {
+  const c = client(undefined, 'https://christopherli.dev');
+  c.env.ASSETS = { fetch: async request => new Response(new URL(request.url).pathname) };
+  const redirect = await c.call('/journal?from=bookmark');
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get('Location'), 'https://christopherli.dev/journal/?from=bookmark');
+  for (const path of ['/', '/journal.js', '/journal.css', '/fonts/fraunces-latin.woff2']) {
+    assert.equal((await c.call('/journal' + path)).data, path);
+  }
+  assert.equal((await c.call('/journal/api/thoughts')).status, 401);
+  assert.equal((await c.call('/journal/api/login', 'POST', { password })).status, 200);
+  const entry = thought('a private thought behind the domain path');
+  assert.equal((await c.call('/journal/api/thoughts', 'POST', entry)).status, 201);
+  assert.equal((await c.call('/journal/api/thoughts')).data.entries[0].id, entry.id);
+  assert.equal((await c.call('/journal/api/thoughts', 'POST', thought('cross-origin'), { Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await c.call('/journal/api/logout', 'POST', {})).status, 200);
+  assert.equal((await c.call('/journal/api/thoughts')).status, 401);
+});
+
+test('the broad Cloudflare route leaves other public-site paths at their origin', async t => {
+  const paths = [];
+  t.mock.method(globalThis, 'fetch', async request => { paths.push(new URL(request.url).pathname); return new Response('public site'); });
+  for (const path of ['/journalism', '/journal-other', '/']) {
+    const result = await worker.fetch(new Request('https://christopherli.dev' + path), {});
+    assert.equal(await result.text(), 'public site');
+  }
+  assert.deepEqual(paths, ['/journalism', '/journal-other', '/']);
+});
 
 test('publication editing and importing require owner authentication', async () => {
   const c = client();

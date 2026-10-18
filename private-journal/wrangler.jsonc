@@ -35,7 +35,13 @@
           "migrations_dir": "migrations"
         }
       ],
-      "workers_dev": true
+      "workers_dev": true,
+      "routes": [
+        {
+          "pattern": "christopherli.dev/journal*",
+          "zone_id": "f9f4663f2c9a415c689bed42271f0eac"
+        }
+      ]
     }
   },
   "account_id": "6516e50660e9529882c768c8fbec1787"

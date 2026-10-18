@@ -191,13 +191,26 @@ async function api(request, env, url, context) {
 export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
+    const journalPath = url.pathname === '/journal' || url.pathname.startsWith('/journal/');
+    // A route ending /journal* also catches /journalism; leave those origin paths alone.
+    if (url.hostname === 'christopherli.dev' && !journalPath) return fetch(request);
     let response;
     try {
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) fail(400, 'HTTPS is required.');
-      if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
-      else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-      else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
-      else fail(404, 'Not found.');
+      if (url.pathname === '/journal') {
+        if (!['GET', 'HEAD'].includes(request.method)) fail(404, 'Not found.');
+        url.pathname = '/journal/';
+        response = Response.redirect(url.toString(), 308);
+      } else {
+        if (journalPath) {
+          url.pathname = url.pathname.slice('/journal'.length);
+          request = new Request(url, request);
+        }
+        if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
+        else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/search-terms.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else fail(404, 'Not found.');
+      }
     } catch (error) {
       const expected = error instanceof HttpError || error instanceof PublicationError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
