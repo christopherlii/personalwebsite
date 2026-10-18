@@ -470,21 +470,18 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   most 400 UTF-8 bytes; it is never silently truncated. The first search repairs
   missing indexing jobs in bounded batches. Edits invalidate vectors in a SQL
   trigger; stale async jobs cannot replace the new content. Deletes cascade.
-- Once the archive is indexed, a semantic query embeds the query and scans
-  stored vectors in bounded pages. Short queries (one chunk, at most 400 UTF-8
-  bytes) retrieve up to 40 candidate thoughts from the top 200 vector and FTS
-  matches. One Cloudflare `@cf/baai/bge-reranker-base` call checks the query
-  against each thought's best semantic passage and best word-matching passage
-  (at most two 400-byte passages per thought). Direct matches require a reranker
-  score of at least 0.4. Paraphrases can qualify with a score of at least 0.02
-  only when embedding similarity is also at least 0.65. Both must reach 20% of
-  the highest reranker score; no minimum result count is filled. Results are
-  ordered by relevance, with newer thoughts breaking ties. Neither a word
-  match nor a top-k position can bypass these checks. The cutoffs are heuristics
-  checked against synthetic examples, not probabilities or archive-wide guarantees.
-  Longer composed queries still embed every chunk; they require cosine
-  similarity of at least 0.65 and do not add word-only results. They are not
-  silently truncated for the reranker. This suits a personal journal; a large
+- Once the archive is indexed, the writing field's search ranks exactly like the
+  reading page's related thoughts (`closestEmbeddings` and `fuse` in
+  `semantic.mjs`, shared by both). The typed text is embedded (every chunk,
+  averaged) and compared with each stored thought's closest passage; the 20
+  closest at cosine similarity 0.55 or above are fused by reciprocal rank with
+  up to 20 word matches. Word matches need every typed search word (related
+  thoughts use any word, since only their top three are shown), so one shared
+  word can't lift an unrelated thought. Thoughts in both lists rise to the top.
+  There is no reranker. The 0.55 line is a heuristic for this model's scores,
+  not a probability: unrelated text typically scores 0.4-0.55 and close
+  paraphrases 0.6-0.8, so a two-word phrase with no shared words can miss a
+  weakly related thought. This suits a personal journal; a large
   archive should move retrieval to a vector index rather than assuming constant
   latency. Search requests are limited to 120 per minute.
 - Cloudflare lists the model at $0.0202 per million input tokens, before any
@@ -492,12 +489,11 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   in model usage; this excludes Worker/database hosting. Indexing text is an
   additional cost when writing or editing. Check current [model pricing](https://developers.cloudflare.com/workers-ai/models/bge-small-en-v1.5/)
   and [account limits](https://developers.cloudflare.com/workers-ai/platform/pricing/).
-  The short-query relevance check adds one bounded inference call at the
-  [reranker's listed $0.00311 per million input tokens](https://developers.cloudflare.com/workers-ai/models/bge-reranker-base/).
-  Live-model verification used five synthetic notes: “start of blog” and a
-  paraphrase returned only the two opening-blog notes, while an unrelated
-  spaceship query returned none. This is a regression example, not an archive-wide
-  recall evaluation or a guarantee for every query.
+  Live-model verification used twelve synthetic notes: “exhausted” returned the
+  tired and burnout notes, “being afraid to take risks” the risk and poker notes,
+  and “becoming a founder” the founder and blog notes, without shared words;
+  “football match” missed a Barcelona comeback note. This is a regression
+  example, not an archive-wide recall evaluation or a guarantee for every query.
 - Anonymous GET/HEAD routes under `/public/` serve only published snapshots:
   `posts/index.json`, `posts/<address>.md`, `feed.xml`, and `export.json`. They
   allow credential-free CORS and use `no-store`. Private endpoints stay behind
@@ -511,8 +507,8 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   previous data under their own policies.
 - No Jev or OpenAI key is required. Semantic indexing sends each thought to
   Cloudflare Workers AI when it is created/edited; searches send the current writing/search text after the typing pause, even
-  before it is posted. Short searches additionally send the selected candidate
-  passages to the Cloudflare reranker; they do not send the entire archive.
+  before it is posted. Past thoughts are compared with stored vectors inside
+  the Worker; their text is not sent again at search time.
   This stays within the selected Cloudflare backend but is still model
   processing, not on-device inference. See [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
 - Typography matches the personal homepage: self-hosted Instrument Sans at

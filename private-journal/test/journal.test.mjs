@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import worker from '../worker.mjs';
 import { passwordHash, digest, COOKIE } from '../auth.mjs';
 import { ftsQuery } from '../search.mjs';
-import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity, RERANKER } from '../semantic.mjs';
+import { chunksOf, DIMENSIONS, indexEntry, maximumSimilarity, RELATED_SIMILARITY } from '../semantic.mjs';
 import { thoughtLink, thoughtLinks, plainThoughtLinks } from '../public/thought-links.js';
 import { readingURL, readingMetadata, fetchReadingMetadata, indexReading, relatedToThought } from '../reading.mjs';
 import { tagNames, markdownTags } from '../public/tags.js';
@@ -620,9 +620,6 @@ test('semantic transport, ranking, indexing reuse, and stale-vector invalidation
   // hosted model's real-world recall quality. Live model testing needs auth.
   const calls = [];
   const ai = { async run(model, input) {
-    if (model === RERANKER) return { response: input.contexts.map(({ text }, id) => ({ id, score:
-      /worn out|exhausted|tired/i.test(input.query) ? /worn out|exhausted|tired/i.test(text) ? 0.9 : 0.01 : /soccer|sport/i.test(text) ? 0.9 : 0.01
-    })) };
     calls.push(input.text);
     return { data: input.text.map(text => {
       const vector = Array(DIMENSIONS).fill(0);
@@ -658,45 +655,37 @@ test('semantic transport, ranking, indexing reuse, and stale-vector invalidation
   assert.equal((await c.env.JOURNAL_DB.prepare('SELECT * FROM embeddings WHERE thought_id = ?').bind(a.id).first()), null);
 });
 
-test('short semantic search filters weak word matches, ranks relevance, and can return no thoughts', async () => {
+test('typing search ranks like related thoughts: meaning matches without shared words, fused with word matches', async () => {
   const c = client(); await c.login();
-  c.env.AI = { async run(model, input) {
-    if (model === RERANKER) return { response: input.contexts.map(({ text }, id) => ({ id, score:
-      /start of blog|beginning to write publicly/.test(input.query) && /first (post|entry)/i.test(text) ?
-        input.query === 'start of blog' ? /first post/i.test(text) ? 0.95 : 0.8 : /first post/i.test(text) ? 0.06 : 0.03 : 0.01
-    })) };
-    return { data: input.text.map(() => [1, ...Array(DIMENSIONS - 1).fill(0)]) };
-  } };
-  const older = (await c.call('/api/thoughts', 'POST', thought('start practicing basketball after school'))).data.entry;
-  const incidental = (await c.call('/api/thoughts', 'POST', thought('read a book review on a blog'))).data.entry;
-  const strongest = (await c.call('/api/thoughts', 'POST', thought('my first post: beginning a place to share my thoughts'))).data.entry;
-  const recent = (await c.call('/api/thoughts', 'POST', thought('my first entry about why i want to write publicly'))).data.entry;
-  const result = await c.call('/api/search', 'POST', { query: 'start of blog', saved: false });
+  // Axis 0 is "starting to write", 1 is basketball, 3 is spaceships. The
+  // sunday thought leans toward writing but stays just under the line.
+  const near = RELATED_SIMILARITY - 0.01;
+  const vector = text => /first (post|entry)|writ|blog/i.test(text) ? [1, 0, 0, 0] : /basketball/i.test(text) ? [0, 1, 0, 0]
+    : /spaceship/i.test(text) ? [0, 0, 0, 1] : [near, 0, Math.sqrt(1 - near * near), 0];
+  c.env.AI = { async run(model, input) { return { data: input.text.map(text => [...vector(text), ...Array(DIMENSIONS - 4).fill(0)]) }; } };
+  const unrelated = (await c.call('/api/thoughts', 'POST', thought('practicing basketball after school'))).data.entry;
+  const paraphrase = (await c.call('/api/thoughts', 'POST', thought('my first entry about why i want to write publicly'))).data.entry;
+  const both = (await c.call('/api/thoughts', 'POST', thought('my first post: starting a blog'))).data.entry;
+  const weak = (await c.call('/api/thoughts', 'POST', thought('a quiet sunday morning'))).data.entry;
+  const result = await c.call('/api/search', 'POST', { query: 'starting a blog', saved: false });
   assert.equal(result.status, 200);
-  assert.deepEqual(result.data.entries.map(entry => entry.id), [strongest.id, recent.id], 'neither recency nor an incidental word can force a weak result into the feed');
-  assert.ok(!result.data.entries.some(entry => [older.id, incidental.id].includes(entry.id)));
-  assert.deepEqual((await c.call('/api/search', 'POST', { query: 'beginning to write publicly', saved: false })).data.entries.map(entry => entry.id), [strongest.id, recent.id], 'a lower-scoring paraphrase requires agreement from semantic retrieval');
+  const ids = result.data.entries.map(entry => entry.id);
+  assert.equal(ids[0], both.id, 'a thought close in meaning and sharing words ranks first');
+  assert.ok(ids.includes(paraphrase.id), 'a thought close in meaning is found without sharing a word');
+  assert.ok(!ids.includes(unrelated.id) && !ids.includes(weak.id), 'vectors below the related-thoughts line stay out');
+  assert.equal(result.data.next, null);
   const empty = await c.call('/api/search', 'POST', { query: 'repairing a spaceship', saved: false });
-  assert.deepEqual(empty.data.entries, [], 'even identical candidate vectors cannot force results past the relevance check');
-  assert.equal(empty.data.next, null);
+  assert.deepEqual(empty.data.entries, [], 'nothing close in meaning or words returns no thoughts');
 });
 
-test('short-query relevance checks use matching passages near the end of long essays', async () => {
+test('typing search finds a meaning near the end of a long essay by its closest passage', async () => {
   const c = client(); await c.login();
-  let checkedTail = false;
   c.env.AI = { async run(model, input) {
-    if (model === RERANKER) {
-      checkedTail = input.contexts.some(context => context.text.includes('first post'));
-      assert.ok(input.contexts.length <= 2);
-      assert.ok(input.contexts.every(context => new TextEncoder().encode(context.text).length <= 400));
-      return { response: input.contexts.map(({ text }, id) => ({ id, score: text.includes('first post') ? 0.95 : 0.001 })) };
-    }
     return { data: input.text.map(text => /first post|start of blog/.test(text) ? [1, ...Array(DIMENSIONS - 1).fill(0)] : [0, 1, ...Array(DIMENSIONS - 2).fill(0)]) };
   } };
-  const essay = (await c.call('/api/thoughts', 'POST', thought('a memory of walking home after class. '.repeat(100) + '\n\nmy first post: beginning a personal blog.'))).data.entry;
+  const essay = (await c.call('/api/thoughts', 'POST', thought('a memory of walking home after class. '.repeat(100) + '\n\nmy first post: beginning a personal space.'))).data.entry;
   const result = await c.call('/api/search', 'POST', { query: 'start of blog', saved: false });
   assert.deepEqual(result.data.entries.map(entry => entry.id), [essay.id]);
-  assert.equal(checkedTail, true);
 });
 
 test('semantic chunks preserve long Unicode inputs and provider failure is explicit', async () => {
