@@ -70,8 +70,11 @@ Production is deployed at
 `https://christopher-private-journal.christopherlii.workers.dev` with D1 and
 Workers AI. The production database ID is configured; the top-level zero ID
 stays local-only. No credentials are committed. Request observability and
-preview URLs are disabled. The public site's DNS remains unchanged.
-The unlisted `/journal/` route redirects to the Worker.
+preview URLs are disabled. The Worker also supports `/journal/`, with a Cloudflare route configured for
+`christopherli.dev/journal*`. The zone is prepared on the Free plan but remains
+pending until the registrar uses its assigned nameservers. Until activation,
+the GitHub Pages `/journal/` fallback redirects to the workers.dev hostname.
+See [domain-setup.md](domain-setup.md) for the reviewed records and activation.
 
 For a new account or deployment:
 

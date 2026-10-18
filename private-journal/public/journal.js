@@ -21,7 +21,7 @@ function showLogin(message = '') {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(`/api/${path}`, {
+  const response = await fetch(`./api/${path}`, {
     credentials: 'same-origin', cache: 'no-store', ...options,
     headers: { 'Content-Type': 'application/json', 'X-Journal': '1', ...options.headers }
   });

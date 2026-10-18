@@ -265,6 +265,21 @@ try {
   await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
+  // The same UI must keep every request under /journal/ when mounted there.
+  const mountedRequests = [];
+  page.on('request', request => { if (new URL(request.url()).origin === origin) mountedRequests.push(new URL(request.url()).pathname); });
+  await page.goto(origin + '/journal');
+  await page.locator('#app').waitFor({ state: 'visible' });
+  assert.equal(new URL(page.url()).pathname, '/journal/');
+  assert.ok(mountedRequests.includes('/journal/journal.js'));
+  assert.ok(mountedRequests.includes('/journal/journal.css'));
+  assert.ok(mountedRequests.includes('/journal/api/session'));
+  assert.ok(mountedRequests.includes('/journal/api/thoughts'));
+  assert.ok(!mountedRequests.some(path => path.startsWith('/api/')), 'mounted UI never calls the origin root API');
+  assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
+  await page.locator('#journal-menu > summary').click();
+  await page.locator('#logout').click();
+  await page.locator('#login').waitFor({ state: 'visible' });
   console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'shared input search', 'debounced semantic request', 'stale request cancellation', 'explicit posting', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
