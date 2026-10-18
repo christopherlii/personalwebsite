@@ -16,11 +16,9 @@ let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
 const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEditor:readerEditor,
-  onBusy(busy){for(const owner of ['composer','reader']){const button=$(`#photo-${owner}`);button.disabled=busy;button.textContent=busy?'adding…':'photo';}},
+  onBusy(busy){for(const id of ['composer-editor','live-editor'])document.getElementById(id).setAttribute('aria-busy',String(busy));},
   onMessage(owner,message){if(owner==='composer')notice(message);else $('#reader-error').textContent=message;}
 });
-$('#photo-composer').addEventListener('click',()=>photos.choose('composer'));
-$('#photo-reader').addEventListener('click',()=>photos.choose('reader'));
 const dictation = createDictation({
   onUnavailable() { api('session').then(session => { if (!session.authenticated) showLogin('your session ended. unlock to continue.'); }).catch(() => {}); },
   onState(owner, value) {
@@ -129,7 +127,6 @@ function updateComposer() {
   composerEditor?.setReadOnly(state.posting);
   $('#post').disabled = !$('#body').value.trim() || state.posting;
   $('#dictate-composer').disabled = state.posting || dictation.phase === 'transcribing';
-  $('#photo-composer').disabled=state.posting||photos.busy;
 }
 
 const hasDraft = draft => Boolean(draft.title || draft.body);
@@ -231,7 +228,6 @@ function renderReader(entry = state.readerEntry) {
 function readerControls() {
   const editing = state.readerEditing;
   const busy = Boolean(state.readerSaving);
-  $('#photo-reader').disabled=busy||photos.busy;
   $('#reader-edit').hidden = editing || !state.readerEntry;
   $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
   $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;

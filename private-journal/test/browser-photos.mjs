@@ -13,12 +13,14 @@ const api=(path,method='GET',body)=>page.evaluate(async({path,method,body})=>{
  const response=await fetch(`/api/${path}`,{method,headers:{'Content-Type':'application/json','X-Journal':'1'},...(body?{body:JSON.stringify(body)}:{})});const data=await response.json();if(!response.ok)throw new Error(data.error);return data;
 },{path,method,body});
 const uploaded=()=>page.waitForResponse(response=>response.url().includes('/api/photos/')&&response.request().method()==='PUT');
+const dropPhoto=(selector,png)=>page.evaluate(({selector,png})=>{const bytes=Uint8Array.from(atob(png),c=>c.charCodeAt(0)),data=new DataTransfer();data.items.add(new File([bytes],'dropped.png',{type:'image/png'}));document.querySelector(selector).dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}));},{selector,png});
 try{
  await page.goto(origin);await page.locator('#password').fill(process.env.JOURNAL_TEST_PASSWORD);await page.locator('#unlock').click();await page.locator('#app').waitFor({state:'visible'});
  const draft=await api('draft');assert.equal(draft.body,'');assert.equal(draft.title,'');ownsDraft=true;
  const png=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=3000;canvas.height=1800;const c=canvas.getContext('2d');c.fillStyle='#dedede';c.fillRect(0,0,3000,1800);c.fillStyle='#555';c.fillRect(300,300,1000,1200);c.fillStyle='#999';c.fillRect(1600,300,1100,500);return canvas.toDataURL('image/png').split(',')[1];});
  const editor=page.locator('#composer-editor .cm-content');await editor.click();await page.keyboard.insertText('sample thought: a photo from today.');
- const chooser=page.waitForEvent('filechooser');await page.locator('#photo-composer').click();const response=uploaded();await(await chooser).setFiles({name:'test-photo.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+ assert.equal(await page.locator('#photo-composer, #photo-reader, #photo-input').count(),0,'photo controls are removed');
+ const response=uploaded();await dropPhoto('#composer-editor .cm-content',png);
  await Promise.race([held,new Promise((_,reject)=>setTimeout(()=>reject(new Error("Photo upload did not start.")),12000))]);await editor.click();await editor.press('ControlOrMeta+End');await page.keyboard.insertText(' a sentence while uploading.');releaseUpload();
  const photo=(await(await response).json()).photo;photoIds.push(photo.id);assert.ok(photo.width<=2048&&photo.height<=2048&&photo.bytes<=1000000);
  await page.locator('#composer-editor .cm-content .cm-photo img').waitFor();
@@ -36,7 +38,7 @@ try{
  await page.locator('#live-editor .cm-content .cm-photo img').waitFor();const geometry=await page.locator('#live-editor .cm-content .cm-photo img').boundingBox();await page.locator('#live-editor .cm-content').press('ControlOrMeta+End');assert.deepEqual(await page.locator('#live-editor .cm-content .cm-photo img').boundingBox(),geometry,'a photo stays rendered when its line is active');
  const paste=uploaded();await page.evaluate(png=>{const bytes=Uint8Array.from(atob(png),c=>c.charCodeAt(0)),data=new DataTransfer();data.items.add(new File([bytes],'pasted.png',{type:'image/png'}));document.querySelector('#live-editor .cm-content').dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));},png);
  photoIds.push((await(await paste).json()).photo.id);await page.waitForFunction(()=>document.querySelectorAll('#live-editor .cm-content .cm-photo img').length===2);
- await page.waitForFunction(()=>document.querySelector('#photo-reader').textContent==='photo');
+ await page.waitForFunction(()=>document.querySelector('#live-editor').getAttribute('aria-busy')==='false');
  const drop=uploaded();await page.evaluate(png=>{const bytes=Uint8Array.from(atob(png),c=>c.charCodeAt(0)),data=new DataTransfer();data.items.add(new File([bytes],'dropped.png',{type:'image/png'}));document.querySelector('#live-editor .cm-content').dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}));},png);
  await page.locator('#reader-save').click();photoIds.push((await(await drop).json()).photo.id);await page.locator('#reader-edit').waitFor({state:'visible'});assert.equal(await page.locator('#reader-content img').count(),3,'save waits for the uploaded photo');
  await page.setViewportSize({width:320,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${artifacts}/photos-mobile.png`,fullPage:true});
@@ -51,10 +53,10 @@ try{
  let failedUploadReady,failUpload;const failing=new Promise(resolve=>failedUploadReady=resolve);
  await page.route('**/api/photos/**',async route=>{if(route.request().method()==='PUT'){failedUploadReady();await new Promise(resolve=>failUpload=resolve);await route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Photo upload failed.'})});}else await route.continue();});
  let posts=0;page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith('/api/thoughts'))posts++;});
- const failedChooser=page.waitForEvent('filechooser');await page.locator('#photo-composer').click();await(await failedChooser).setFiles({name:'failed.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
- await failing;await page.locator('#post').click();failUpload();await page.waitForFunction(()=>document.querySelector('#photo-composer').textContent==='photo');
+ await dropPhoto('#composer-editor .cm-content',png);
+ await failing;await page.locator('#post').click();failUpload();await page.waitForFunction(()=>document.querySelector('#composer-editor').getAttribute('aria-busy')==='false');
  assert.equal(posts,0,'posting waits for an upload and stops if it fails');assert.equal(await page.locator('#body').inputValue(),'keep this draft when its photo cannot upload.');assert.deepEqual(errors,[]);
- console.log(JSON.stringify({passed:true,checks:['file chooser','browser resizing','typing during upload','one-step undo/redo','draft reload','feed thumbnail','stable live photo rendering','paste','drop','save waits for upload','320px layout','private photo access','explicit publication and unpublish','export manifest','failed upload preserves the draft and stops posting'],screenshots:artifacts}));
+ console.log(JSON.stringify({passed:true,checks:['photo controls removed','composer drag and drop','browser resizing','typing during upload','one-step undo/redo','draft reload','feed thumbnail','stable live photo rendering','paste','reader drag and drop','save waits for upload','320px layout','private photo access','explicit publication and unpublish','export manifest','failed upload preserves the draft and stops posting'],screenshots:artifacts}));
 }catch(error){releaseUpload?.();await page.screenshot({path:`${artifacts}/failure.png`,fullPage:true}).catch(()=>{});throw error;}
 finally{
  if(ownsDraft){const draft=await api('draft').catch(()=>null);if(draft)await api('draft','PUT',{title:'',body:'',version:draft.version}).catch(()=>{});}

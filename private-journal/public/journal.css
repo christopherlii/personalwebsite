@@ -745,8 +745,6 @@ dialog .public-actions {
 #active-tag { max-width:100%; overflow-wrap:anywhere }
 .tag-filter>a { color:var(--muted); font-size:11px; text-decoration:none }
 .tag-filter>a { transition:opacity 250ms ease }
-.add-photo { width:44px }
-.photo-tools { margin-top:8px }
 .journal-photo { display:block; max-width:100%; height:auto; margin:12px 0; border:0 }
 .thought-preview .journal-photo { max-height:160px; width:auto; object-fit:contain; object-position:left }
 .cm-photo { display:inline-block; width:100%; vertical-align:top }

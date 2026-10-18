@@ -20,8 +20,8 @@ async function prepare(file){
   }finally{bitmap.close();}
 }
 export function createPhotos({api,getEditor,onBusy,onMessage}){
-  const input=document.getElementById('photo-input');let job=null,controller=null,choice=null;
-  function cancel(){controller?.abort();choice?.target.cancel();choice=null;input.value='';}
+  let job=null,controller=null;
+  function cancel(){controller?.abort();}
   async function add(files,selection){
     if(!files.length){selection?.target.cancel();return;}
     if(job){selection?.target.cancel();return;}
@@ -43,13 +43,11 @@ export function createPhotos({api,getEditor,onBusy,onMessage}){
     finally{clearTimeout(timeout);selection.target.cancel();job=null;controller=null;onBusy(false);}
   }
   function selection(owner){const target=getEditor(owner)?.captureInsertion();return target?{owner,target}:null;}
-  input.addEventListener('change',()=>{const selected=choice;choice=null;if(selected)add([...input.files],selected);input.value='';});
-  input.addEventListener('cancel',()=>{choice?.target.cancel();choice=null;});
   for(const [id,owner]of [['composer-editor','composer'],['live-editor','reader']]){
     const parent=document.getElementById(id);
     parent.addEventListener('paste',event=>{const files=[...(event.clipboardData?.files||[])];if(!files.length)return;const selected=selection(owner);if(!selected)return;event.preventDefault();add(files,selected);},true);
     parent.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
     parent.addEventListener('drop',event=>{const files=[...(event.dataTransfer?.files||[])];if(!files.length)return;const selected=selection(owner);if(!selected)return;event.preventDefault();event.stopPropagation();add(files,selected);},true);
   }
-  return{get busy(){return Boolean(job);},cancel,async finish(){try{await job;return true;}catch{return false;}},choose(owner){if(job)return;choice?.target.cancel();choice=selection(owner);if(choice){input.value='';input.click();}}};
+  return{get busy(){return Boolean(job);},cancel,async finish(){try{await job;return true;}catch{return false;}}};
 }

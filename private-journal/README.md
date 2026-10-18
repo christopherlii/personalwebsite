@@ -77,7 +77,7 @@ words, so private destinations are never published by following a link.
 
 ## Photos
 
-The quiet photo control, pasting an image file, or dropping one into either
+Pasting an image file or dropping one into either
 writing field uploads a raster photo and inserts ordinary image Markdown.
 Uploads are attached to a mapped editor selection, so typing while the request
 is pending does not replace newer text. Each image insertion is one undoable
@@ -117,7 +117,7 @@ underlying photo or an older public snapshot. The owner export includes a photo
 manifest, not the binary contents; back up image files separately through their
 authenticated addresses. Every image response is `no-store` and `nosniff`.
 
-`npm run test:photos` uses generated local raster fixtures to check file selection,
+`npm run test:photos` uses generated local raster fixtures to check drag and drop,
 browser resizing, typing during upload, undo/redo, draft restoration, thumbnails,
 stable live rendering, paste/drop, save during upload, mobile layout, private
 access, explicit publication/unpublish, and export metadata. No real photos or
@@ -208,7 +208,8 @@ unavailable, the toggle still works for the current page.
 
 The composer has a permanent optional title field above the writing. Its empty
 placeholder is muted “no title”; that phrase is never stored as a title.
-Photo, dictate, and post form one compact group on the right. Post stays visible
+Dictate and post form one compact group on the right. Photos can be dropped or
+pasted into the writing without a separate toolbar control. Post stays visible
 and disabled until there is saved/typed body text. The title, writing, and
 controls use the existing homepage type and hover treatment.
 
