@@ -25,7 +25,7 @@ try{
  await page.screenshot({path:`${artifacts}/tag-desktop.png`,fullPage:true});
  await page.reload();await page.locator('#tag-filter').waitFor({state:'visible'});assert.equal(await page.locator('#feed article').count(),2);
  await page.locator('#composer-editor .cm-content').click();await page.keyboard.insertText('unfinished writing while browsing a tag');
- await page.waitForFunction(()=>document.querySelector('#draft-status').textContent==='draft saved');assert.equal(await page.locator('#feed article').count(),2);
+ await page.waitForFunction(async()=>document.querySelector('#composer').dataset.draftState==='saved'&&(await (await fetch('/api/draft')).json()).body===document.querySelector('#body').value);assert.equal(await page.locator('#feed article').count(),2);
  await page.locator(`article[data-id="${one.id}"]`).hover();await page.locator(`article[data-id="${one.id}"] [data-action=read]`).click();
  await page.locator('#reader-content a[data-tag=ideas]').waitFor();assert.equal(await page.locator('#reader-content a[data-tag=code]').count(),0);assert.equal(await page.locator('#reader-content a[data-tag=not-a-tag]').count(),0);
  await page.locator('#reader-back').click();await page.locator('#tag-filter').waitFor({state:'visible'});assert.equal(await page.locator('#body').inputValue(),'unfinished writing while browsing a tag');
@@ -34,7 +34,7 @@ try{
  const editor=page.locator('#live-editor .cm-content');await editor.click();await editor.press('ControlOrMeta+a');await page.keyboard.insertText('sample thought: now #life');await page.locator('#reader-save').click();await page.locator('#reader-edit').waitFor({state:'visible'});
  await page.locator('#reader-back').click();await page.waitForFunction(id=>!document.querySelector(`#feed article[data-id="${id}"]`),one.id);assert.equal(await page.locator('#feed article').count(),1);
  await page.locator('#tag-filter a').click();await page.locator('#tag-filter').waitFor({state:'hidden'});
- await page.locator('#clear-input').click();await page.waitForFunction(()=>document.querySelector('#body').value==='');
+ await page.locator('#composer-editor .cm-content').click();await page.keyboard.press('ControlOrMeta+a');await page.keyboard.press('Backspace');await page.waitForFunction(()=>document.querySelector('#body').value==='');
  const longTag='long-tag'.repeat(8);await create(`sample thought: #${longTag}`);
  await page.evaluate(tag=>{location.hash=`tag/${tag}`;},longTag);await page.locator('#active-tag').filter({hasText:longTag}).waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'long tag names wrap on mobile');

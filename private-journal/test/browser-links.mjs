@@ -20,7 +20,7 @@ const setText = async (selector, value) => {
   const editor = page.locator(selector); await editor.click(); await editor.press('ControlOrMeta+a');
   if (value) await page.keyboard.insertText(value); else await editor.press('Backspace');
 };
-const saved = () => page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
+const saved = () => page.waitForFunction(async () => document.querySelector('#composer').dataset.draftState==='saved' && (await (await fetch('/api/draft')).json()).body === document.querySelector('#body').value);
 try {
   await page.goto(origin); await page.locator('#password').fill(process.env.JOURNAL_TEST_PASSWORD); await page.locator('#unlock').click();
   await page.locator('#app').waitFor({ state: 'visible' });

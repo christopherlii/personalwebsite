@@ -56,6 +56,21 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('transcription requires authentication, CSRF, bounded audio, and never saves recordings',async()=>{
+  const c=client(),audio=new Uint8Array([26,69,223,163,0,0,0,0,0,0,0,0]),headers={'Content-Type':'audio/webm;codecs=opus'};
+  let calls=0;
+  c.env.AI={async run(model,input){calls++;assert.equal(model,'@cf/openai/whisper-large-v3-turbo');assert.deepEqual(new Uint8Array(Buffer.from(input.audio,'base64')),audio);assert.equal(input.vad_filter,true);return{text:' a transcribed thought '};}};
+  assert.equal((await c.call('/api/transcribe','POST',audio,headers)).status,401);await c.login();
+  assert.equal((await c.call('/api/transcribe','POST',audio,{...headers,Origin:'https://elsewhere.example'})).status,403);
+  assert.equal((await c.call('/api/transcribe','POST',audio,{'Content-Type':'application/json'})).status,415);
+  assert.equal((await c.call('/api/transcribe','POST',new Uint8Array(2000001),headers)).status,413);
+  assert.equal((await c.call('/api/transcribe','POST',new Uint8Array(16),headers)).status,415);assert.equal(calls,0);
+  const response=await c.call('/api/transcribe','POST',audio,headers);assert.equal(response.status,200);assert.deepEqual(response.data,{text:'a transcribed thought'});assert.equal(calls,1);assert.equal(response.headers.get('Cache-Control'),'no-store');
+  assert.deepEqual((await c.call('/api/thoughts')).data.entries,[]);assert.equal((await c.call('/api/draft')).data.body,'');
+  c.env.AI.run=async()=>{throw new Error('private provider details');};const failed=await c.call('/api/transcribe','POST',audio,headers);assert.equal(failed.status,502);assert.equal(failed.data.error,'Could not transcribe. Try again.');
+  delete c.env.AI;assert.equal((await c.call('/api/transcribe','POST',audio,headers)).status,503);c.env.JOURNAL_DB.sqlite.close();
+});
+
 test('photo uploads are private, bounded, immutable, export metadata, and become public only through published writing',async()=>{
   const c=client(),id=crypto.randomUUID(),path=`/api/photos/${id}`;
   const png=new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=','base64'));
