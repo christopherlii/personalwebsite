@@ -323,10 +323,6 @@ textarea::placeholder {
   text-decoration:underline;
   text-underline-offset:4px
 }
-.thought-actions {
-  min-width:24px;
-  text-align:left
-}
 .reader {
   max-width:640px;
   margin:64px auto 80px;
@@ -335,10 +331,54 @@ textarea::placeholder {
 #reader-back {
   display:inline-block;
   padding:6px 0;
-  margin-bottom:32px;
   font-size:11px;
   color:var(--muted);
   text-decoration:none
+}
+.reader-toolbar {
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:112px
+}
+.reader-actions {
+  display:flex;
+  align-items:center;
+  gap:16px
+}
+.reader-actions button {
+  color:var(--muted)
+}
+.entry-menu.reader-menu {
+  position:absolute;
+  top:100%;
+  right:0;
+  margin-top:6px;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:0
+}
+#reader-delete {
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px solid var(--track)
+}
+#edit-body {
+  display:block;
+  width:100%;
+  min-height:55svh;
+  max-height:none;
+  field-sizing:content;
+  resize:none;
+  padding:0;
+  border:0;
+  background:transparent;
+  outline:none;
+  font:14px/1.7 var(--font-body)
+}
+#edit-form .title-input {
+  margin-bottom:18px
 }
 #reader-content:focus {
   outline:none
@@ -348,8 +388,61 @@ textarea::placeholder {
 }
 #reader-error {
   font-size:12px;
+  color:var(--muted);
+  margin-top:16px
+}
+.markdown-body {
+  white-space:normal;
+  line-height:1.7
+}
+.markdown-body p,.markdown-body ul,.markdown-body ol,.markdown-body blockquote,.markdown-body pre,.markdown-body .table-scroll {
+  margin:0 0 1.2em
+}
+.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6 {
+  font-family:var(--font-body);
+  font-weight:500;
+  line-height:1.4;
+  margin:1.8em 0 .6em
+}
+.markdown-body h1 { font-size:18px }
+.markdown-body h2 { font-size:16px }
+.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6 { font-size:14px }
+.markdown-body>:first-child { margin-top:0 }
+.markdown-body ul,.markdown-body ol { padding-left:22px }
+.markdown-body li { padding-left:2px }
+.markdown-body li>ul,.markdown-body li>ol { margin-bottom:0 }
+.markdown-body blockquote {
+  border-left:1px solid var(--track);
+  padding-left:18px;
   color:var(--muted)
 }
+.markdown-body blockquote>:last-child { margin-bottom:0 }
+.markdown-body code {
+  font:inherit;
+  background:#eee;
+  padding:1px 4px
+}
+.markdown-body pre {
+  font:inherit;
+  padding:12px;
+  background:#eee;
+  overflow-x:auto
+}
+.markdown-body pre code { padding:0; white-space:pre }
+.markdown-body hr {
+  border:0;
+  border-top:1px solid var(--track);
+  margin:28px 0
+}
+.markdown-body .table-scroll { overflow-x:auto }
+.markdown-body table { border-collapse:collapse; min-width:100% }
+.markdown-body th,.markdown-body td {
+  text-align:left;
+  padding:6px 12px 6px 0;
+  border-bottom:1px solid var(--track)
+}
+.markdown-body .task-item { list-style:none }
+.markdown-body input[type=checkbox] { margin-left:-20px; accent-color:var(--fg) }
 details {
   position:relative
 }
@@ -369,13 +462,6 @@ summary::-webkit-details-marker {
   flex-wrap:wrap;
   align-items:center;
   gap:0 20px
-}
-.thought-menu {
-  position:absolute;
-  top:calc(100% - 58px);
-  left:26px;
-  right:0;
-  gap:0 16px
 }
 .entry-menu button {
   padding:4px 0;
@@ -596,9 +682,6 @@ dialog .public-actions {
   }
   .thought {
     padding-left:22px
-  }
-  .thought-menu {
-    left:22px
   }
   .composer-section,.view-heading,.notice {
     margin-left:22px

@@ -60,22 +60,30 @@
     </section>
   </main>
   <main id="reader" class="reader" hidden>
-    <a id="reader-back" href="#" aria-label="back to timeline">back</a>
+    <header class="reader-toolbar">
+      <a id="reader-back" href="#" aria-label="back to timeline">back</a>
+      <div class="reader-actions">
+        <button type="button" id="reader-preview" hidden>preview</button>
+        <button type="button" id="reader-cancel" hidden>cancel</button>
+        <button type="submit" form="edit-form" id="reader-save" hidden>save</button>
+        <button type="button" id="reader-edit">edit</button>
+        <button type="button" id="reader-menu-toggle" data-menu aria-label="thought options" aria-expanded="false" aria-controls="reader-menu">…</button>
+      </div>
+      <nav id="reader-menu" class="entry-menu reader-menu" aria-label="thought actions" hidden>
+        <button type="button" id="reader-bookmark" aria-pressed="false">bookmark</button>
+        <button type="button" id="reader-public">publish…</button>
+        <button type="button" id="reader-delete">delete…</button>
+      </nav>
+    </header>
     <article id="reader-content" tabindex="-1"></article>
-    <p id="reader-error" role="status"></p>
-  </main>
-
-  <dialog id="edit-dialog" aria-labelledby="edit-title">
-    <form id="edit-form">
-      <header><h2 id="edit-title">edit thought</h2><button type="button" data-close="edit-dialog" aria-label="close edit">close</button></header>
+    <form id="edit-form" hidden>
       <label for="edit-thought-title" class="sr-only">title (optional)</label>
       <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
       <label for="edit-body" class="sr-only">thought</label>
       <textarea id="edit-body" rows="8" maxlength="20000" required></textarea>
-      <p id="edit-error" role="status"></p>
-      <footer><button type="button" data-close="edit-dialog">cancel</button><button type="submit" class="solid">save</button></footer>
     </form>
-  </dialog>
+    <p id="reader-error" role="status"></p>
+  </main>
   <dialog id="delete-dialog" aria-labelledby="delete-title">
     <form id="delete-form">
       <h2 id="delete-title">delete this thought?</h2>
