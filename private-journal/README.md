@@ -1,6 +1,6 @@
 # Private journal
 
-A single-owner journal with a chronological timeline, replies, bookmarks, draft
+A single-owner journal with a chronological timeline, bookmarks, draft
 autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a faint left timeline, a borderless inline composer, and three-line thought
 previews with an open/close control. Entries have no 280-character limit (the
@@ -52,7 +52,7 @@ Browser tests refuse remote URLs and use only synthetic local entries. Use a
 clean local draft before running them. Screenshots go to ignored `test-results/`.
 An existing Chromium binary can be selected with `CHROMIUM_PATH`. These tests
 cover autosave restoration, posting, bookmarks, accent-insensitive search,
-threads, editing, safe rendering, separate public drafts, desktop/mobile layout,
+editing, safe rendering, separate public drafts, desktop/mobile layout,
 font loading, draft conflicts, and server-side session revocation.
 
 ## Deploy after connecting a Cloudflare account
@@ -115,7 +115,7 @@ on the new deployment because every session is bound to the current hash.
 - SQLite FTS5 ranks prefix matches across words and normalizes accents. Typing
   shows keyword results after 150ms; submitting search adds semantic results
   when the AI binding is configured. Keyword results remain available if the
-  provider fails. Results, timelines, and threads use 40-entry pages. Search
+  provider fails. Results and timelines use 40-entry pages. Search
   highlighting never renders user text as HTML.
 - Semantic search uses Cloudflare-hosted `@cf/baai/bge-small-en-v1.5` (384
   dimensions). Thoughts are embedded on creation/edit and normalized Float32
@@ -136,10 +136,10 @@ on the new deployment because every session is bound to the current hash.
   in model usage; this excludes Worker/database hosting. Indexing text is an
   additional cost when writing or editing. Check current [model pricing](https://developers.cloudflare.com/workers-ai/models/bge-small-en-v1.5/)
   and [account limits](https://developers.cloudflare.com/workers-ai/platform/pricing/).
-- JSON export includes all entries, timestamps, replies, bookmarks, and the
+- JSON export includes all entries, timestamps, bookmarks, and the
   current draft. Export periodically to an owner-controlled private backup.
-  Deleting an entry removes it from active search and leaves its replies
-  intact; provider backups may retain previous data under their own policies.
+  Deleting an entry removes it from active search; provider backups may retain
+  previous data under their own policies.
 - No Jev or OpenAI key is required. Semantic indexing sends each thought to
   Cloudflare Workers AI when it is created/edited; searches send the query.
   This stays within the selected Cloudflare backend but is still model

@@ -63,16 +63,6 @@ try {
   await idle();
 
   await entryMenu(article);
-  await article.locator('[data-action=reply]').click();
-  const reply = `${prefix}: a little more to remember.`;
-  await page.locator('#body').fill(reply);
-  await page.locator('#post').click();
-  await page.waitForFunction(text => [...document.querySelectorAll('.thought-body')].some(p => p.textContent === text), reply);
-  const replyEntry = (await api(`thoughts?q=${encodeURIComponent(prefix)}`)).data.entries.find(e => e.body === reply); ids.push(replyEntry.id);
-  await page.locator(`article[data-id="${root.id}"] [data-action=thread]`).first().click();
-  await page.waitForFunction(() => document.querySelector('#view-title').textContent === 'thread' && document.querySelectorAll('.thought').length === 2);
-
-  await entryMenu(article);
   await article.locator('[data-action=edit]').click();
   const edited = `${prefix}: soccer and coffee instead. <img src=x onerror=alert(1)>`;
   await page.locator('#edit-body').fill(edited);
@@ -95,10 +85,10 @@ try {
   const samples = [
     'sample thought: somewhere to leave an idea before it needs to become a post.\n\na longer thought can stay in the timeline without taking over it. open it when you want to read the rest, then fold it back into the feed. the rest of this sample stays out of the way until it is opened. short thoughts keep their full text, while longer ones leave room for the next entry.',
     'sample thought: what did i want to remember about that book?',
-    'sample reply: coming back to this with a little more context.'
+    'sample thought: a passing idea worth keeping.'
   ];
-  for (const [index, body] of samples.entries()) {
-    const result = await api('thoughts', 'POST', { id: crypto.randomUUID(), body, reply_to: index === 2 ? ids[0] : null });
+  for (const body of samples) {
+    const result = await api('thoughts', 'POST', { id: crypto.randomUUID(), body });
     ids.push(result.data.entry.id);
   }
   await api(`thoughts/${ids[1]}`, 'PATCH', { bookmarked: true });
@@ -113,13 +103,13 @@ try {
 
   // A second tab changes the draft: the first must preserve its own text.
   const oldVersion = (await api('draft')).data.version;
-  await api('draft', 'PUT', { body: 'another device draft', reply_to: null, version: oldVersion });
+  await api('draft', 'PUT', { body: 'another device draft', version: oldVersion });
   await page.locator('#body').fill('local text that must survive a conflict');
   await page.waitForFunction(() => document.querySelector('#draft-status').textContent.includes('changed elsewhere'));
   assert.equal(await page.locator('#body').inputValue(), 'local text that must survive a conflict');
   assert.equal((await api('draft')).data.body, 'another device draft');
   const draftVersion = (await api('draft')).data.version;
-  await api('draft', 'PUT', { body: '', reply_to: null, version: draftVersion });
+  await api('draft', 'PUT', { body: '', version: draftVersion });
   // Reload after explicitly discarding this synthetic conflict, then test lock.
   page.on('dialog', dialog => dialog.accept());
   await page.reload(); await page.locator('#app').waitFor({ state: 'visible' });
@@ -132,7 +122,7 @@ try {
   await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'search', 'thread', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'truncation/expand', 'bookmark', 'search', 'edit', 'HTML safety', 'public draft isolation', 'desktop/mobile', 'font loading', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

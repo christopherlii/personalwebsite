@@ -1,5 +1,5 @@
 import { digest } from './auth.mjs';
-import { ftsQuery } from './search.mjs';
+import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
 
 export const MODEL = '@cf/baai/bge-small-en-v1.5';
 export const DIMENSIONS = 384;
@@ -94,9 +94,7 @@ export async function semanticSearch(query, saved, cursor, env) {
   const ids = ordered.slice(cursor, cursor + 40).map(([id]) => id);
   let entries = [];
   if (ids.length) {
-    const { results } = await env.JOURNAL_DB.prepare(`SELECT t.*, p.body AS parent_body,
-      (SELECT count(*) FROM thoughts r WHERE r.reply_to = t.id) AS replies
-      FROM thoughts t LEFT JOIN thoughts p ON p.id = t.reply_to WHERE t.id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT ${THOUGHT_FIELDS.map(field => `t.${field}`).join(', ')} FROM thoughts t WHERE t.id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
     const byId = new Map(results.map(entry => [entry.id, entry]));
     entries = ids.map(id => byId.get(id)).filter(Boolean);
   }

@@ -129,10 +129,6 @@ h1,h2 {
 .view-heading {
   margin-left:26px
 }
-.view-heading>button {
-  margin-bottom:28px;
-  color:var(--muted)
-}
 .view-heading h1:not(.sr-only) {
   margin-bottom:30px;
   font-size:12px
@@ -216,23 +212,6 @@ textarea::placeholder {
 .post {
   font-size:12px
 }
-.reply-context {
-  display:flex;
-  justify-content:space-between;
-  align-items:baseline;
-  gap:15px;
-  color:var(--muted);
-  font-size:11px;
-  margin-bottom:12px
-}
-.reply-context span {
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis
-}
-.reply-context button {
-  font-size:10px
-}
 .thought {
   padding-bottom:28px;
   overflow-wrap:anywhere
@@ -248,12 +227,6 @@ textarea::placeholder {
 }
 .thought-header time {
   font-variant-numeric:tabular-nums
-}
-.thought-header button {
-  font-size:10px;
-  color:var(--muted);
-  padding:0;
-  line-height:1.5
 }
 .thought-body {
   font:14px/1.55 var(--font-body);
@@ -287,10 +260,6 @@ textarea::placeholder {
 .expand-thought {
   font-size:11px;
   color:var(--muted)
-}
-.thread-link {
-  color:var(--muted);
-  font-size:10px
 }
 .thought-actions {
   position:absolute;
@@ -333,17 +302,6 @@ summary::-webkit-details-marker {
 .entry-menu button[aria-pressed=true] {
   text-decoration:underline;
   text-underline-offset:4px
-}
-.parent-preview {
-  display:block;
-  margin:0 0 10px;
-  color:var(--muted);
-  font-size:10px;
-  text-align:left;
-  max-width:100%;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap
 }
 .notice {
   font-size:11px;

@@ -43,7 +43,7 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config })
     return { status: response.status, headers: response.headers, data: await response.json() };
   }, async login() { return this.call('/api/login', 'POST', { password }); } };
 }
-const thought = (body, reply_to = null) => ({ id: crypto.randomUUID(), body, reply_to });
+const thought = body => ({ id: crypto.randomUUID(), body });
 
 test('every private read/write fails closed, including an unconfigured deployment', async () => {
   const c = client();
@@ -93,9 +93,9 @@ test('login attempts are limited in the database', async () => {
 
 test('thoughts survive sessions, post retries are idempotent, and drafts do not overwrite newer work', async () => {
   const c = client(); await c.login();
-  const draft = await c.call('/api/draft', 'PUT', { body: 'a thought to keep', reply_to: null, version: 0 });
+  const draft = await c.call('/api/draft', 'PUT', { body: 'a thought to keep', version: 0 });
   assert.equal(draft.data.version, 1);
-  assert.equal((await c.call('/api/draft', 'PUT', { body: 'stale text', reply_to: null, version: 0 })).status, 409);
+  assert.equal((await c.call('/api/draft', 'PUT', { body: 'stale text', version: 0 })).status, 409);
   const data = thought('a thought to keep');
   const post = await c.call('/api/thoughts', 'POST', { ...data, draft_version: 1 });
   assert.equal(post.status, 201);
@@ -105,7 +105,7 @@ test('thoughts survive sessions, post retries are idempotent, and drafts do not 
   await c.call('/api/logout', 'POST', {}); await c.login();
   assert.equal((await c.call('/api/thoughts')).data.entries[0].body, data.body);
   const version = (await c.call('/api/draft')).data.version;
-  await c.call('/api/draft', 'PUT', { body: 'a newer draft', reply_to: null, version });
+  await c.call('/api/draft', 'PUT', { body: 'a newer draft', version });
   const old = await c.call('/api/thoughts', 'POST', { ...thought('old device text'), draft_version: version });
   assert.equal(old.data.draft.body, 'a newer draft');
 });
@@ -129,30 +129,24 @@ test('Unicode/prefix search, punctuation, bookmark filtering, editing, and delet
   assert.equal((await c.call('/api/thoughts?q=soccer')).data.entries.length, 0);
 });
 
-test('thread and feed pagination do not lose entries; deleting a parent preserves replies', async () => {
+test('timeline pagination preserves independent thoughts and deletion removes only one entry', async () => {
   const c = client(); await c.login();
-  const parent = (await c.call('/api/thoughts', 'POST', thought('parent'))).data.entry;
-  for (let i = 0; i < 44; i++) await c.call('/api/thoughts', 'POST', thought(`reply ${i}`, parent.id));
+  for (let i = 0; i < 45; i++) await c.call('/api/thoughts', 'POST', thought(`thought ${i}`));
   const page = (await c.call('/api/thoughts')).data;
   const next = (await c.call(`/api/thoughts?cursor=${page.next}`)).data;
   assert.equal(new Set([...page.entries, ...next.entries].map(e => e.id)).size, 45);
-  const thread = (await c.call(`/api/thoughts?parent=${parent.id}`)).data;
-  const rest = (await c.call(`/api/thoughts?parent=${parent.id}&cursor=${thread.next}`)).data;
-  assert.equal(thread.entries.length + rest.entries.length, 45);
-  await c.call(`/api/thoughts/${parent.id}`, 'DELETE', {});
+  await c.call(`/api/thoughts/${page.entries[0].id}`, 'DELETE', {});
   const remaining = (await c.call('/api/export')).data;
   assert.equal(remaining.entries.length, 44);
-  assert.ok(remaining.entries.every(e => e.reply_to === null));
 });
 
-test('HTML stays data, invalid references are rejected, and exports include the private draft', async () => {
+test('HTML stays data, input limits are enforced, and exports include the private draft', async () => {
   const c = client(); await c.login();
   assert.equal((await c.call('/api/thoughts', 'POST', thought('   '))).status, 400);
   assert.equal((await c.call('/api/thoughts', 'POST', thought('x'.repeat(20001)))).status, 400);
-  assert.equal((await c.call('/api/thoughts', 'POST', thought('reply', crypto.randomUUID()))).status, 404);
   const body = '<img src=x onerror=alert(1)> https://example.com';
   await c.call('/api/thoughts', 'POST', thought(body));
-  await c.call('/api/draft', 'PUT', { body: 'not posted', reply_to: null, version: 0 });
+  await c.call('/api/draft', 'PUT', { body: 'not posted', version: 0 });
   const exported = await c.call('/api/export');
   assert.equal(exported.data.entries[0].body, body);
   assert.equal(exported.data.draft.body, 'not posted');
