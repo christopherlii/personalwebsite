@@ -305,7 +305,6 @@ async function showRoute() {
   }
   if (!id) {
     const tag=routeTag(),tagChanged=tag!==state.tag;state.tag=tag;
-    if(tagChanged&&tag){state.timelineHidden=false;$('#timeline').hidden=false;$('#toggle-timeline').textContent='hide timeline';$('#toggle-timeline').setAttribute('aria-expanded','true');}
     const wasReading = !$('#reader').hidden;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
@@ -582,11 +581,15 @@ $('#composer').addEventListener('submit', async event => {
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
 });
 $('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true' && state.query === state.renderedQuery && state.view === state.renderedView) loadFeed(state.entries.size > 0 && state.cursor !== null); });
-$('#toggle-timeline').addEventListener('click', () => {
-  state.timelineHidden = !state.timelineHidden;
+function setTimelineHidden(hidden) {
+  state.timelineHidden = hidden;
   $('#timeline').hidden = state.timelineHidden;
   $('#toggle-timeline').textContent = state.timelineHidden ? 'show timeline' : 'hide timeline';
   $('#toggle-timeline').setAttribute('aria-expanded', String(!state.timelineHidden));
+}
+$('#toggle-timeline').addEventListener('click', () => {
+  setTimelineHidden(!state.timelineHidden);
+  try { localStorage.setItem('journal.timelineHidden', String(state.timelineHidden)); } catch {}
   searchFromComposer(true);
 });
 document.addEventListener('keydown', event => {
@@ -788,6 +791,8 @@ window.addEventListener('beforeunload', event => {
   if (dictation.owner || photos.busy || state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }
 });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
+
+try { setTimelineHidden(localStorage.getItem('journal.timelineHidden') === 'true'); } catch {}
 
 try {
   const session = await api('session');
