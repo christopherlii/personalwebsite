@@ -68,9 +68,12 @@ try {
   await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '0', root.id);
   await article.hover();
   await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .thought-header`)).opacity === '1', root.id);
+  const openBeforeCopy = await article.locator('[data-action=read]').boundingBox();
   await article.locator('[data-action=copy]').click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), `a day of building\n\n${first}`, 'direct copy includes title and full body');
-  assert.equal(await article.locator('[data-action=copy]').textContent(), 'copied', 'copy confirms with quiet text');
+  assert.equal(await article.locator('[data-action=copy]').textContent(), 'copy', 'copy feedback keeps the compact label');
+  assert.equal(await page.locator('#copy-status').textContent(), 'thought copied');
+  assert.deepEqual(await article.locator('[data-action=read]').boundingBox(), openBeforeCopy, 'copy feedback never moves the adjacent action');
   await page.mouse.move(0, 0);
   await page.waitForFunction(id => getComputedStyle(document.querySelector(`article[data-id="${id}"] .entry-footer`)).opacity === '0', root.id);
   await article.hover();

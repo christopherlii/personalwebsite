@@ -425,8 +425,8 @@ $('#feed').addEventListener('click', async event => {
       else target.closest('article').replaceWith(renderEntry({ ...entry, ...data.entry }));
     } else if (action === 'copy') {
       await navigator.clipboard.writeText(entryText(entry));
-      target.textContent = 'copied';
-      setTimeout(() => { target.textContent = 'copy'; }, 1200);
+      target.classList.add('is-copied'); target.setAttribute('aria-label', 'thought copied'); $('#copy-status').textContent = 'thought copied';
+      setTimeout(() => { target.classList.remove('is-copied'); target.setAttribute('aria-label', 'copy thought'); $('#copy-status').textContent = ''; }, 1200);
     } else if (action === 'edit') { $('#edit-thought-title').value = entry.title || ''; $('#edit-body').value = entry.body; $('#edit-error').textContent = ''; $('#edit-dialog').showModal(); }
     else if (action === 'delete') { $('#delete-error').textContent = ''; $('#delete-dialog').showModal(); }
     else if (action === 'public') { await openPublication(entry); }
