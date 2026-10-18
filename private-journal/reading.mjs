@@ -1,5 +1,5 @@
 import { ftsQuery } from './search.mjs';
-import { chunksOf, DIMENSIONS, MODEL, maximumSimilarity } from './semantic.mjs';
+import { chunksOf, closestEmbeddings, DIMENSIONS, fuse, MODEL } from './semantic.mjs';
 import { plainThoughtLinks } from './public/thought-links.js';
 import { plainPhotoLinks } from './public/photo-links.js';
 
@@ -126,9 +126,9 @@ export async function relatedToThought(id, env) {
   const thoughts = new Map(), reading = new Map();
   if (terms) {
     const own = await env.JOURNAL_DB.prepare(`SELECT t.id FROM thoughts t JOIN thoughts_fts ON thoughts_fts.rowid=t.seq WHERE thoughts_fts MATCH ? AND t.id != ? ORDER BY bm25(thoughts_fts) LIMIT 12`).bind(terms,id).all();
-    own.results.forEach((row,index)=>thoughts.set(row.id,1/(60+index)));
+    fuse(thoughts, own.results.map(row=>row.id));
     const saved = await env.JOURNAL_DB.prepare(`SELECT r.id FROM reading r JOIN reading_fts ON reading_fts.rowid=r.seq WHERE reading_fts MATCH ? ORDER BY bm25(reading_fts) LIMIT 12`).bind(terms).all();
-    saved.results.forEach((row,index)=>reading.set(row.id,1/(60+index)));
+    fuse(reading, saved.results.map(row=>row.id));
   }
   const source = await env.JOURNAL_DB.prepare('SELECT vectors,chunks,dimensions FROM embeddings WHERE thought_id = ? AND model = ?').bind(id,MODEL).first();
   if (source?.dimensions === DIMENSIONS) {
@@ -137,20 +137,10 @@ export async function relatedToThought(id, env) {
       const query = new Float32Array(DIMENSIONS);
       for (let start=0;start<vectors.length;start+=DIMENSIONS) for (let i=0;i<DIMENSIONS;i++) query[i]+=vectors[start+i];
       const norm=Math.hypot(...query);
-      if (norm) for (let i=0;i<DIMENSIONS;i++) query[i]/=norm;
-      for (const [table,foreign,target] of norm ? [['embeddings','thought_id',thoughts],['reading_embeddings','reading_id',reading]] : []) {
-        let after = '';
-        const candidates = [];
-        while (true) {
-          const {results} = await env.JOURNAL_DB.prepare(`SELECT ${foreign} AS id,vectors,chunks,dimensions FROM ${table} WHERE ${foreign} > ? AND ${foreign} != ? AND model = ? ORDER BY ${foreign} LIMIT 80`).bind(after,id,MODEL).all();
-          for (const row of results) {
-            const score=maximumSimilarity(query,row.vectors,row.chunks,row.dimensions);
-            if (score >= 0.55) candidates.push({id:row.id,score});
-          }
-          candidates.sort((a,b)=>b.score-a.score); candidates.length=Math.min(candidates.length,12);
-          if (results.length<80) break; after=results.at(-1).id;
-        }
-        candidates.forEach((row,index)=>target.set(row.id,(target.get(row.id)||0)+1/(60+index)));
+      if (norm) {
+        for (let i=0;i<DIMENSIONS;i++) query[i]/=norm;
+        fuse(thoughts, await closestEmbeddings(env, query, { exclude: id }));
+        fuse(reading, await closestEmbeddings(env, query, { table: 'reading_embeddings', key: 'reading_id', exclude: id }));
       }
     }
   }

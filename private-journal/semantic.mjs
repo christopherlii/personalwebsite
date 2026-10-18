@@ -1,15 +1,13 @@
 import { digest } from './auth.mjs';
 import { ftsQuery, THOUGHT_FIELDS } from './search.mjs';
-import { searchTerms } from './public/search-terms.js';
 import { plainPhotoLinks } from './public/photo-links.js';
 
 export const MODEL = '@cf/baai/bge-small-en-v1.5';
 export const DIMENSIONS = 384;
-export const RERANKER = '@cf/baai/bge-reranker-base';
-const MIN_RELEVANCE = 0.4;
-const MIN_PARAPHRASE_RELEVANCE = 0.02;
-const MIN_RELATIVE_RELEVANCE = 0.2;
-const MIN_LONG_QUERY_SIMILARITY = 0.65;
+// Related thoughts (reading page) and the composer's search share one ranking:
+// the closest stored vectors above this similarity, fused with word matches.
+export const RELATED_SIMILARITY = 0.55;
+const SEARCH_POOL = 20;
 const encoder = new TextEncoder();
 
 export function chunksOf(text) {
@@ -74,45 +72,28 @@ export function maximumSimilarity(query, blob, count, dimensions) {
   return similarityMatch(query, blob, count, dimensions).score;
 }
 
-async function refine(query, candidates, matches, env) {
-  if (!candidates.length) return [];
-  const fold = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-  const terms = [...new Set(searchTerms(query).map(fold))];
-  const contexts = [], owners = [];
-  for (const entry of candidates) {
-    const body=plainPhotoLinks(entry.body);
-    const passages = chunksOf(entry.title ? `${entry.title}\n\n${body}` : body);
-    const selected = new Set();
-    const semantic = matches.get(entry.id);
-    if (semantic) selected.add(semantic.chunk);
-    let lexical = 0, coverage = 0;
-    passages.forEach((passage, index) => {
-      const words = (fold(passage).match(/[\p{L}\p{N}]+/gu) || []);
-      const count = terms.filter(term => words.some(word => word.startsWith(term))).length;
-      if (count > coverage) { coverage = count; lexical = index; }
-    });
-    if (coverage || !selected.size) selected.add(lexical);
-    for (const index of selected) { contexts.push({ text: passages[index] }); owners.push(entry.id); }
+export async function closestEmbeddings(env, query, { table = 'embeddings', key = 'thought_id', exclude = '', saved = false, limit = 12 } = {}) {
+  const savedOnly = saved ? ` AND ${key} IN (SELECT id FROM thoughts WHERE bookmarked = 1)` : '';
+  const candidates = [];
+  let after = '';
+  while (true) {
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT ${key} AS id, vectors, chunks, dimensions FROM ${table}
+      WHERE ${key} > ? AND ${key} != ? AND model = ?${savedOnly} ORDER BY ${key} LIMIT 80`).bind(after, exclude, MODEL).all();
+    for (const row of results) {
+      const score = maximumSimilarity(query, row.vectors, row.chunks, row.dimensions);
+      if (score >= RELATED_SIMILARITY) candidates.push({ id: row.id, score });
+    }
+    // Bound request memory while considering vectors from the full archive.
+    candidates.sort((a, b) => b.score - a.score); candidates.length = Math.min(candidates.length, limit);
+    if (results.length < 80) break;
+    after = results.at(-1).id;
   }
-  // At most 40 thoughts, two 400-byte passages each. A word match is only a
-  // candidate; every returned thought must pass the same relevance check.
-  const result = await env.AI.run(RERANKER, { query, contexts, top_k: contexts.length });
-  if (!Array.isArray(result.response) || result.response.length !== contexts.length) throw new Error('Invalid relevance response.');
-  const scores = new Map(), seen = new Set();
-  for (const item of result.response) {
-    if (!Number.isInteger(item.id) || item.id < 0 || item.id >= contexts.length || seen.has(item.id) || !Number.isFinite(item.score) || item.score < 0 || item.score > 1) throw new Error('Invalid relevance score.');
-    seen.add(item.id);
-    const id = owners[item.id]; scores.set(id, Math.max(scores.get(id) || 0, item.score));
-  }
-  const best = Math.max(...scores.values());
-  return candidates.filter(entry => {
-    const score = scores.get(entry.id) || 0;
-    // Strong direct relevance can stand alone. Lower-scoring paraphrases need
-    // agreement from the embedding model and must stay near the best result.
-    return score >= best * MIN_RELATIVE_RELEVANCE && (score >= MIN_RELEVANCE ||
-      (score >= MIN_PARAPHRASE_RELEVANCE && matches.get(entry.id)?.score >= MIN_LONG_QUERY_SIMILARITY));
-  })
-    .sort((a, b) => scores.get(b.id) - scores.get(a.id) || b.seq - a.seq);
+  return candidates.map(row => row.id);
+}
+
+// Reciprocal-rank fusion: an id ranked well by both lists rises to the top.
+export function fuse(scores, ids) {
+  ids.forEach((id, rank) => scores.set(id, (scores.get(id) || 0) + 1 / (60 + rank)));
 }
 
 export async function semanticSearch(query, saved, cursor, env) {
@@ -122,47 +103,27 @@ export async function semanticSearch(query, saved, cursor, env) {
   const pending = await env.JOURNAL_DB.prepare(`SELECT t.* ${pendingSql} ORDER BY t.seq LIMIT 4`).bind(MODEL).all();
   for (const entry of pending.results) await indexEntry(entry, env);
   const remaining = await env.JOURNAL_DB.prepare(`SELECT count(*) AS count ${pendingSql}`).bind(MODEL).first();
-  const queryChunks = chunksOf(query);
-  const refineShortQuery = queryChunks.length === 1;
-  const queryVectors = await embedAll(queryChunks, env);
+  const queryVectors = await embedAll(chunksOf(query), env);
   const queryVector = Array.from({ length: DIMENSIONS }, (_, index) => queryVectors.reduce((sum, vector) => sum + vector[index], 0));
   const norm = Math.hypot(...queryVector);
   if (!norm) throw new Error('Empty query vector.');
   for (let i = 0; i < queryVector.length; i++) queryVector[i] /= norm;
-  const ranked = [];
-  let after = 0;
-  while (true) {
-    const { results } = await env.JOURNAL_DB.prepare(`SELECT t.seq, t.id, e.vectors, e.chunks, e.dimensions
-      FROM thoughts t JOIN embeddings e ON e.thought_id = t.id WHERE t.seq > ? AND e.model = ?${saved ? ' AND t.bookmarked = 1' : ''} ORDER BY t.seq LIMIT 80`).bind(after, MODEL).all();
-    for (const entry of results) {
-      const match = similarityMatch(queryVector, entry.vectors, entry.chunks, entry.dimensions);
-      if (match.score >= (refineShortQuery ? 0.45 : MIN_LONG_QUERY_SIMILARITY)) ranked.push({ id: entry.id, ...match });
-    }
-    // Bound request memory while considering vectors from the full archive.
-    ranked.sort((a, b) => b.score - a.score); ranked.length = Math.min(ranked.length, 200);
-    if (results.length < 80) break;
-    after = results.at(-1).seq;
-  }
-  const combined = new Map(ranked.map((entry, rank) => [entry.id, refineShortQuery ? 1 / (60 + rank) : entry.score]));
-  const terms = ftsQuery(query);
-  if (terms && refineShortQuery) {
+  const scores = new Map();
+  // Typed words must all appear for a word match, so one shared word ("out")
+  // can't pull an unrelated thought up beside the meaning matches.
+  const terms = ftsQuery(query, true);
+  if (terms) {
     const lexical = await env.JOURNAL_DB.prepare(`SELECT t.id FROM thoughts t JOIN thoughts_fts ON thoughts_fts.rowid = t.seq
-      WHERE thoughts_fts MATCH ?${saved ? ' AND t.bookmarked = 1' : ''} ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT 200`).bind(terms).all();
-    lexical.results.forEach((entry, rank) => combined.set(entry.id, (combined.get(entry.id) || 0) + 1 / (60 + rank)));
+      WHERE thoughts_fts MATCH ?${saved ? ' AND t.bookmarked = 1' : ''} ORDER BY bm25(thoughts_fts), t.seq DESC LIMIT ${SEARCH_POOL}`).bind(terms).all();
+    fuse(scores, lexical.results.map(row => row.id));
   }
-  let ordered = [...combined].sort((a, b) => b[1] - a[1]);
-  if (refineShortQuery && ordered.length) {
-    const candidates = ordered.slice(0, 40).map(([id]) => id);
-    const { results } = await env.JOURNAL_DB.prepare(`SELECT ${THOUGHT_FIELDS.map(field => `t.${field}`).join(', ')} FROM thoughts t WHERE t.id IN (${candidates.map(() => '?').join(',')})`).bind(...candidates).all();
-    const refined = await refine(query, results, new Map(ranked.map(entry => [entry.id, entry])), env);
-    return { entries: refined.slice(cursor, cursor + 40), next: null, indexing: remaining.count > 0 };
-  }
-  const ids = ordered.slice(cursor, cursor + 40).map(([id]) => id);
+  fuse(scores, await closestEmbeddings(env, queryVector, { saved, limit: SEARCH_POOL }));
+  const ids = [...scores].sort((a, b) => b[1] - a[1]).map(([id]) => id).slice(cursor, cursor + 40);
   let entries = [];
   if (ids.length) {
     const { results } = await env.JOURNAL_DB.prepare(`SELECT ${THOUGHT_FIELDS.map(field => `t.${field}`).join(', ')} FROM thoughts t WHERE t.id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all();
     const byId = new Map(results.map(entry => [entry.id, entry]));
     entries = ids.map(id => byId.get(id)).filter(Boolean);
   }
-  return { entries, next: ordered.length > cursor + 40 ? cursor + 40 : null, indexing: remaining.count > 0 };
+  return { entries, next: null, indexing: remaining.count > 0 };
 }
