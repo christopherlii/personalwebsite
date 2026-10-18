@@ -201,6 +201,11 @@ only publish/update does. Unpublish removes public access and retains the draft.
 Copy/download remain available for Substack, X, or Markdown backups without
 posting to those services. Existing media and reading/favorites stay in Git.
 
+Timeline visibility is remembered in this browser across reloads, reopening,
+and tag navigation. Only this display preference is stored in localStorage;
+private writing keeps its existing server storage. If browser storage is
+unavailable, the toggle still works for the current page.
+
 The composer has a permanent optional title field above the writing. Its empty
 placeholder is muted “no title”; that phrase is never stored as a title.
 Photo, dictate, and post form one compact group on the right. Post stays visible
