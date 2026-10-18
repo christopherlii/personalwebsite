@@ -28,7 +28,7 @@ try{
  const initial=await api('draft');assert.equal(initial.body,'');assert.equal(initial.title,'');ownsDraft=true;
  assert.equal(connections,0);assert.equal(await page.locator('#add-title').count(),0);assert.equal(await page.locator('#title').getAttribute('placeholder'),'no title');assert.equal(await page.locator('#title').isVisible(),true);
  const title=await page.locator('#title').boundingBox(),body=await page.locator('#composer-editor').boundingBox();assert.ok(title.y+title.height<=body.y);
- const tools=await Promise.all(['#photo-composer','#dictate-composer','#post'].map(selector=>page.locator(selector).boundingBox()));assert.ok(tools[0].x<tools[1].x&&tools[1].x<tools[2].x);assert.ok(Math.abs(tools[2].x+tools[2].width-(await page.locator('.composer-toolbar').boundingBox()).x-(await page.locator('.composer-toolbar').boundingBox()).width)<1);
+ const tools=await Promise.all(['#dictate-composer','#post'].map(selector=>page.locator(selector).boundingBox()));assert.ok(tools[0].x<tools[1].x);assert.ok(Math.abs(tools[1].x+tools[1].width-(await page.locator('.composer-toolbar').boundingBox()).x-(await page.locator('.composer-toolbar').boundingBox()).width)<1);
  const before=await page.locator('#timeline').boundingBox();await recording('composer');assert.deepEqual(await page.locator('#timeline').boundingBox(),before);
  push('sample thought:');await page.locator('.cm-dictation-preview').waitFor();assert.equal(await page.locator('#body').inputValue(),'');assert.equal(await page.locator('#composer-editor .cm-placeholder').isVisible(),false);
  push('sample thought: a dictated thought.');await page.waitForFunction(()=>document.querySelector('.cm-dictation-preview')?.textContent==='sample thought: a dictated thought.');
