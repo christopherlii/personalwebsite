@@ -144,8 +144,9 @@ on the new deployment because every session is bound to the current hash.
   Cloudflare Workers AI when it is created/edited; searches send the query.
   This stays within the selected Cloudflare backend but is still model
   processing, not on-device inference. See [Cloudflare data usage](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
-- Fonts are self-hosted Geist and EB Garamond from `google/fonts`, with their
-  OFL licenses alongside them. Square corners, solid fills, and visible rules
+- Typography matches the personal homepage: self-hosted Instrument Sans at
+  14px with 1.55 line height, #333 reading text, and the same #fafafa background.
+  The existing font subsets are reused with their OFL license. Square corners, solid fills, and visible rules
   separate menus and controls; the feed itself has no cards or boxed composer.
   Its line marks chronology, points align with timestamps, and the composer
   point darkens only while editing. There are no decorative effects or motion.

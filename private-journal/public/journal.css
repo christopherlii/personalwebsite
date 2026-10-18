@@ -1,31 +1,41 @@
 @font-face {
-  font-family:Geist;
-  src:url('/fonts/geist.ttf') format('truetype');
-  font-style:normal;
-  font-weight:100 900;
-  font-display:swap
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/fonts/instrument-sans-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family:'EB Garamond';
-  src:url('/fonts/eb-garamond.ttf') format('truetype');
-  font-style:normal;
-  font-weight:400 800;
-  font-display:swap
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(/fonts/instrument-sans-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 :root {
-  font-family:Geist,sans-serif;
-  color:#222;
-  background:#fff;
+  font-family:var(--font-body);
+  font-size:14px;
+  line-height:1.55;
+  color:var(--body);
+  background:var(--bg);
   font-synthesis:none;
   color-scheme:light;
-  --muted:#777;
-  --track:#e8e8e8
+  --font-body:'Instrument Sans','Helvetica Neue',Helvetica,sans-serif;
+  --bg:#fafafa;
+  --fg:#1a1a1a;
+  --body:#333;
+  --muted:#737373;
+  --track:#e5e5e5
 }
 * {
   box-sizing:border-box
 }
 body {
-  margin:0
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale
 }
 button,input,textarea {
   font:inherit;
@@ -37,7 +47,7 @@ button,a,input,textarea {
 }
 button {
   cursor:pointer;
-  background:#fff;
+  background:var(--bg);
   border:0;
   padding:6px 0;
   font-size:11px;
@@ -69,22 +79,17 @@ h1,h2 {
   font-size:15px;
   font-weight:500
 }
-.name {
-  font:27px/1.1 'EB Garamond',serif;
-  text-decoration:none;
-  letter-spacing:-.5px
-}
 .journal {
-  max-width:660px;
+  max-width:640px;
   margin:64px auto 80px;
-  padding:0 30px
+  padding:0 24px
 }
 .page-header {
   display:flex;
   align-items:center;
-  justify-content:space-between;
+  justify-content:flex-end;
   gap:30px;
-  margin-bottom:55px
+  margin-bottom:32px
 }
 .utilities {
   display:flex;
@@ -99,7 +104,7 @@ h1,h2 {
   position:relative
 }
 .utilities nav button {
-  color:#222
+  color:var(--fg)
 }
 .search {
   display:flex;
@@ -112,8 +117,8 @@ h1,h2 {
   min-width:0;
   padding:5px 0;
   border:0;
-  background:#fff;
-  font:18px/1.5 'EB Garamond',serif
+  background:var(--bg);
+  font:14px/1.55 var(--font-body)
 }
 .search input::-webkit-search-cancel-button {
   display:none
@@ -158,7 +163,7 @@ h1,h2 {
   background:#d4d4d4
 }
 .composer-section {
-  padding-bottom:42px
+  padding-bottom:32px
 }
 .composer-section:focus-within::before {
   background:#222
@@ -172,11 +177,11 @@ h1,h2 {
 }
 textarea {
   resize:vertical;
-  background:#fff;
+  background:var(--bg);
   width:100%;
   padding:0;
   border:0;
-  font:23px/1.5 'EB Garamond',serif;
+  font:14px/1.55 var(--font-body);
   max-height:50svh
 }
 textarea::placeholder {
@@ -185,7 +190,7 @@ textarea::placeholder {
 #body {
   display:block;
   resize:none;
-  min-height:35px;
+  min-height:22px;
   max-height:45svh;
   overflow-y:auto;
   outline:none;
@@ -229,7 +234,7 @@ textarea::placeholder {
   font-size:10px
 }
 .thought {
-  padding-bottom:38px;
+  padding-bottom:28px;
   overflow-wrap:anywhere
 }
 .thought-header {
@@ -251,7 +256,7 @@ textarea::placeholder {
   line-height:1.5
 }
 .thought-body {
-  font:23px/1.5 'EB Garamond',serif;
+  font:14px/1.55 var(--font-body);
   white-space:pre-wrap;
   overflow-wrap:anywhere
 }
@@ -264,11 +269,12 @@ textarea::placeholder {
   overflow:hidden
 }
 .thought-body a {
+  color:#0b243e;
   text-decoration-thickness:1px;
   text-underline-offset:3px
 }
 .thought-body mark {
-  color:#222;
+  color:var(--fg);
   background:#eee
 }
 .entry-footer {
@@ -312,7 +318,7 @@ summary::-webkit-details-marker {
   right:0;
   top:100%;
   z-index:3;
-  background:#fff;
+  background:var(--bg);
   border:1px solid var(--track);
   padding:7px 15px;
   width:160px;
@@ -362,7 +368,7 @@ summary::-webkit-details-marker {
   padding:0 24px
 }
 .login h1 {
-  margin:50px 0 28px
+  margin:0 0 28px
 }
 .login label {
   display:block;
@@ -371,7 +377,7 @@ summary::-webkit-details-marker {
 }
 .login input {
   border:1px solid var(--track);
-  background:#fff;
+  background:var(--bg);
   width:100%;
   padding:10px 12px;
   font-size:16px
@@ -384,7 +390,7 @@ summary::-webkit-details-marker {
   min-width:82px
 }
 .solid:disabled {
-  background:#fff;
+  background:var(--bg);
   border-color:var(--track);
   color:var(--muted)
 }
@@ -409,8 +415,8 @@ summary::-webkit-details-marker {
   color:var(--muted)
 }
 dialog {
-  background:#fff;
-  color:#222;
+  background:var(--bg);
+  color:var(--fg);
   border:1px solid #222;
   padding:26px 30px;
   max-width:560px;
@@ -418,7 +424,7 @@ dialog {
   max-height:90svh
 }
 dialog::backdrop {
-  background:#fff
+  background:var(--bg)
 }
 dialog header {
   display:flex;
@@ -475,16 +481,10 @@ dialog .public-actions {
     padding:0 26px 0 24px
   }
   .page-header {
-    margin-bottom:42px
-  }
-  .name {
-    font-size:25px
+    margin-bottom:32px
   }
   .utilities {
     gap:22px
-  }
-  .thought-body,#body {
-    font-size:22px
   }
   .composer-section,.thought {
     padding-left:22px
@@ -496,7 +496,7 @@ dialog .public-actions {
     padding-left:22px
   }
   .thought {
-    padding-bottom:32px
+    padding-bottom:28px
   }
   dialog {
     padding:24px

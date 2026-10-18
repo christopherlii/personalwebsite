@@ -93,7 +93,7 @@ try {
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   ids.length = 0;
   const samples = [
-    'sample thought: somewhere to leave an idea before it needs to become a post.\n\na longer thought can stay in the timeline without taking over it. open it when you want to read the rest, then fold it back into the feed.',
+    'sample thought: somewhere to leave an idea before it needs to become a post.\n\na longer thought can stay in the timeline without taking over it. open it when you want to read the rest, then fold it back into the feed. the rest of this sample stays out of the way until it is opened. short thoughts keep their full text, while longer ones leave room for the next entry.',
     'sample thought: what did i want to remember about that book?',
     'sample reply: coming back to this with a little more context.'
   ];
@@ -109,7 +109,7 @@ try {
   await page.screenshot({ path: `${artifacts}/mobile.png`, fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile has no horizontal overflow');
   const fontStatus = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].map(font => ({ family: font.family, status: font.status })); });
-  assert.ok(fontStatus.every(font => font.status === 'loaded'), 'both fonts load');
+  assert.ok(fontStatus.some(font => font.family.includes('Instrument Sans') && font.status === 'loaded'), 'homepage body font loads');
 
   // A second tab changes the draft: the first must preserve its own text.
   const oldVersion = (await api('draft')).data.version;
