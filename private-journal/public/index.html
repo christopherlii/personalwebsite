@@ -44,10 +44,10 @@
         </div>
         <div id="composer-editor"></div>
         <textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
-        <div class="dictation-controls"><button type="button" id="photo-composer" class="add-photo">photo</button><button id="dictate-composer" class="dictate-toggle" type="button" aria-pressed="false" aria-describedby="dictation-composer-status" title="Uses your browser’s speech service">dictate</button><span id="dictation-composer-status" role="status"></span></div>
+        <div class="dictation-controls"><button type="button" id="photo-composer" class="add-photo tool-button">photo</button><button id="dictate-composer" class="dictate-toggle tool-button" type="button" aria-pressed="false" aria-describedby="dictation-composer-status" title="Press stop to transcribe. Audio is processed by Cloudflare and is not saved in the journal.">dictate</button><span id="dictation-composer-status" role="status"></span></div>
         <div class="compose-actions" id="compose-actions" hidden>
           <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
-          <div class="compose-buttons"><button type="button" id="add-title">add title</button><button type="button" id="clear-input" hidden>clear</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
+          <div class="compose-buttons"><button type="button" id="add-title">add title</button><button class="post" type="submit" id="post" disabled>post ↗</button></div>
         </div>
       </form>
     </section>
@@ -66,7 +66,6 @@
     <header class="reader-toolbar">
       <div class="reader-context"><a id="reader-back" href="#" aria-label="back to timeline">back</a><span id="reader-status" class="entry-state"></span></div>
       <div class="reader-actions">
-        <button type="button" id="dictate-reader" class="dictate-toggle" aria-pressed="false" title="Uses your browser’s speech service" hidden>dictate</button>
         <button type="button" id="reader-cancel" hidden>cancel</button>
         <button type="submit" form="edit-form" id="reader-save" hidden>save</button>
         <button type="button" id="reader-edit">edit</button>
@@ -82,7 +81,7 @@
     <form id="edit-form" hidden>
       <label for="edit-thought-title" class="sr-only">title (optional)</label>
       <input id="edit-thought-title" class="title-input" placeholder="title (optional)" maxlength="160" autocomplete="off">
-      <div class="photo-tools"><button type="button" id="photo-reader" class="add-photo">photo</button></div>
+      <div class="photo-tools dictation-controls"><button type="button" id="photo-reader" class="add-photo tool-button">photo</button><button type="button" id="dictate-reader" class="dictate-toggle tool-button" aria-pressed="false" title="Press stop to transcribe. Audio is processed by Cloudflare and is not saved in the journal." hidden>dictate</button><span id="dictation-reader-status" role="status"></span></div>
       <div id="live-editor"></div>
       <textarea id="edit-body" hidden aria-hidden="true" tabindex="-1"></textarea>
     </form>

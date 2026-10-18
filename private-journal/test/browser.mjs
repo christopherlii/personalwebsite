@@ -34,7 +34,7 @@ const fillThought = async value => {
   await page.waitForFunction(value => document.querySelector('#edit-body').value === value, value);
 };
 const blankDraft = async () => {
-  await page.waitForFunction(() => document.querySelector('#draft-status').textContent === '');
+  await page.waitForFunction(async () => {const draft=await(await fetch('/api/draft')).json();return draft.body===''&&draft.title==='';});
   const { status, data } = await api('draft');
   assert.equal(status, 200); assert.equal(data.body, ''); assert.equal(data.title, '');
 };
@@ -43,6 +43,10 @@ const fillComposer = async value => {
   await editor.click(); await editor.press('ControlOrMeta+a');
   if (value) await page.keyboard.insertText(value); else await editor.press('Backspace');
   await page.waitForFunction(value => document.querySelector('#body').value === value, value);
+};
+const clearComposer = async () => {
+  const persisted = page.waitForResponse(response => response.url().endsWith('/api/draft') && response.request().method() === 'PUT' && response.ok() && response.request().postDataJSON().body === '');
+  await fillComposer(''); await persisted;
 };
 const idle = () => page.waitForFunction(() => document.querySelector('#feed').getAttribute('aria-busy') === 'false' && document.querySelector('#feed-status').textContent !== 'loading…');
 const settled = () => page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
@@ -70,7 +74,7 @@ try {
   await fillComposer(first);
   await page.locator('#add-title').click();
   await page.locator('#title').fill('a day of building');
-  await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
+  await page.waitForFunction(async () => document.querySelector('#composer').dataset.draftState==='saved' && (await (await fetch('/api/draft')).json()).body === document.querySelector('#body').value);
   await page.reload();
   await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#body').inputValue(), first, 'draft survives reload');
@@ -136,7 +140,7 @@ try {
   assert.equal(previewEdgeCases.unsafe, 0, 'feed previews retain the safe Markdown rules');
   await fillComposer('cafe');
   await page.waitForFunction(() => document.querySelector('#view-title').classList.contains('sr-only') && document.querySelector('mark')?.textContent === 'café');
-  await page.locator('#clear-input').click();
+  await clearComposer();
   await idle(); await blankDraft();
 
   await openReader(article);
@@ -373,7 +377,7 @@ try {
   await fillComposer('sample thought: i remember ideas better when i leave myself a few words about why they mattered.');
   await page.locator('#add-title').click();
   await page.locator('#title').fill('leaving a little context');
-  await page.waitForFunction(() => document.querySelector('#draft-status').textContent === 'draft saved');
+  await page.waitForFunction(async () => document.querySelector('#composer').dataset.draftState==='saved' && (await (await fetch('/api/draft')).json()).body === document.querySelector('#body').value);
   await idle();
   await page.screenshot({ path: `${artifacts}/composing-desktop.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -402,7 +406,7 @@ try {
   await page.screenshot({ path: `${artifacts}/related-mobile.png`, fullPage: true });
   assert.equal(await page.locator('#body').inputValue(), 'remember a book');
   assert.equal((await api('export')).data.entries.length, samples.length, 'typing/searching creates no timeline entry');
-  await page.locator('#clear-input').click();
+  await clearComposer();
   await page.waitForFunction(() => document.querySelectorAll('.thought').length === 3 && document.querySelector('#compose-actions').hidden);
   await blankDraft();
   assert.equal(await page.locator('#composer-section').evaluate(element => element.closest('.stream') === null), true, 'composer is separate from the timeline');

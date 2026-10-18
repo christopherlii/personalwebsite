@@ -1,58 +1,39 @@
-import { test } from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import { createDictation } from '../public/dictation.js';
-class Recognition {
-  constructor() { Recognition.latest = this; }
-  start() { this.onstart?.(); }
-  stop() { this.stopped = true; }
-  abort() { this.aborted = true; }
-  result(text, index = 0, final = true) {
-    const result = Object.assign([{ transcript: text }], { isFinal: final });
-    this.onresult?.({ resultIndex: index, results: [...Array(index), result] });
-  }
+import {createDictation} from '../public/dictation.js';
+class Recorder{
+ static isTypeSupported(type){return type.startsWith('audio/webm');}
+ constructor(){Recorder.latest=this;this.state='inactive';this.mimeType='audio/webm;codecs=opus';}
+ start(){this.state='recording';}
+ stop(){this.state='inactive';queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(['recording'],{type:this.mimeType})});this.onstop?.();});}
 }
-function setup(options = {}) {
-  const states = [], messages = [], inserted = [];
-  const controller = createDictation({ Recognition, language:'en-US', onState:(...value)=>states.push(value), onMessage:(...value)=>messages.push(value), ...options });
-  const editor = { focus() {}, insertText(text) { inserted.push(text); return true; } };
-  return { controller, editor, states, messages, inserted };
+function setup(extra={}){
+ const states=[],messages=[],inserted=[],track={stopped:false,stop(){this.stopped=true;}},calls=[];
+ const controller=createDictation({Recorder,getMedia:async()=>({getTracks:()=>[track]}),transcribe:async(audio,signal)=>{calls.push({audio,signal});return{text:'spoken words'};},onState:(...v)=>states.push(v),onMessage:(...v)=>messages.push(v),...extra});
+ const editor={focus(){},insertText(text){inserted.push(text);return true;}};
+ return{controller,editor,states,messages,inserted,track,calls};
 }
-test('dictation starts only on request, inserts final phrases once, and flushes on stop', async () => {
-  const { controller, editor, states, inserted } = setup();
-  assert.equal(controller.owner, null);
-  controller.toggle('composer', editor);
-  const recognition = Recognition.latest;
-  assert.equal(recognition.lang, 'en-US');
-  recognition.result('draft words', 0, false); assert.deepEqual(inserted, []);
-  recognition.result('some words'); recognition.result('some words');
-  assert.deepEqual(inserted, ['some words']);
-  const done = controller.stop();
-  assert.equal(recognition.stopped, true);
-  recognition.result('the last phrase', 1); recognition.onend(); await done;
-  assert.deepEqual(inserted, ['some words', 'the last phrase']);
-  assert.deepEqual(states.at(-1), ['composer','idle']);
+test('dictation captures only on request, releases the mic, and waits for the final transcript',async()=>{
+ const s=setup();assert.equal(s.controller.owner,null);assert.equal(s.calls.length,0);
+ await s.controller.toggle('composer',s.editor);assert.equal(s.controller.phase,'listening');assert.deepEqual(s.inserted,[]);
+ const done=s.controller.stop();assert.equal(s.controller.phase,'transcribing');assert.equal(await done,true);
+ assert.deepEqual(s.inserted,['spoken words']);assert.equal(s.calls[0].audio.type,'audio/webm;codecs=opus');assert.equal(s.track.stopped,true);assert.equal(s.controller.owner,null);
 });
-test('cancel and switching editors reject late speech callbacks', () => {
-  const { controller, editor, inserted } = setup();
-  controller.toggle('composer', editor);
-  const previous = Recognition.latest, late = previous.onresult;
-  controller.toggle('reader', editor);
-  assert.equal(previous.aborted, true);
-  late({ resultIndex:0, results:[Object.assign([{transcript:'wrong note'}],{isFinal:true})] });
-  assert.deepEqual(inserted, []); assert.equal(controller.owner,'reader');
-  controller.cancel(); assert.equal(controller.owner,null);
+test('cancel and late microphone or transcription results never change text',async()=>{
+ let media;const s=setup({getMedia:()=>new Promise(resolve=>media=resolve)});
+ const pending=s.controller.toggle('composer',s.editor);s.controller.cancel();media({getTracks:()=>[s.track]});await pending;assert.equal(s.track.stopped,true);assert.deepEqual(s.inserted,[]);
+ let transcript;const t=setup({transcribe:()=>new Promise(resolve=>transcript=resolve)});await t.controller.toggle('reader',t.editor);const done=t.controller.stop();await new Promise(resolve=>setImmediate(resolve));t.controller.cancel();transcript({text:'late words'});assert.equal(await done,false);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(t.inserted,[]);
 });
-test('permission errors and unsupported browsers preserve existing text', () => {
-  const { controller, editor, messages, inserted } = setup();
-  controller.toggle('composer', editor);
-  Recognition.latest.onerror({error:'not-allowed'});
-  assert.match(messages.at(-1)[1], /Microphone access was denied/);
-  assert.equal(controller.owner,null); assert.deepEqual(inserted, []);
-  const unsupported=setup({Recognition:null}); unsupported.controller.toggle('composer',unsupported.editor);
-  assert.match(unsupported.messages.at(-1)[1], /isn’t supported/);
+test('permission errors, unsupported recording, and provider failure preserve text',async()=>{
+ const s=setup({getMedia:async()=>{throw new DOMException('denied','NotAllowedError');}});await s.controller.toggle('composer',s.editor);assert.match(s.messages.at(-1)[1],/Microphone access was denied/);assert.equal(s.controller.owner,null);
+ const u=setup({Recorder:null});await u.controller.toggle('composer',u.editor);assert.match(u.messages.at(-1)[1],/unavailable/);
+ const t=setup({transcribe:async()=>{throw new Error('Could not transcribe.');}});await t.controller.toggle('reader',t.editor);assert.equal(await t.controller.stop(),false);assert.deepEqual(t.inserted,[]);assert.equal(t.track.stopped,true);
 });
-test('an editor limit stops dictation without inserting an overflow', () => {
-  const {controller,states}=setup(); controller.toggle('reader',{focus(){},insertText(){return false;}});
-  const recognition=Recognition.latest; recognition.result('too much');
-  assert.equal(recognition.aborted,true); assert.deepEqual(states.at(-1),['reader','idle']);
+test('empty speech, editor limits, and recording limits stop safely',async()=>{
+ const s=setup({transcribe:async()=>({text:''})});await s.controller.toggle('composer',s.editor);assert.equal(await s.controller.stop(),false);assert.match(s.messages.at(-1)[1],/No speech/);
+ const t=setup();await t.controller.toggle('reader',{focus(){},insertText(){return false;}});assert.equal(await t.controller.stop(),false);
+ const u=setup();await u.controller.toggle('composer',u.editor);Recorder.latest.ondataavailable({data:new Blob([new Uint8Array(2000001)])});assert.equal(u.controller.owner,null);assert.equal(u.track.stopped,true);assert.equal(u.calls.length,0);
+});
+test('recordings stop and transcribe at the time limit',async()=>{
+ const s=setup({maximumMilliseconds:10});await s.controller.toggle('composer',s.editor);await new Promise(resolve=>setTimeout(resolve,30));assert.deepEqual(s.inserted,['spoken words']);assert.equal(s.track.stopped,true);
 });

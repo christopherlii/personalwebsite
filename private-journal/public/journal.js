@@ -22,18 +22,18 @@ const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEdito
 $('#photo-composer').addEventListener('click',()=>photos.choose('composer'));
 $('#photo-reader').addEventListener('click',()=>photos.choose('reader'));
 const dictation = createDictation({
+  transcribe: (audio,signal) => api('transcribe', {method:'POST',body:audio,headers:{'Content-Type':audio.type},signal}),
   onState(owner, value) {
-    const button = $(`#dictate-${owner}`), active = value !== 'idle';
-    button.textContent = active ? 'stop' : 'dictate';
-    button.setAttribute('aria-pressed', String(active));
-    button.setAttribute('aria-label', active ? 'stop dictation' : 'start dictation');
-    button.disabled = value === 'stopping';
-    if (owner === 'composer') {
-      if (active) $('#dictation-composer-status').textContent = value === 'starting' ? 'allow microphone access' : value === 'stopping' ? 'finishing…' : 'listening…';
-      else if (['allow microphone access', 'finishing…', 'listening…'].includes($('#dictation-composer-status').textContent)) $('#dictation-composer-status').textContent = '';
-    }
+    const button = $(`#dictate-${owner}`), recording = value === 'starting' || value === 'listening';
+    button.textContent = recording ? 'stop' : 'dictate';
+    button.setAttribute('aria-pressed', String(recording));
+    button.setAttribute('aria-label', recording ? 'stop dictation and transcribe' : value === 'transcribing' ? 'transcribing recording' : 'start dictation');
+    button.disabled = value === 'transcribing';
+    const status = $(`#dictation-${owner}-status`);
+    if (value !== 'idle') status.textContent = value === 'starting' ? 'allow microphone access' : value === 'listening' ? 'listening…' : 'transcribing…';
+    else if (['allow microphone access','listening…','transcribing…'].includes(status.textContent)) status.textContent = '';
   },
-  onMessage(owner, message) { $(owner === 'composer' ? '#dictation-composer-status' : '#reader-error').textContent = message; }
+  onMessage(owner, message) { $(`#dictation-${owner}-status`).textContent = message; }
 });
 $('#dictate-composer').addEventListener('click', () => dictation.toggle('composer', composerEditor));
 $('#dictate-reader').addEventListener('click', () => dictation.toggle('reader', readerEditor));
@@ -49,7 +49,11 @@ async function findThoughts(query, signal, exclude = '') {
 function clearReaderEditor() { readerEditor?.destroy(); readerEditor = null; $('#live-editor').replaceChildren(); }
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
-function draftStatus(message) { $('#draft-status').textContent = message; }
+function draftStatus(message) {
+  const routine = {'saving…':'saving',unsaved:'unsaved','draft saved':'saved','':'empty'};
+  $('#composer').dataset.draftState = routine[message] || 'error';
+  $('#draft-status').textContent = Object.hasOwn(routine,message) ? '' : message;
+}
 function closeMenus(except = null) {
   for (const trigger of document.querySelectorAll('[data-menu][aria-expanded=true]')) {
     if (trigger === except) continue;
@@ -125,11 +129,9 @@ function updateComposer() {
   composerEditor?.setReadOnly(state.posting);
   $('#post').disabled = !$('#body').value.trim() || state.posting;
   $('#compose-actions').hidden = !$('#body').value && !$('#title').value && !state.conflict && $('#retry-draft').hidden;
-  $('#clear-input').hidden = !$('#body').value && !$('#title').value;
   $('#add-title').hidden = !$('#composer-title').hidden;
   $('#add-title').disabled = state.posting;
-  $('#clear-input').disabled = state.posting;
-  $('#dictate-composer').disabled = state.posting;
+  $('#dictate-composer').disabled = state.posting || dictation.phase === 'transcribing';
   $('#photo-composer').disabled=state.posting||photos.busy;
 }
 
@@ -238,6 +240,7 @@ function readerControls() {
   $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
   $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
   $('#dictate-reader').hidden = !editing;
+  $('#dictate-reader').disabled = busy || (dictation.owner === 'reader' && dictation.phase === 'transcribing');
   $('#edit-form').hidden = !editing;
   $('#reader-content').hidden = editing;
   readingView.editing(editing);
@@ -267,7 +270,7 @@ function stopEditing() {
 }
 async function saveReader() {
   if(!await photos.finish())throw new Error('Photo upload failed. Try adding the photo again.');
-  if (dictation.owner === 'reader') await dictation.stop();
+  if (dictation.owner === 'reader' && !await dictation.stop()) throw new Error('Dictation was not saved. Try again.');
   if (state.readerSaving) return state.readerSaving;
   if (!state.readerDirty) { stopEditing(); return; }
   const title = $('#edit-thought-title').value, body = $('#edit-body').value;
@@ -283,7 +286,7 @@ async function saveReader() {
 async function showRoute() {
   if (!state.authenticated) return;
   if(!await photos.finish()){history.replaceState(state.readerHistory||null,'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
-  await dictation.stop();
+  if(!await dictation.stop()){history.replaceState(state.readerHistory||null,'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
   const id = readerId();
@@ -563,7 +566,7 @@ $('#composer').addEventListener('keydown', event => {
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
   if(!await photos.finish())return;
-  if (dictation.owner === 'composer') await dictation.stop();
+  if (dictation.owner === 'composer' && !await dictation.stop()) return;
   if (state.posting || !$('#body').value.trim()) return;
   state.posting = true; $('#body').disabled = true; $('#title').disabled = true;
   clearTimeout(state.searchTimer); state.controller?.abort(); state.generation++;
@@ -582,11 +585,6 @@ $('#composer').addEventListener('submit', async event => {
     await setView('all');
   } catch (error) { notice(error.message); }
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
-});
-$('#clear-input').addEventListener('click', () => {
-  photos.cancel();
-  if (dictation.owner === 'composer') dictation.cancel();
-  $('#body').value = ''; $('#title').value = ''; $('#composer-title').hidden = true; changedDraft(); composerEditor?.focus();
 });
 $('#more').addEventListener('click', () => { if ($('#feed').getAttribute('aria-busy') !== 'true' && state.query === state.renderedQuery && state.view === state.renderedView) loadFeed(state.entries.size > 0 && state.cursor !== null); });
 $('#toggle-timeline').addEventListener('click', () => {
@@ -774,7 +772,7 @@ $('#logout').addEventListener('click', async () => {
   if (state.posting) return;
   try {
     if(!await photos.finish())return;
-    await dictation.stop();
+    if(!await dictation.stop())return;
     await saveDraft();
     if (state.publicDirty) await savePublication();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
@@ -791,9 +789,9 @@ $('#logout').addEventListener('click', async () => {
   } catch (error) { notice(error.message); }
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { dictation.cancel(); if (state.dirty) saveDraft().catch(() => {}); } });
+window.addEventListener('pagehide', () => dictation.cancel());
 window.addEventListener('beforeunload', event => {
-  dictation.cancel();
-  if (photos.busy || state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }
+  if (dictation.owner || photos.busy || state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }
 });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 

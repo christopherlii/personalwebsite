@@ -6,6 +6,7 @@ import { ReadingError, readingApi, relatedToThought } from './reading.mjs';
 import { indexTags, repairTagIndex } from './tags.mjs';
 import { normalizeTag } from './public/tags.js';
 import { photoApi, PhotoError } from './photos.mjs';
+import { TranscriptionError, transcribe } from './transcription.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -111,6 +112,12 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  if(path==='/api/transcribe'){
+    if(request.method!=='POST')fail(405,'Method not allowed.');
+    await limit(env,'dictation:minute',20,60000);
+    await limit(env,'dictation:hour',300,3600000);
+    return transcribe(request,env);
+  }
   if(path.startsWith('/api/photos/')&&request.method==='PUT')await limit(env,'photos:global',30,60*1000);
   const photo=await photoApi(request,env,path);if(photo)return photo;
   if (path === '/api/reading' && request.method === 'POST') await limit(env, 'reading:global', 30, 60 * 1000);
@@ -274,7 +281,7 @@ export default {
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof TranscriptionError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     // CodeMirror mounts its base styles at runtime. Authorize only those

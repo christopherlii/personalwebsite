@@ -201,20 +201,38 @@ only publish/update does. Unpublish removes public access and retains the draft.
 Copy/download remain available for Substack, X, or Markdown backups without
 posting to those services. Existing media and reading/favorites stay in Git.
 
-Dictation uses the browser's `SpeechRecognition` / `webkitSpeechRecognition`
-service from the small dictate control in the composer or full-page editor.
-It starts only on an explicit click and requires microphone permission. Each
-final recognized phrase enters the current selection as an undoable edit and
-follows the existing draft/save behavior. Stop flushes the last returned phrase
-before posting, saving, or changing the reading route. Cancel, locking,
-session expiry, and hiding the tab end capture; it never restarts automatically.
-The journal stores no audio and adds no transcription endpoint or provider key.
-Browser speech support and service availability vary; errors retain existing
-text. The browser may send audio to its vendor's speech service, so this is not
-an on-device or Cloudflare-only audio-processing guarantee. See the
-[browser speech-recognition documentation](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition).
-Automated checks inject recognition events; they verify insertion and lifecycle,
-not real microphone permission or recognition accuracy on a user's browser.
+Dictation uses `getUserMedia` and `MediaRecorder`, so it does not depend on the
+browser vendor's `SpeechRecognition` service. The bordered photo and dictate
+buttons are available in both writing fields. Capture starts only on an explicit
+click and requires microphone permission. Press stop to transcribe; post, save,
+and back also stop capture and wait for the final transcript. Each transcript
+is one undoable editor insertion. Existing typing, autosave, and conflict
+protections remain in place. Routine draft success/saving labels and the clear
+control are removed; draft failures and retry remain visible.
+
+The authenticated, CSRF-protected `/api/transcribe` endpoint sends bounded audio
+to Cloudflare-hosted `@cf/openai/whisper-large-v3-turbo` using the existing AI
+binding. There is no new provider key or recording storage. The browser keeps
+recordings in memory only, stops at two minutes or 2 MB, releases microphone
+tracks before transcription, and accepts supported WebM/Opus, MP4, or Ogg
+recording. The endpoint enforces an actual 2 MB stream limit, checks container
+signatures, accepts WAV for fixtures, and bounds output text. Voice activity
+filtering reduces silence hallucinations. Rate limits are 20 requests/minute and
+300/hour. No audio, transcripts, or provider error details are logged. Cancel,
+hiding the tab, locking, and session expiry abort pending results. Permission,
+provider, empty-speech, timeout, and editor-limit failures preserve typed text;
+a failed transcription stops the action that was waiting for it. Starting
+capture and awaiting transcription have deadlines. A late microphone grant
+is immediately released after cancellation.
+
+`npm run test:dictation` exercises real MediaRecorder with a synthetic microphone,
+without `SpeechRecognition`, and controlled transcription responses. It checks
+stop/post/save/back, track cleanup, autosave, undo, provider errors, late-result
+cancellation, reserved control geometry, and a 320px layout. A separate local
+Workers AI binding check transcribes generated speech through the real model.
+No physical microphone or private writing is used by automated checks.
+See the [model documentation](https://developers.cloudflare.com/workers-ai/models/whisper-large-v3-turbo/)
+and [MediaRecorder documentation](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder).
 
 ## Local preview
 
@@ -273,10 +291,10 @@ the local preview (`JOURNAL_TEST_URL` may select its port). API tests additional
 cover private access, export, rejected destinations and redirects, bounded
 metadata, and cached semantic retrieval without provider calls during lookup.
 Run `npm run test:dictation` for composer/reader insertion, autosave, undo/redo,
-final phrases on stop/post/save/back, microphone-denial handling, stale-result
-isolation, and a 320px layout. Recognition events are injected; the test never
-opens a microphone. A real permission and speech-service check still needs a
-supported browser on the user's device.
+final transcripts on stop/post/save/back, provider-failure handling, stale-result
+isolation, track cleanup, and a 320px layout. MediaRecorder uses Chromium's
+synthetic microphone; physical microphone permission still depends on the
+user's browser and system settings.
 
 ## Deploy after connecting a Cloudflare account
 

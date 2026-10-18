@@ -1,74 +1,73 @@
-// Explicit clicks start the browser's speech service. Only its transcript
-// enters the journal; audio may be processed by the browser vendor remotely.
-export function createDictation({ onState, onMessage, Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition, language = globalThis.navigator?.language || 'en-US' }) {
-  let session = null;
-  function finish(current) {
-    if (session !== current) return;
-    clearTimeout(current.timer); session = null;
-    current.recognition.onstart = current.recognition.onresult = current.recognition.onerror = current.recognition.onend = null;
-    onState(current.owner, 'idle'); current.resolve?.();
+// Recordings remain in memory; only their transcript enters the editor.
+export function createDictation({onState,onMessage,transcribe,
+  getMedia=globalThis.navigator?.mediaDevices?.getUserMedia?.bind(globalThis.navigator.mediaDevices),
+  Recorder=globalThis.MediaRecorder,maximumMilliseconds=120000}){
+  let session=null;
+  function finish(current,success){
+    if(session!==current)return;
+    session=null;clearTimeout(current.timer);current.controller.abort();
+    if(current.recorder){
+      current.recorder.ondataavailable=current.recorder.onstop=current.recorder.onerror=null;
+      if(current.recorder.state!=='inactive')try{current.recorder.stop();}catch{}
+    }
+    current.stream?.getTracks().forEach(track=>track.stop());current.chunks=[];
+    onState(current.owner,'idle');current.resolve(success);
   }
-  function cancel() {
-    const current = session; if (!current) return;
-    finish(current);
-    try { current.recognition.abort(); } catch { /* Already ended. */ }
+  function fail(current,message){if(session===current){onMessage(current.owner,message);finish(current,false);}}
+  function cancel(){if(session)finish(session,false);}
+  async function convert(current){
+    if(session!==current)return;
+    clearTimeout(current.timer);current.phase='transcribing';onState(current.owner,'transcribing');
+    current.stream.getTracks().forEach(track=>track.stop());
+    const audio=new Blob(current.chunks,{type:current.recorder.mimeType||current.chunks[0]?.type});current.chunks=[];
+    if(!audio.size){fail(current,'No speech detected. Try again.');return;}
+    current.timer=setTimeout(()=>fail(current,'Transcription timed out. Try again.'),45000);
+    try{
+      const {text}=await transcribe(audio,current.controller.signal);
+      if(session!==current)return;
+      if(typeof text!=='string'||!text.trim()){fail(current,'No speech detected. Try again.');return;}
+      if(!current.editor.insertText(text.trim())){finish(current,false);return;}
+      finish(current,true);
+    }catch(error){if(session===current)fail(current,error.message||'Could not transcribe. Try again.');}
   }
-  function stop() {
-    const current = session; if (!current) return Promise.resolve();
-    if (current.done) return current.done;
-    current.done = new Promise(resolve => { current.resolve = resolve; });
-    onState(current.owner, 'stopping');
-    clearTimeout(current.timer);
-    current.timer = setTimeout(() => {
-      if (session !== current) return;
-      onMessage(current.owner, 'Dictation stopped before the last phrase was returned.'); cancel();
-    }, 5000);
-    try { current.recognition.stop(); } catch { cancel(); }
+  function stop(){
+    const current=session;if(!current)return Promise.resolve(true);
+    if(current.phase==='starting'){cancel();return Promise.resolve(true);}
+    if(current.phase==='listening'){
+      current.phase='transcribing';onState(current.owner,'transcribing');clearTimeout(current.timer);
+      // The final data event precedes onstop.
+      try{current.recorder.stop();}catch{fail(current,'Could not finish recording. Try again.');}
+    }
     return current.done;
   }
-  function start(owner, editor) {
-    cancel(); onMessage(owner, '');
-    if (!Recognition) { onMessage(owner, 'Dictation isn’t supported by this browser.'); return; }
-    if (!editor) return;
-    let recognition;
-    try { recognition = new Recognition(); }
-    catch { onMessage(owner, 'The speech service is unavailable in this browser.'); return; }
-    const current = { owner, recognition, seen: new Set() }; session = current;
-    recognition.lang = language; recognition.continuous = true; recognition.interimResults = false; recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
-      if (session !== current || current.done) return;
-      clearTimeout(current.timer); onState(owner, 'listening');
-    };
-    recognition.onresult = event => {
-      if (session !== current) return;
-      for (let index = event.resultIndex; index < event.results.length; index++) {
-        const result = event.results[index];
-        if (!result.isFinal || current.seen.has(index)) continue;
-        current.seen.add(index);
-        const text = result[0]?.transcript?.trim();
-        if (text && !editor.insertText(text)) { cancel(); return; }
-      }
-    };
-    recognition.onerror = event => {
-      if (session !== current) return;
-      const messages = {
-        'not-allowed': 'Microphone access was denied. Allow it in your browser, then try again.',
-        'service-not-allowed': 'Your browser has blocked its speech service.',
-        'audio-capture': 'No microphone is available.',
-        'no-speech': 'No speech detected. Try again.',
-        'network': 'The speech service is unavailable. Try again.',
-        'language-not-supported': 'Your browser’s speech service doesn’t support this language.'
+  async function start(owner,editor){
+    if(!editor)return;
+    onMessage(owner,'');
+    if(!Recorder||!getMedia){onMessage(owner,'Microphone recording is unavailable in this browser.');return;}
+    const current={owner,editor,phase:'starting',chunks:[],bytes:0,controller:new AbortController()};
+    current.done=new Promise(resolve=>current.resolve=resolve);session=current;onState(owner,'starting');
+    current.timer=setTimeout(()=>fail(current,'Microphone access timed out. Allow it in your browser and try again.'),30000);
+    try{
+      const stream=await getMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+      if(session!==current){stream.getTracks().forEach(track=>track.stop());return;}
+      current.stream=stream;clearTimeout(current.timer);
+      const mimeType=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(type=>Recorder.isTypeSupported(type));
+      current.recorder=new Recorder(stream,{...(mimeType?{mimeType}:{}),audioBitsPerSecond:64000});
+      current.recorder.ondataavailable=event=>{
+        if(session!==current||!event.data.size)return;
+        current.bytes+=event.data.size;
+        if(current.bytes>2000000){fail(current,'This recording is too long. Try a shorter thought.');return;}
+        current.chunks.push(event.data);
       };
-      if (event.error !== 'aborted') onMessage(owner, messages[event.error] || 'Dictation stopped. Try again.');
-      cancel();
-    };
-    recognition.onend = () => finish(current);
-    onState(owner, 'starting');
-    current.timer = setTimeout(() => { if (session === current) { onMessage(owner, 'Dictation could not start. Check your microphone permission.'); cancel(); } }, 30000);
-    try { recognition.start(); editor.focus(); }
-    catch { onMessage(owner, 'Dictation could not start. Check your microphone permission.'); cancel(); }
+      current.recorder.onstop=()=>{void convert(current);};
+      current.recorder.onerror=()=>fail(current,'The microphone stopped. Try again.');
+      current.recorder.start(1000);current.phase='listening';onState(owner,'listening');editor.focus();
+      current.timer=setTimeout(()=>{void stop();},maximumMilliseconds);
+    }catch(error){
+      fail(current,error.name==='NotAllowedError'?'Microphone access was denied. Allow it in your browser, then try again.':error.name==='NotFoundError'?'No microphone is available.':'Could not start the microphone. Check its permission and try again.');
+    }
   }
-  return { get owner() { return session?.owner || null; }, stop, cancel,
-    toggle(owner, editor) { return session?.owner === owner ? stop() : start(owner, editor); }
+  return{get owner(){return session?.owner||null;},get phase(){return session?.phase||'idle';},stop,cancel,
+    async toggle(owner,editor){if(session?.owner===owner)return stop();if(session&&!await stop())return;return start(owner,editor);}
   };
 }
