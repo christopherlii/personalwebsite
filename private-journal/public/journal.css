@@ -235,7 +235,7 @@ textarea::placeholder {
   font-size:12px
 }
 .thought {
-  padding-bottom:28px;
+  padding-bottom:48px;
   overflow-wrap:anywhere
 }
 .thought-header {
@@ -495,9 +495,6 @@ dialog .public-actions {
   }
   .feed-footer {
     padding-left:22px
-  }
-  .thought {
-    padding-bottom:28px
   }
   dialog {
     padding:24px
