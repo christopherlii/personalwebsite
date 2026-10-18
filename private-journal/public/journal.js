@@ -546,6 +546,10 @@ $('#login-form').addEventListener('submit', async event => {
   catch (error) { $('#login-message').textContent = error.message; }
   finally { $('#unlock').disabled = false; }
 });
+// Without CSS masking the field falls back to a real password input, which
+// still never shows the password; new-password at least stops autofill.
+if (!CSS.supports('-webkit-text-security', 'disc')) { $('#password').type = 'password'; $('#password').autocomplete = 'new-password'; }
+for (const type of ['copy', 'cut']) $('#password').addEventListener(type, event => event.preventDefault());
 $('#body').addEventListener('input', changedDraft);
 $('#title').addEventListener('input', changedDraft);
 $('#retry-draft').addEventListener('click', () => saveDraft().catch(() => {}));
