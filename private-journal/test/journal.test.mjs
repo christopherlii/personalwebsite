@@ -49,6 +49,28 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('thought status reflects live publication snapshots across reads, search, and bookmark changes', async () => {
+  const c = client(); await c.login();
+  const input = thought('status marker');
+  const entry = (await c.call('/api/thoughts', 'POST', input)).data.entry;
+  assert.equal(entry.published_slug, null);
+  const path = `/api/thoughts/${entry.id}/publication`;
+  const saved = await c.call(path, 'PUT', { draft: publicDraft(), version: 0 });
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.published_slug, null, 'an unpublished draft is not published');
+  const live = await c.call(path + '/publish', 'POST', { version: saved.data.version });
+  assert.equal((await c.call('/api/thoughts')).data.entries[0].published_slug, 'a-public-note');
+  assert.equal((await c.call('/api/thoughts?q=status')).data.entries[0].published_slug, 'a-public-note');
+  assert.equal((await c.call('/api/search', 'POST', { query: 'status', saved: false, semantic: false })).data.entries[0].published_slug, 'a-public-note');
+  const bookmarked = (await c.call(`/api/thoughts/${entry.id}`, 'PATCH', { bookmarked: true })).data.entry;
+  assert.equal(bookmarked.bookmarked, 1); assert.equal(bookmarked.published_slug, 'a-public-note');
+  assert.equal((await c.call('/api/thoughts', 'POST', input)).data.entry.published_slug, 'a-public-note', 'idempotent posting retains publication state');
+  const revised = await c.call(path, 'PUT', { draft: publicDraft('a private revision'), version: live.data.version });
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.published_slug, 'a-public-note', 'editing a draft keeps the live snapshot published');
+  await c.call(path + '/unpublish', 'POST', { version: revised.data.version });
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.published_slug, null);
+  assert.equal((await c.call('/api/thoughts?saved=1')).data.entries[0].bookmarked, 1, 'unpublishing does not change the bookmark');
+});
+
 test('editor styles use a fresh shell nonce while scripts and arbitrary inline styles stay restricted', async () => {
   const c = client();
   c.env.ASSETS = { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '1', ETag: 'original' } }) };
