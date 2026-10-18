@@ -8,8 +8,8 @@ if (process.stdin.isTTY) {
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 const password = input.replace(/\r?\n$/, '');
-if (password.length < 16 || password.length > 1024) {
-  process.stderr.write('Use a password between 16 and 1024 characters.\n');
+if (password.length < 8 || password.length > 1024) {
+  process.stderr.write('Use a password between 8 and 1024 characters.\n');
   process.exit(1);
 }
 const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
