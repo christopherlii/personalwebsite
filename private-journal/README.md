@@ -1,13 +1,15 @@
 # Private journal
 
-A single-owner journal with a chronological timeline, bookmarks, draft
-autosave, editing, deletion, export, and keyword plus semantic search. The feed
+A single-owner journal with a chronological timeline, saved and liked thoughts,
+draft autosave, editing, deletion, export, and keyword plus semantic search. The feed
 has a borderless writing/search field above a faint timeline, and 280-character
 thought previews with an open link to a separate reading page. Optional titles sit above the
 body; dates sit to the left of the timeline on desktop and mobile.
-A muted heart identifies bookmarked thoughts beside the date area and in the
-writing page toolbar. A square green published tag sits beside the thought's
-title in the feed and reader and links to its live site snapshot. An untitled
+Square tags sit beside the thought's title in the feed and reader: green
+published (linking to its live site snapshot), yellow saved, and red liked; an
+untitled thought shows its tags on their own line. Save and like toggle
+independently from the feed's hover actions and the reading page toolbar, and
+the menu's saved view lists saved thoughts (stored as `bookmarked`). An untitled
 private note uses its published title for this heading; publishing requires a
 title. Draft saves do not imply publication; unpublish removes
 the label. Timeline, keyword search, semantic search, and individual reads
@@ -303,7 +305,7 @@ the local preview password using a hidden prompt. Run `npm run test:browser`.
 Browser tests refuse remote URLs and use only synthetic local entries. Use a
 clean local draft before running them. Screenshots go to ignored `test-results/`.
 An existing Chromium binary can be selected with `CHROMIUM_PATH`. These tests
-cover title/body autosave restoration, posting, bookmarks, accent-insensitive search,
+cover title/body autosave restoration, posting, save and like, accent-insensitive search,
 editing, safe rendering, separate public drafts, desktop/mobile layout,
 font loading, draft conflicts, and server-side session revocation. Shared-field
 checks cover retained results without a loading label, pause-triggered semantic requests, stale response cancellation,
@@ -447,7 +449,7 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   arrives; an empty result clears the feed without an empty-state label.
   Earlier requests are canceled and stale responses cannot replace
   newer results. Input, selection, and draft content stay separate from result
-  rendering. Clearing restores the timeline; switching bookmark views preserves
+  rendering. Clearing restores the timeline; switching saved views preserves
   what is being written. No typing/search request creates a timeline entry.
 - SQLite FTS5 ranks prefix matches, normalizes accents, and ignores common
   function words when specific terms are present. Search requests use a POST
@@ -496,8 +498,10 @@ Owner JSON export and per-draft Markdown download provide writing backups.
   allow credential-free CORS and use `no-store`. Private endpoints stay behind
   owner authentication and reject cross-origin writes. Unpublishing removes
   active public routes; readers may have retained earlier public copies.
-- JSON export includes all entries, timestamps, bookmarks, publications, and the
-  current draft. Export periodically to an owner-controlled private backup.
+- JSON export includes all entries, timestamps, saved and liked marks,
+  publications, and the current draft. There is no export button; while signed
+  in, open `/journal/api/export` to download it. Export periodically to an
+  owner-controlled private backup.
   Deleting an entry removes it from active search; provider backups may retain
   previous data under their own policies.
 - No Jev or OpenAI key is required. Semantic indexing sends each thought to

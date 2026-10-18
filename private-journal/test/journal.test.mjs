@@ -259,6 +259,23 @@ test('thought status reflects live publication snapshots across reads, search, a
   assert.equal((await c.call('/api/thoughts?saved=1')).data.entries[0].bookmarked, 1, 'unpublishing does not change the bookmark');
 });
 
+test('saved and liked toggle independently and survive reads, filters, and export', async () => {
+  const c = client(); await c.login();
+  const entry = (await c.call('/api/thoughts', 'POST', thought('marks marker'))).data.entry;
+  assert.equal(entry.liked, 0); assert.equal(entry.bookmarked, 0);
+  const liked = (await c.call(`/api/thoughts/${entry.id}`, 'PATCH', { liked: true })).data.entry;
+  assert.equal(liked.liked, 1); assert.equal(liked.bookmarked, 0, 'liking does not save');
+  const both = (await c.call(`/api/thoughts/${entry.id}`, 'PATCH', { bookmarked: true })).data.entry;
+  assert.equal(both.liked, 1, 'saving keeps the like'); assert.equal(both.bookmarked, 1);
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.liked, 1);
+  assert.equal((await c.call('/api/thoughts?saved=1')).data.entries[0].liked, 1);
+  assert.equal((await c.call('/api/search', 'POST', { query: 'marks', saved: false, semantic: false })).data.entries[0].liked, 1);
+  assert.equal((await c.call('/api/export')).data.entries[0].liked, 1);
+  const cleared = (await c.call(`/api/thoughts/${entry.id}`, 'PATCH', { liked: false, bookmarked: false })).data.entry;
+  assert.equal(cleared.liked, 0); assert.equal(cleared.bookmarked, 0);
+  for (const body of [{}, { liked: 'yes' }, { liked: true, bookmarked: 1 }, { pinned: true }]) assert.equal((await c.call(`/api/thoughts/${entry.id}`, 'PATCH', body)).status, 400);
+});
+
 test('editor styles use a fresh shell nonce while scripts and arbitrary inline styles stay restricted', async () => {
   const c = client();
   c.env.ASSETS = { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '1', ETag: 'original' } }) };

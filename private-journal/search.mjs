@@ -5,4 +5,4 @@ export function ftsQuery(query, matchAll = false) {
   return searchTerms(query).map(term => `"${term}"*`).join(matchAll ? ' AND ' : ' OR ');
 }
 
-export const THOUGHT_FIELDS = ['seq', 'id', 'title', 'body', 'bookmarked', 'created_at', 'updated_at', 'source_date'];
+export const THOUGHT_FIELDS = ['seq', 'id', 'title', 'body', 'bookmarked', 'liked', 'created_at', 'updated_at', 'source_date'];

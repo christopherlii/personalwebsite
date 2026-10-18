@@ -107,18 +107,29 @@ try {
   assert.equal(await page.locator('#reader-back').textContent(), 'back');
   await page.locator('#reader-back').click(); await page.locator('#app').waitFor({ state: 'visible' });
   assert.equal(await article.locator('.thought-body').textContent(), initialPreview, 'back returns to the unchanged preview');
-  await openReader(article); await readerMenu();
+  await openReader(article);
   await page.locator('#reader-bookmark').click();
   await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'true');
-  assert.equal(await page.locator('#reader-status [aria-label=bookmarked]').count(), 1, 'reading view shows the heart');
-  assert.equal(await article.locator('.entry-heart').count(), 1, 'feed also shows the heart');
-  await backToFeed(); await setView('saved');
-  await article.waitFor();
-  await openReader(article); await readerMenu(); await page.locator('#reader-bookmark').click();
-  await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'false');
-  assert.equal(await page.locator('#reader-status .entry-heart').count(), 0, 'removing the bookmark removes its indicator');
+  assert.equal(await page.locator('#reader-bookmark').textContent(), 'unsave');
+  assert.equal(await page.locator('#reader-content .thought-title .entry-saved').textContent(), 'saved', 'reading view shows the saved tag');
+  assert.equal(await article.locator('.thought-title .entry-saved').count(), 1, 'feed also shows the saved tag');
   await backToFeed();
-  await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'no bookmarks yet.');
+  await article.hover(); await article.locator('[data-action=liked]').click();
+  await article.locator('.thought-title .entry-liked').waitFor();
+  assert.equal(await article.locator('[data-action=liked]').textContent(), 'unlike', 'hover actions toggle the like in place');
+  await setView('saved');
+  await article.waitFor();
+  await openReader(article);
+  assert.equal(await page.locator('#reader-content .thought-title .entry-liked').count(), 1, 'reading view shows the liked tag');
+  await page.locator('#reader-bookmark').click();
+  await page.waitForFunction(() => document.querySelector('#reader-bookmark').getAttribute('aria-pressed') === 'false');
+  assert.equal(await page.locator('#reader-content .entry-saved').count(), 0, 'unsaving removes its tag');
+  await page.locator('#reader-like').click();
+  await page.waitForFunction(() => document.querySelector('#reader-like').getAttribute('aria-pressed') === 'false');
+  assert.equal(await page.locator('#reader-content .entry-liked').count(), 0, 'unliking removes its tag');
+  await backToFeed();
+  await page.waitForFunction(() => document.querySelector('#feed-status').textContent === 'nothing saved yet.');
+  assert.equal(await page.locator('#export').count(), 0, 'export is not offered in the menu');
   await setView('all'); await idle();
   const previewEdgeCases = await page.evaluate(async () => {
     const { markdownPreview } = await import('./markdown.js');
@@ -176,7 +187,6 @@ try {
   await page.locator('#publish-public').click();
   await page.waitForFunction(() => document.querySelector('#public-status').textContent === 'published');
   assert.equal(await page.locator('#reader-content .thought-title .entry-published').textContent(), 'published');
-  assert.equal(await page.locator('#reader-status .entry-published').count(), 0, 'publication status sits beside the title');
   assert.equal(await article.locator('.thought-title .entry-published').count(), 1);
   assert.equal(await article.locator('.entry-published').count(), 1, 'publishing updates the existing feed entry');
   const publicSite = await publicSitePreview(context, origin);
@@ -516,7 +526,7 @@ try {
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'bookmark', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

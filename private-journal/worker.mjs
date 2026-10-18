@@ -230,8 +230,10 @@ async function api(request, env, url, context) {
         await indexTags(result,env);
         if (env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
       } else {
-        if (typeof data.bookmarked !== 'boolean') fail(400, 'Invalid bookmark.');
-        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET bookmarked = ? WHERE id = ? RETURNING ${thoughtColumns}`).bind(data.bookmarked ? 1 : 0, id).first();
+        // Saved (stored as bookmarked) and liked toggle independently.
+        const marks = ['bookmarked', 'liked'].filter(field => Object.hasOwn(data, field));
+        if (!marks.length || marks.some(field => typeof data[field] !== 'boolean')) fail(400, 'Invalid change.');
+        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET ${marks.map(field => `${field} = ?`).join(', ')} WHERE id = ? RETURNING ${thoughtColumns}`).bind(...marks.map(field => data[field] ? 1 : 0), id).first();
         if (!result) fail(404, 'Thought not found.');
       }
       return json({ entry: (await withPublicationState([result], env))[0] });
@@ -244,7 +246,7 @@ async function api(request, env, url, context) {
     }
   }
   if (path === '/api/export' && request.method === 'GET') {
-    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, created_at, updated_at, source_date FROM thoughts ORDER BY seq').all();
+    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, liked, created_at, updated_at, source_date FROM thoughts ORDER BY seq').all();
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();

@@ -217,10 +217,11 @@ function readerBackTarget(){return history.state?.previousThought?`#thought/${hi
 function renderReader(entry = state.readerEntry) {
   const content = $('#reader-content'); content.replaceChildren();
   if (!entry) return;
-  const name = entry.title || entry.published_title;
-  if (name) {
+  const name = entry.title || entry.published_title, tags = entryTags(entry);
+  if (name || tags.childNodes.length) {
     const title = document.createElement('h1'); title.className = 'thought-title';
-    const label = document.createElement('span'); label.append(bodyContent(name,'')); title.append(label,publishedTag(entry)); content.append(title);
+    if (name) { const label = document.createElement('span'); label.append(bodyContent(name,'')); title.append(label); }
+    title.append(tags); content.append(title);
   }
   const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); content.append(body);
   readingView.related(entry);
@@ -228,7 +229,7 @@ function renderReader(entry = state.readerEntry) {
 function readerControls() {
   const editing = state.readerEditing;
   const busy = Boolean(state.readerSaving);
-  $('#reader-edit').hidden = editing || !state.readerEntry;
+  for (const id of ['reader-edit', 'reader-bookmark', 'reader-like']) $(`#${id}`).hidden = editing || !state.readerEntry;
   $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
   $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
   $('#dictate-reader').hidden = !editing;
@@ -239,13 +240,15 @@ function readerControls() {
   readerEditor?.setReadOnly(busy);
   for (const control of document.querySelectorAll('.reader-actions button, #edit-form input, #edit-form textarea')) control.disabled = busy;
   $('#reader-save').disabled = busy || !$('#edit-body').value.trim();
-  const bookmarked = Boolean(state.readerEntry?.bookmarked);
-  $('#reader-bookmark').textContent = bookmarked ? 'remove bookmark' : 'bookmark';
-  $('#reader-bookmark').setAttribute('aria-pressed', String(bookmarked));
-  $('#reader-status').replaceChildren(entryStatus(state.readerEntry));
+  const saved = Boolean(state.readerEntry?.bookmarked), liked = Boolean(state.readerEntry?.liked);
+  $('#reader-bookmark').textContent = saved ? 'unsave' : 'save';
+  $('#reader-bookmark').setAttribute('aria-pressed', String(saved));
+  $('#reader-like').textContent = liked ? 'unlike' : 'like';
+  $('#reader-like').setAttribute('aria-pressed', String(liked));
 }
 function updateEntry(entry) {
-  state.readerEntry = entry; state.selected = entry;
+  if (state.readerEntry?.id === entry.id) state.readerEntry = entry;
+  state.selected = entry;
   const removedBookmark = state.view === 'saved' && !entry.bookmarked;
   if (removedBookmark) state.entries.delete(entry.id);
   else if (state.entries.has(entry.id)) state.entries.set(entry.id, entry);
@@ -390,20 +393,16 @@ function bodyContent(body, query, linkify = true) {
   return fragment;
 }
 
-function entryStatus(entry) {
-  const status = document.createDocumentFragment();
-  if (entry?.bookmarked) {
-    const heart = document.createElement('span'); heart.className = 'entry-heart'; heart.textContent = '♥';
-    heart.setAttribute('role', 'img'); heart.setAttribute('aria-label', 'bookmarked'); heart.title = 'bookmarked'; status.append(heart);
-  }
-  return status;
-}
-function publishedTag(entry) {
+function entryTags(entry) {
   const status = document.createDocumentFragment();
   if (entry?.published_slug) {
-    const published = document.createElement('a'); published.className = 'entry-published'; published.textContent = 'published';
+    const published = document.createElement('a'); published.className = 'entry-tag entry-published'; published.textContent = 'published';
     published.href = `https://christopherli.dev/#thought/${encodeURIComponent(entry.published_slug)}`;
     published.target = '_blank'; published.rel = 'noopener noreferrer'; published.setAttribute('aria-label', 'view published thought'); status.append(published);
+  }
+  for (const [field, label] of [['bookmarked', 'saved'], ['liked', 'liked']]) {
+    if (!entry?.[field]) continue;
+    const tag = document.createElement('span'); tag.className = `entry-tag entry-${label}`; tag.textContent = label; status.append(tag);
   }
   return status;
 }
@@ -421,13 +420,12 @@ function renderEntry(entry) {
   const dateDetails = document.createElement('span'); dateDetails.className = 'thought-date'; dateDetails.append(time);
   if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; dateDetails.append(edited); }
   header.append(dateDetails);
-  const status = document.createElement('span'); status.className = 'entry-state'; status.append(entryStatus(entry)); header.append(status);
   article.append(header);
-  const name = entry.title || entry.published_title;
-  if (name) {
+  const name = entry.title || entry.published_title, tags = entryTags(entry);
+  if (name || tags.childNodes.length) {
     const title = document.createElement('h2'); title.className = 'thought-title';
-    const label = document.createElement('span'); label.append(bodyContent(name, state.query));
-    title.append(label, publishedTag(entry)); article.append(title);
+    if (name) { const label = document.createElement('span'); label.append(bodyContent(name, state.query)); title.append(label); }
+    title.append(tags); article.append(title);
   }
   const text = document.createElement('div'); text.className = 'thought-body markdown-body thought-preview';
   text.id = `thought-${entry.id}`;
@@ -441,6 +439,8 @@ function renderEntry(entry) {
   const footer = document.createElement('div'); footer.className = 'entry-footer';
   const copy = button('copy', 'copy', entry); copy.className = 'copy-thought'; copy.setAttribute('aria-label', 'copy thought'); footer.append(copy);
   const read = document.createElement('a'); read.href = `#thought/${entry.id}`; read.dataset.action = 'read'; read.textContent = 'open'; read.setAttribute('aria-label', 'open thought'); footer.append(read);
+  const save = button(entry.bookmarked ? 'unsave' : 'save', 'bookmarked', entry); save.setAttribute('aria-pressed', String(Boolean(entry.bookmarked))); footer.append(save);
+  const like = button(entry.liked ? 'unlike' : 'like', 'liked', entry); like.setAttribute('aria-pressed', String(Boolean(entry.liked))); footer.append(like);
   article.append(footer);
 
   return article;
@@ -452,7 +452,7 @@ function updateView() {
     if (item.dataset.view === state.view) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   }
-  $('#view-title').textContent = state.view === 'saved' ? 'bookmarks' : 'thoughts';
+  $('#view-title').textContent = state.view === 'saved' ? 'saved' : 'thoughts';
   $('#view-title').classList.toggle('sr-only', state.view === 'all' || Boolean(state.query));
 }
 
@@ -523,7 +523,7 @@ async function loadFeed(append = false, semantic = state.semantic) {
     updateView(); notice(message);
     $('#more').hidden = data.next === null;
     $('#more').textContent = 'load more';
-    $('#feed-status').textContent = !state.entries.size && !queryText ? saved ? 'no bookmarks yet.' : 'your first thought goes here.' : '';
+    $('#feed-status').textContent = !state.entries.size && !queryText ? saved ? 'nothing saved yet.' : 'your first thought goes here.' : '';
   } catch (error) {
     if (error.name !== 'AbortError' && generation === state.generation) {
       $('#feed-status').textContent = error.message;
@@ -604,7 +604,13 @@ $('#feed').addEventListener('click', async event => {
   const action = target.dataset.action;
   state.selected = entry;
   try {
-    if (action === 'copy') {
+    if (action === 'bookmarked' || action === 'liked') {
+      target.disabled = true;
+      const data = await api(`thoughts/${entry.id}`, { method: 'PATCH', body: JSON.stringify({ [action]: !entry[action] }) });
+      const focused = document.activeElement === target;
+      updateEntry(data.entry);
+      if (focused) $(`#feed article[data-id="${entry.id}"] [data-action=${action}]`)?.focus();
+    } else if (action === 'copy') {
       await navigator.clipboard.writeText(entryText(entry));
       target.classList.add('is-copied'); target.setAttribute('aria-label', 'thought copied'); $('#copy-status').textContent = 'thought copied';
       setTimeout(() => { target.classList.remove('is-copied'); target.setAttribute('aria-label', 'copy thought'); $('#copy-status').textContent = ''; }, 1200);
@@ -641,15 +647,17 @@ $('#edit-form').addEventListener('input', event => {
   if (event.target.id === 'edit-thought-title') changedReader();
 });
 $('#reader-cancel').addEventListener('click', stopEditing);
-$('#reader-bookmark').addEventListener('click', async () => {
+async function toggleReaderMark(control, field) {
   const entry = state.readerEntry; if (!entry) return;
-  $('#reader-bookmark').disabled = true;
+  control.disabled = true;
   try {
-    const data = await api(`thoughts/${entry.id}`, { method: 'PATCH', body: JSON.stringify({ bookmarked: !entry.bookmarked }) });
-    if (state.readerEntry?.id === entry.id) { updateEntry(data.entry); readerControls(); }
+    const data = await api(`thoughts/${entry.id}`, { method: 'PATCH', body: JSON.stringify({ [field]: !entry[field] }) });
+    if (state.readerEntry?.id === entry.id) { updateEntry(data.entry); renderReader(); readerControls(); }
   } catch (error) { $('#reader-error').textContent = error.message; }
-  finally { $('#reader-bookmark').disabled = false; }
-});
+  finally { control.disabled = false; }
+}
+$('#reader-bookmark').addEventListener('click', () => toggleReaderMark($('#reader-bookmark'), 'bookmarked'));
+$('#reader-like').addEventListener('click', () => toggleReaderMark($('#reader-like'), 'liked'));
 $('#reader-public').addEventListener('click', async () => {
   if (!state.readerEntry) return;
   state.selected = state.readerEntry;
@@ -757,10 +765,6 @@ $('#download-public').addEventListener('click', () => {
   const { slug, body, ...metadata } = publicInput();
   download(`${slug}.md`, `---\n${Object.entries({ ...metadata, published: false }).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n${body}\n`, 'text/markdown');
   $('#public-status').textContent = 'downloaded.';
-});
-$('#export').addEventListener('click', async () => {
-  try { if(!await photos.finish())return;await saveDraft(); if (state.publicDirty) await savePublication(); const data = await api('export'); download(`journal-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), 'application/json'); }
-  catch (error) { notice(error.message); }
 });
 $('#logout').addEventListener('click', async () => {
   if (state.posting) return;
