@@ -56,6 +56,16 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('live dictation requires the owner session, same-origin upgrade, and an available binding',async()=>{
+ const c=client(),upgrade={Upgrade:'websocket'};
+ assert.equal((await c.call('/api/dictation','GET',undefined,upgrade)).status,401);await c.login();
+ assert.equal((await c.call('/api/dictation','GET',undefined,{...upgrade,Origin:'https://elsewhere.example'})).status,403);
+ assert.equal((await c.call('/api/dictation')).status,426);assert.equal((await c.call('/api/dictation','POST',{})).status,405);
+ assert.equal((await c.call('/api/dictation','GET',undefined,upgrade)).status,503);
+ c.env.AI={async run(){throw new Error('private provider error');}};const failed=await c.call('/api/dictation','GET',undefined,upgrade);assert.equal(failed.status,502);assert.equal(failed.data.error,'Live dictation is unavailable. Try again.');
+ c.env.JOURNAL_DB.sqlite.close();
+});
+
 test('transcription requires authentication, CSRF, bounded audio, and never saves recordings',async()=>{
   const c=client(),audio=new Uint8Array([26,69,223,163,0,0,0,0,0,0,0,0]),headers={'Content-Type':'audio/webm;codecs=opus'};
   let calls=0;

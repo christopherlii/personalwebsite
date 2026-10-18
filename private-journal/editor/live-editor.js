@@ -1,4 +1,4 @@
-import { EditorState, StateField, Compartment, Prec, RangeSet } from '@codemirror/state';
+import { EditorState, StateField, StateEffect, Compartment, Prec, RangeSet } from '@codemirror/state';
 import { EditorView, Decoration, WidgetType, keymap, placeholder } from '@codemirror/view';
 import { autocompletion, completionKeymap, pickedCompletion } from '@codemirror/autocomplete';
 import { markdown } from '@codemirror/lang-markdown';
@@ -157,13 +157,32 @@ const formatting = HighlightStyle.define([
   { tag: tags.strikethrough, class: 'cm-md-strike' }
 ]);
 
+const speechPreview = StateEffect.define();
+class SpeechPreview extends WidgetType {
+  constructor(text) { super(); this.text = text; }
+  eq(other) { return this.text === other.text; }
+  toDOM() { const span = document.createElement('span'); span.className = 'cm-dictation-preview'; span.textContent = this.text; span.setAttribute('aria-hidden','true'); return span; }
+  ignoreEvent() { return true; }
+}
+const liveSpeech = StateField.define({
+  create: () => ({ text:'', decorations:Decoration.none }),
+  update(value, transaction) {
+    let text = value.text;
+    for (const effect of transaction.effects) if (effect.is(speechPreview)) text = effect.value;
+    const at = transaction.state.selection.main.to, before = transaction.state.doc.sliceString(Math.max(0,at-1),at);
+    const prefix = before && !/\s/u.test(before) && !/^[.,!?;:)}\]]/u.test(text) ? ' ' : '';
+    return { text, decorations:text ? Decoration.set([Decoration.widget({widget:new SpeechPreview(prefix+text),side:1}).range(at)]) : Decoration.none };
+  },
+  provide: field => EditorView.decorations.from(field, value => value.decorations)
+});
+
 export function createLiveEditor(parent, { value, nonce, onChange, onLimit, findThoughts, onOpenThought, onSubmit, emptyText = '' }) {
   const editable = new Compartment(),insertions=new Set(); let readOnly = false, destroyed = false;
   const makeState = value => EditorState.create({
     doc: value, selection: { anchor: value.length },
     extensions: [
       EditorView.cspNonce.of(nonce),
-      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets,
+      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets, liveSpeech,
       EditorView.atomicRanges.of(view => view.state.field(hiddenTargets)),
       placeholder(emptyText),
       autocompletion({ override: [completions(findThoughts)], icons: false, maxRenderedOptions: 8, activateOnTypingDelay: 180 }),
@@ -196,6 +215,11 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
   const view = new EditorView({ parent, state: makeState(value) });
   return {
     focus() { view.focus(); },
+    previewText(text) {
+      if (readOnly || destroyed) return false;
+      if (view.state.doc.length - (view.state.selection.main.to-view.state.selection.main.from) + text.length > 20000) { onLimit(); return false; }
+      view.dispatch({effects:speechPreview.of(text)}); return true;
+    },
     destroy() { destroyed = true; insertions.clear(); view.destroy(); },
     captureInsertion(){
       if(readOnly||destroyed)return null;

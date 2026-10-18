@@ -22,12 +22,12 @@ const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEdito
 $('#photo-composer').addEventListener('click',()=>photos.choose('composer'));
 $('#photo-reader').addEventListener('click',()=>photos.choose('reader'));
 const dictation = createDictation({
-  transcribe: (audio,signal) => api('transcribe', {method:'POST',body:audio,headers:{'Content-Type':audio.type},signal}),
+  onUnavailable() { api('session').then(session => { if (!session.authenticated) showLogin('your session ended. unlock to continue.'); }).catch(() => {}); },
   onState(owner, value) {
     const button = $(`#dictate-${owner}`), recording = value === 'starting' || value === 'listening';
     button.textContent = recording ? 'stop' : 'dictate';
     button.setAttribute('aria-pressed', String(recording));
-    button.setAttribute('aria-label', recording ? 'stop dictation and transcribe' : value === 'transcribing' ? 'transcribing recording' : 'start dictation');
+    button.setAttribute('aria-label', recording ? 'stop dictation' : value === 'transcribing' ? 'transcribing recording' : 'start dictation');
     button.disabled = value === 'transcribing';
     const status = $(`#dictation-${owner}-status`);
     if (value !== 'idle') status.textContent = value === 'starting' ? 'allow microphone access' : value === 'listening' ? 'listening…' : 'transcribing…';
@@ -128,9 +128,6 @@ function updateComposer() {
   composerEditor?.setValue($('#body').value);
   composerEditor?.setReadOnly(state.posting);
   $('#post').disabled = !$('#body').value.trim() || state.posting;
-  $('#compose-actions').hidden = !$('#body').value && !$('#title').value && !state.conflict && $('#retry-draft').hidden;
-  $('#add-title').hidden = !$('#composer-title').hidden;
-  $('#add-title').disabled = state.posting;
   $('#dictate-composer').disabled = state.posting || dictation.phase === 'transcribing';
   $('#photo-composer').disabled=state.posting||photos.busy;
 }
@@ -190,7 +187,6 @@ async function enter() {
   state.dirty = state.conflict;
   $('#body').value = unsaved?.body ?? draft.body;
   $('#title').value = unsaved?.title ?? draft.title ?? '';
-  $('#composer-title').hidden = !$('#title').value;
   state.authenticated = true;
   $('#login').hidden = true;
   $('#app').hidden = Boolean(readerId()) || location.hash === '#reading';
@@ -557,7 +553,6 @@ $('#login-form').addEventListener('submit', async event => {
 });
 $('#body').addEventListener('input', changedDraft);
 $('#title').addEventListener('input', changedDraft);
-$('#add-title').addEventListener('click', () => { $('#composer-title').hidden = false; updateComposer(); $('#title').focus(); });
 $('#retry-draft').addEventListener('click', () => saveDraft().catch(() => {}));
 $('#composer').addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !$('#post').disabled) { event.preventDefault(); $('#composer').requestSubmit(); }
@@ -581,7 +576,7 @@ $('#composer').addEventListener('submit', async event => {
     const data = await api('thoughts', { method: 'POST', body: JSON.stringify({ ...state.pendingPost, draft_version: state.draft.version }) });
     state.pendingPost = null; state.dirty = false; state.conflict = false; state.draft = data.draft;
     $('#body').value = data.draft.body; $('#title').value = data.draft.title || '';
-    $('#composer-title').hidden = !$('#title').value; draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
+    draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
     await setView('all');
   } catch (error) { notice(error.message); }
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
@@ -784,7 +779,6 @@ $('#logout').addEventListener('click', async () => {
     state.tag=null;
     readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
-    $('#composer-title').hidden = true;
     showLogin();
   } catch (error) { notice(error.message); }
 });
