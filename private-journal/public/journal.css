@@ -184,6 +184,13 @@ h1,h2 {
   background:var(--bg);
   font-size:12px
 }
+.command-receipt { margin-right:auto; color:var(--muted); font-size:11px; opacity:0 }
+.command-receipt.is-showing { animation:receipt 2400ms ease forwards }
+@keyframes receipt { 0% { opacity:0 } 12% { opacity:1 } 70% { opacity:1 } 100% { opacity:0 } }
+.idea-ghost { position:fixed; z-index:10; pointer-events:none; transform-origin:0 0; font:14px/1.55 var(--font-body); color:var(--body); white-space:nowrap }
+.cm-idea-marker { padding:1px 5px; font-size:11px }
+.cm-idea-marker-idea { background:#e3ecf7; color:#1f4f8a }
+.cm-idea-marker-project { background:#ece6f6; color:#5b3d8f }
 .command-menu li { display:flex; align-items:baseline; gap:14px; padding:3px 0; cursor:pointer; color:var(--muted) }
 .command-menu .command-name { min-width:84px; color:var(--muted) }
 .command-menu [aria-selected=true] .command-name { color:var(--fg) }

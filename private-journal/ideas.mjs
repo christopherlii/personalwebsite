@@ -33,16 +33,32 @@ export async function ideaApi(request, env, path, readBody) {
     const kind = new URL(request.url).searchParams.get('kind');
     if (!Object.hasOwn(IDEA_KINDS, kind)) fail(400, 'Invalid idea kind.');
     const indexing = await repairIdeaIndex(env);
-    const { results } = await env.JOURNAL_DB.prepare(`SELECT i.id, i.kind, i.text, i.thought_id, i.created_at, i.done_at
-      FROM thought_ideas i WHERE i.kind = ? ORDER BY i.done_at IS NOT NULL, COALESCE(i.done_at, i.created_at) DESC LIMIT 200`).bind(kind).all();
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT * FROM (
+      SELECT id, kind, text, thought_id, created_at, done_at, 'line' AS origin FROM thought_ideas WHERE kind = ?
+      UNION ALL SELECT id, kind, text, context_id, created_at, done_at, 'loose' FROM loose_ideas WHERE kind = ?
+    ) ORDER BY done_at IS NOT NULL, COALESCE(done_at, created_at) DESC LIMIT 200`).bind(kind, kind).all();
     return Response.json({ ideas: results, indexing });
+  }
+  if (path === '/api/ideas' && request.method === 'POST') {
+    const data = await readBody(request);
+    if (!/^[a-f0-9]{32}$/.test(data.id || '') || !Object.hasOwn(IDEA_KINDS, data.kind)) fail(400, 'Invalid idea.');
+    const text = typeof data.text === 'string' ? data.text.trim() : '';
+    if (!text || text.length > 280 || /[\r\n]/.test(text)) fail(400, 'Write an idea of up to 280 characters on one line.');
+    const existing = await env.JOURNAL_DB.prepare('SELECT id, kind, text, context_id AS thought_id, created_at, done_at FROM loose_ideas WHERE id = ?').bind(data.id).first();
+    if (existing) return Response.json({ idea: { ...existing, origin: 'loose' } });
+    // Context is whatever was written just before the idea.
+    const idea = await env.JOURNAL_DB.prepare(`INSERT INTO loose_ideas(id, kind, text, context_id, created_at)
+      VALUES (?, ?, ?, (SELECT id FROM thoughts ORDER BY seq DESC LIMIT 1), ?) RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`)
+      .bind(data.id, data.kind, text, new Date().toISOString()).first();
+    return Response.json({ idea: { ...idea, origin: 'loose' } }, { status: 201 });
   }
   const idea = path.match(/^\/api\/ideas\/([a-f0-9]{32})$/);
   if (idea && request.method === 'PATCH') {
     const data = await readBody(request);
     if (typeof data.done !== 'boolean') fail(400, 'Invalid idea.');
-    const row = await env.JOURNAL_DB.prepare(`UPDATE thought_ideas SET done_at = ? WHERE id = ? RETURNING id, kind, text, thought_id, created_at, done_at`)
-      .bind(data.done ? new Date().toISOString() : null, idea[1]).first();
+    const done = data.done ? new Date().toISOString() : null;
+    const row = await env.JOURNAL_DB.prepare(`UPDATE thought_ideas SET done_at = ? WHERE id = ? RETURNING id, kind, text, thought_id, created_at, done_at`).bind(done, idea[1]).first()
+      || await env.JOURNAL_DB.prepare(`UPDATE loose_ideas SET done_at = ? WHERE id = ? RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`).bind(done, idea[1]).first();
     if (!row) fail(404, 'Idea not found.');
     return Response.json({ idea: row });
   }

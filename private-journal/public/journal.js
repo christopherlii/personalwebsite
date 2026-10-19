@@ -616,7 +616,8 @@ async function floatIdeas(kind) {
     const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
     open.append(text);
-    open.addEventListener('click', () => { state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` }; navigateThought(idea.thought_id); });
+    // A line idea opens at its line; a loose one opens the note it followed.
+    open.addEventListener('click', () => { if (!idea.thought_id) return; if (idea.origin === 'line') state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` }; navigateThought(idea.thought_id); });
     const done = document.createElement('button'); done.type = 'button'; done.className = 'float-done';
     done.textContent = idea.done_at ? 'undo' : finished; done.setAttribute('aria-label', idea.done_at ? `mark not ${finished}` : `mark ${finished}`);
     done.addEventListener('click', async () => {
@@ -665,20 +666,20 @@ function floatThoughts(side, heading, entries, emptyText) {
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; items.push(empty); }
   float.replaceChildren(title, ...items); float.hidden = false; delete float.dataset.showing;
 }
-async function runCommand(name, argument) {
+async function runCommand(name, argument, context = {}) {
   notice();
   try {
     if (name === 'focus') setFocus(!document.body.classList.contains('focus-mode'));
     else if (name === 'lock') $('#logout').click();
-    else if (name === 'cl') clearFloat('left');
-    else if (name === 'cr') clearFloat('right');
+    else if (name === 'cl') { clearFloat('left'); receipt('cleared the left'); }
+    else if (name === 'cr') { clearFloat('right'); receipt('cleared the right'); }
     else if (name === 'idea' || name === 'project') {
       if (!argument) { await floatIdeas(name); return; }
-      // An idea logged on its own becomes a one-line thought, so it still has a note to return to.
-      await api('thoughts', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), title: '', body: `/${name} ${argument}` }) });
-      if ($('#float-left').dataset.showing === name && !$('#float-left').hidden) await floatIdeas(name);
-      if (!state.tag) await loadFeed();
-      notice(name === 'idea' ? 'writing idea saved.' : 'project idea saved.');
+      // An idea logged on its own lives only in the ideas list, linked to the
+      // note written just before it, and flies there from where it was typed.
+      await api('ideas', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID().replaceAll('-', ''), kind: name, text: argument }) });
+      receipt(name === 'idea' ? 'idea saved' : 'project saved');
+      await flyIdea(name, argument, context.rect);
     }
     else if (name === 'draft') {
       const { entries } = await api('thoughts/drafts');
@@ -693,14 +694,35 @@ async function runCommand(name, argument) {
     } else if (name === 'read') {
       if (!argument) { location.hash = '#reading'; return; }
       const data = await api('reading', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), url: argument }) });
-      notice(data.existing ? 'already in read later.' : 'saved to read later.');
+      receipt(data.existing ? 'already in read later' : 'saved to read later');
     }
   } catch (error) { notice(error.status === 404 && name === 'random' ? 'no thoughts yet.' : error.message); }
 }
+// A faint line under the writing that says what a command did, then fades.
+function receipt(text) {
+  const element = $('#command-receipt');
+  element.textContent = text; element.classList.remove('is-showing'); void element.offsetWidth; element.classList.add('is-showing');
+}
+async function flyIdea(kind, text, from) {
+  await floatIdeas(kind);
+  const target = [...document.querySelectorAll('#float-left .float-idea:not(.is-done) .float-text')].find(item => item.textContent === text);
+  if (!target || !from || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const to = target.getBoundingClientRect();
+  const ghost = document.createElement('span'); ghost.className = 'idea-ghost'; ghost.textContent = text;
+  ghost.style.left = `${from.left}px`; ghost.style.top = `${from.top}px`;
+  document.body.append(ghost); target.style.opacity = '0';
+  const flight = ghost.animate([
+    { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+    { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${12 / 14})`, opacity: 0.6 }
+  ], { duration: 560, easing: 'cubic-bezier(.3,.6,.2,1)' });
+  await flight.finished.catch(() => {});
+  ghost.remove(); target.style.opacity = '';
+}
 const commands = createCommands({
-  getText: () => $('#body').value,
+  getEditor: () => composerEditor,
   fill(text) { $('#body').value = text; composerEditor?.setValue(text); changedDraft(); composerEditor?.focus(); },
-  run: runCommand
+  run: runCommand,
+  receipt
 });
 
 $('#login-form').addEventListener('submit', async event => {

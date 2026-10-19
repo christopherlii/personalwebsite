@@ -47,8 +47,13 @@ entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. The writing field
 doubles as a command bar (`public/commands.js`): a single line starting with `/`
 that could still become a command opens a menu (arrows, Tab to complete, Enter
 to run, Esc to dismiss) and is neither searched nor saved as a draft; any other
-line starting with `/` stays ordinary writing. `/idea <text>` and `/project <text>` log a writing or
-project idea as a one-line thought; the same lines anywhere in a note
+line starting with `/` stays ordinary writing. Commands work on any line: an action on a line of a longer note runs and removes
+just that line, a faint receipt under the writing says what happened, and Up in
+an empty field recalls recent commands. `/idea <text>` and `/project <text>`
+on their own log a loose idea (`loose_ideas`) that lives only in the ideas
+list, linked to the note written just before, and flies there from where it
+was typed; inside a longer note the line stays as its tag (styled as you type)
+and Enter moves on. The same lines anywhere in a note
 (`/idea …`, `/project …`, one per line) are indexed when it is saved
 (`ideas.mjs`, `thought_ideas`) and render as a blue idea / purple project tag.
 Bare `/idea` or `/project` floats that list up on the left, open ideas first;

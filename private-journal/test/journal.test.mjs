@@ -375,6 +375,29 @@ test('/idea and /project lines are indexed, keep their done mark through edits, 
   assert.equal((await c.call(`/api/ideas/${after[0].id}`, 'PATCH', { done: 'yes' })).status, 400);
 });
 
+test('standalone ideas live only in the ideas list, linked to the note written before them', async () => {
+  const c = client(); await c.login();
+  const hex = () => crypto.randomUUID().replaceAll('-', '');
+  const early = hex();
+  const orphan = await c.call('/api/ideas', 'POST', { id: early, kind: 'idea', text: 'an idea before any note' });
+  assert.equal(orphan.status, 201); assert.equal(orphan.data.idea.thought_id, null);
+  const before = (await c.call('/api/thoughts', 'POST', thought('what i was writing just before'))).data.entry;
+  const id = hex();
+  const created = (await c.call('/api/ideas', 'POST', { id, kind: 'project', text: '  a 9pm memories app  ' })).data.idea;
+  assert.deepEqual([created.text, created.thought_id, created.origin], ['a 9pm memories app', before.id, 'loose']);
+  assert.equal((await c.call('/api/ideas', 'POST', { id, kind: 'project', text: 'a 9pm memories app' })).data.idea.id, id, 'a retried save is kept once');
+  assert.equal((await c.call('/api/thoughts')).data.entries.length, 1, 'no timeline note is created');
+  await c.call('/api/thoughts', 'POST', thought('a note\n/project a line project'));
+  const projects = (await c.call('/api/ideas?kind=project')).data.ideas;
+  assert.deepEqual(projects.map(idea => idea.origin).sort(), ['line', 'loose'], 'loose and line ideas list together');
+  assert.ok((await c.call(`/api/ideas/${id}`, 'PATCH', { done: true })).data.idea.done_at, 'loose ideas can be marked done');
+  await c.call(`/api/thoughts/${before.id}`, 'DELETE', {});
+  const kept = (await c.call('/api/ideas?kind=project')).data.ideas.find(idea => idea.id === id);
+  assert.equal(kept.thought_id, null, 'deleting the context note keeps the idea, unlinked');
+  assert.ok((await c.call('/api/export')).data.ideas.some(idea => idea.id === id), 'ideas are in the export');
+  for (const body of [{ id: 'x', kind: 'idea', text: 'a' }, { id: hex(), kind: 'quote', text: 'a' }, { id: hex(), kind: 'idea', text: '  ' }, { id: hex(), kind: 'idea', text: 'two\nlines' }]) assert.equal((await c.call('/api/ideas', 'POST', body)).status, 400);
+});
+
 test('the inbox adds thoughts with its own key and can do nothing else', async () => {
   const c = client(); await c.login();
   const post = (body, token, headers = {}) => worker.fetch(new Request('https://journal.example/api/inbox', {
