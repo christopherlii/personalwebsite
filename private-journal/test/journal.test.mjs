@@ -340,6 +340,55 @@ test('random and on-this-day lookups for the command bar', async () => {
   for (const query of ['day=1019&year=2026&offset=0', 'day=10-19&year=26&offset=0', 'day=10-19&year=2026&offset=9999', 'day=10-19&year=2026&offset=x']) assert.equal((await c.call(`/api/thoughts/on-this-day?${query}`)).status, 400);
 });
 
+test('/idea and /project lines are indexed, keep their done mark through edits, and link back to their note', async () => {
+  const c = client(); await c.login();
+  assert.equal((await c.call('/api/ideas?kind=idea')).status, 200);
+  assert.equal((await c.call('/api/ideas?kind=quote')).status, 400);
+  const note = (await c.call('/api/thoughts', 'POST', thought('long day.\n/idea poker as a lens for risk\n/project a 9pm memories app\nmore words'))).data.entry;
+  const ideas = (await c.call('/api/ideas?kind=idea')).data.ideas;
+  assert.deepEqual(ideas.map(idea => [idea.text, idea.thought_id]), [['poker as a lens for risk', note.id]]);
+  assert.deepEqual((await c.call('/api/ideas?kind=project')).data.ideas.map(idea => idea.text), ['a 9pm memories app'], 'writing and project ideas stay separate');
+  const done = (await c.call(`/api/ideas/${ideas[0].id}`, 'PATCH', { done: true })).data.idea;
+  assert.ok(done.done_at);
+  const edited = (await c.call(`/api/thoughts/${note.id}`, 'PATCH', { body: 'long day.\n/idea poker as a lens for risk\n/idea what bobst taught me', updated_at: note.updated_at })).data.entry;
+  const after = (await c.call('/api/ideas?kind=idea')).data.ideas;
+  assert.deepEqual(after.map(idea => [idea.text, Boolean(idea.done_at)]), [['what bobst taught me', false], ['poker as a lens for risk', true]], 'an unchanged idea keeps its mark; open ideas come first');
+  assert.deepEqual((await c.call('/api/ideas?kind=project')).data.ideas, [], 'a removed line removes its idea');
+  const legacy = crypto.randomUUID(), now = new Date().toISOString();
+  c.env.JOURNAL_DB.sqlite.prepare('INSERT INTO thoughts(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').run(legacy, '', '/project imported before ideas existed', now, now);
+  assert.ok((await c.call('/api/ideas?kind=project')).data.ideas.some(idea => idea.thought_id === legacy), 'older thoughts are indexed on first look');
+  await c.call(`/api/thoughts/${edited.id}`, 'DELETE', {});
+  assert.ok(!(await c.call('/api/ideas?kind=idea')).data.ideas.length, 'deleting a note deletes its ideas');
+  assert.equal((await c.call(`/api/ideas/${'0'.repeat(32)}`, 'PATCH', { done: true })).status, 404);
+  assert.equal((await c.call(`/api/ideas/${after[0].id}`, 'PATCH', { done: 'yes' })).status, 400);
+});
+
+test('the inbox adds thoughts with its own key and can do nothing else', async () => {
+  const c = client(); await c.login();
+  const post = (body, token, headers = {}) => worker.fetch(new Request('https://journal.example/api/inbox', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers }, body: JSON.stringify(body)
+  }), c.env);
+  assert.equal((await post({ text: 'hi' }, 'x'.repeat(64))).status, 404, 'off until a key is configured');
+  const key = 'k'.repeat(48);
+  c.env.JOURNAL_INBOX_TOKEN_HASH = await digest(key);
+  assert.equal((await post({ text: 'hi' })).status, 401);
+  assert.equal((await post({ text: 'hi' }, 'y'.repeat(48))).status, 401);
+  const id = crypto.randomUUID();
+  const created = await post({ id, text: 'texted from the train\n/idea trains as thinking rooms' }, key);
+  assert.equal(created.status, 201, 'no session, origin, or journal header needed');
+  const entry = (await c.call(`/api/thoughts/${id}`)).data.entry;
+  assert.equal(entry.source, 'imessage'); assert.equal(entry.body, 'texted from the train\n/idea trains as thinking rooms');
+  assert.equal((await c.call('/api/ideas?kind=idea')).data.ideas[0].text, 'trains as thinking rooms', 'ideas sent by message are indexed too');
+  const retried = await post({ id, text: 'texted from the train\n/idea trains as thinking rooms' }, key);
+  assert.equal(retried.status, 200); assert.equal((await retried.json()).existing, true);
+  assert.equal((await post({ id, text: 'something else' }, key)).status, 409);
+  assert.equal((await post({ text: '   ' }, key)).status, 400);
+  assert.equal((await post({ text: 'hi', source: '<b>' }, key)).status, 400);
+  const read = await worker.fetch(new Request('https://journal.example/api/thoughts', { headers: { Authorization: `Bearer ${key}` } }), c.env);
+  assert.equal(read.status, 401, 'the inbox key cannot read the journal');
+  assert.equal((await worker.fetch(new Request('https://journal.example/api/inbox', { headers: { Authorization: `Bearer ${key}` } }), c.env)).status, 405);
+});
+
 test('editor styles use a fresh shell nonce while scripts and arbitrary inline styles stay restricted', async () => {
   const c = client();
   c.env.ASSETS = { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '1', ETag: 'original' } }) };

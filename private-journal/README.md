@@ -47,7 +47,13 @@ entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. The writing field
 doubles as a command bar (`public/commands.js`): a single line starting with `/`
 that could still become a command opens a menu (arrows, Tab to complete, Enter
 to run, Esc to dismiss) and is neither searched nor saved as a draft; any other
-line starting with `/` stays ordinary writing. `/focus` hides everything but the
+line starting with `/` stays ordinary writing. `/idea <text>` and `/project <text>` log a writing or
+project idea as a one-line thought; the same lines anywhere in a note
+(`/idea …`, `/project …`, one per line) are indexed when it is saved
+(`ideas.mjs`, `thought_ideas`) and render as a blue idea / purple project tag.
+Bare `/idea` or `/project` floats that list up on the left, open ideas first;
+clicking one opens its note and highlights the line, and hover offers
+written / started (kept through later edits of the note). `/focus` hides everything but the
 page (Esc or `/focus` again restores it), `/random` opens a random thought,
 `/onthisday` floats this date's thoughts from earlier years up on the left (in
 the browser's time zone; imported posts use their dates), `/read <link>` saves
@@ -445,6 +451,22 @@ Markdown bodies and the old index. Existing media stays in site-content; an
 article referencing an image previously withheld with a draft needs the next
 site build to make that image available. Public image URLs also work directly.
 Owner JSON export and per-draft Markdown download provide writing backups.
+
+## Inbox (instinct over iMessage)
+
+`POST /journal/api/inbox` lets an outside assistant add thoughts. It is off
+unless the `JOURNAL_INBOX_TOKEN_HASH` secret holds the SHA-256 hex of a key;
+requests send `Authorization: Bearer <key>` and JSON `{"text": "…"}` with
+optional `title`, `id` (a UUID, so a retried message is saved once) and
+`source` (default `imessage`, shown as "via imessage" under the date). The
+key can only create: it cannot read, list, edit, or delete, and it needs no
+session or browser headers. `/idea` and `/project` lines sent this way are
+indexed like any other. Rotate the key by putting a new hash:
+
+```sh
+key=$(openssl rand -hex 32)
+printf '%s' "$key" | shasum -a 256 | cut -d' ' -f1 | npx wrangler secret put JOURNAL_INBOX_TOKEN_HASH --env production
+```
 
 ## Privacy and behavior
 

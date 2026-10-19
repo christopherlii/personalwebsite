@@ -8,6 +8,7 @@ import { createDictation } from './dictation.js';
 import { createPhotos } from './photos.js';
 import { plainPhotoLinks } from './photo-links.js';
 import { createCommands, commandMatches } from './commands.js';
+import { IDEA_KINDS } from './ideas.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -232,7 +233,7 @@ function renderReader(entry = state.readerEntry) {
     if (name) { const label = document.createElement('span'); label.append(bodyContent(name,'')); title.append(label); }
     title.append(tags); content.append(title);
   }
-  const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); content.append(body);
+  const body = document.createElement('div'); body.className = 'thought-body markdown-body'; body.append(markdown(entry.body)); decorateIdeas(body); content.append(body);
   readingView.related(entry);
 }
 function readerControls() {
@@ -358,7 +359,7 @@ async function showRoute() {
     state.readerEntry = entry; state.selected = entry;
     state.readerHistory = history.state;
     state.readerEditing = false; clearReaderEditor();
-    renderReader(); readerControls();
+    renderReader(); readerControls(); revealIdea(entry.id);
     $('#reader-error').textContent = '';
     if (entry.is_draft) beginEditing(false);
     document.title = 'journal';
@@ -454,6 +455,7 @@ function renderEntry(entry) {
   if (!entry.source_date) time.append(clock);
   const dateDetails = document.createElement('span'); dateDetails.className = 'thought-date'; dateDetails.append(time);
   if (entry.updated_at !== entry.created_at) { const edited = document.createElement('span'); edited.textContent = 'edited'; dateDetails.append(edited); }
+  if (entry.source) { const via = document.createElement('span'); via.textContent = `via ${entry.source}`; dateDetails.append(via); }
   header.append(dateDetails);
   article.append(header);
   const name = entry.title || entry.published_title, tags = entryTags(entry);
@@ -465,6 +467,7 @@ function renderEntry(entry) {
   const text = document.createElement('div'); text.className = 'thought-body markdown-body thought-preview';
   text.id = `thought-${entry.id}`;
   text.append(markdownPreview(entry.body));
+  decorateIdeas(text);
   if (state.query) {
     const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT), nodes = [];
     for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
@@ -575,11 +578,65 @@ async function setView(view) {
   await searchFromComposer(true);
 }
 
+// "/idea …" and "/project …" lines render as a small tag followed by the idea.
+function decorateIdeas(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) if (/\/(idea|project)[ \t]/i.test(node.data) && !node.parentElement.closest('code,pre,a')) nodes.push(node);
+  for (const node of nodes) {
+    // A match at the very start of this text node only counts at a line start.
+    const lineStart = !node.previousSibling || node.previousSibling.nodeName === 'BR';
+    const fragment = document.createDocumentFragment(); let last = 0;
+    for (const match of node.data.matchAll(/(^|\n)[ \t]*\/(idea|project)[ \t]+([^\n]*)/gi)) {
+      if (match.index === 0 && !match[1] && !lineStart) continue;
+      const start = match.index + match[1].length, kind = match[2].toLowerCase(), value = match[3];
+      fragment.append(node.data.slice(last, start));
+      const line = document.createElement('span'); line.className = 'idea-line'; line.dataset.key = `${kind}\n${value.trim()}`;
+      const tag = document.createElement('span'); tag.className = `entry-tag entry-${kind}`; tag.textContent = kind;
+      line.append(tag, ` ${value}`); fragment.append(line); last = match.index + match[0].length;
+    }
+    if (!last) continue;
+    fragment.append(node.data.slice(last)); node.replaceWith(fragment);
+  }
+}
+function revealIdea(id) {
+  const wanted = state.revealIdea; state.revealIdea = null;
+  if (!wanted || wanted.thought !== id) return;
+  const line = [...document.querySelectorAll('#reader-content .idea-line')].find(item => item.dataset.key === wanted.key);
+  if (!line) return;
+  line.scrollIntoView({ block: 'center' }); line.classList.add('is-revealed');
+  setTimeout(() => line.classList.remove('is-revealed'), 2400);
+}
+async function floatIdeas(kind) {
+  let data;
+  do { data = await api(`ideas?kind=${kind}`); } while (data.indexing);
+  const float = $('#float-left'), finished = kind === 'idea' ? 'written' : 'started';
+  const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = IDEA_KINDS[kind];
+  const items = data.ideas.map((idea, index) => {
+    const item = document.createElement('div'); item.className = `float-idea${idea.done_at ? ' is-done' : ''}`;
+    item.style.animationDelay = `${(index + 1) * 40}ms`;
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
+    const date = document.createElement('span'); date.className = 'float-date'; date.textContent = new Date(idea.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
+    const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
+    open.append(date, text);
+    open.addEventListener('click', () => { state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` }; navigateThought(idea.thought_id); });
+    const done = document.createElement('button'); done.type = 'button'; done.className = 'float-done';
+    done.textContent = idea.done_at ? 'undo' : finished; done.setAttribute('aria-label', idea.done_at ? `mark not ${finished}` : `mark ${finished}`);
+    done.addEventListener('click', async () => {
+      done.disabled = true;
+      try { await api(`ideas/${idea.id}`, { method: 'PATCH', body: JSON.stringify({ done: !idea.done_at }) }); await floatIdeas(kind); }
+      catch (error) { done.disabled = false; notice(error.message); }
+    });
+    item.append(open, done);
+    return item;
+  });
+  if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = `no ${IDEA_KINDS[kind]} yet. log one with /${kind} …`; items.push(empty); }
+  float.replaceChildren(title, ...items); float.hidden = false; float.dataset.showing = kind;
+}
 function setFocus(on) { document.body.classList.toggle('focus-mode', on); }
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && document.body.classList.contains('focus-mode') && !document.querySelector('dialog[open]')) setFocus(false);
 });
-function clearFloat(side) { const float = $(`#float-${side}`); float.replaceChildren(); float.hidden = true; }
+function clearFloat(side) { const float = $(`#float-${side}`); float.replaceChildren(); float.hidden = true; delete float.dataset.showing; }
 // Results float up beside the writing as plain text: no panel, no border.
 function floatThoughts(side, heading, entries, emptyText) {
   const float = $(`#float-${side}`);
@@ -595,7 +652,7 @@ function floatThoughts(side, heading, entries, emptyText) {
     return item;
   });
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; items.push(empty); }
-  float.replaceChildren(title, ...items); float.hidden = false;
+  float.replaceChildren(title, ...items); float.hidden = false; delete float.dataset.showing;
 }
 async function runCommand(name, argument) {
   notice();
@@ -604,6 +661,14 @@ async function runCommand(name, argument) {
     else if (name === 'lock') $('#logout').click();
     else if (name === 'cl') clearFloat('left');
     else if (name === 'cr') clearFloat('right');
+    else if (name === 'idea' || name === 'project') {
+      if (!argument) { await floatIdeas(name); return; }
+      // An idea logged on its own becomes a one-line thought, so it still has a note to return to.
+      await api('thoughts', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), title: '', body: `/${name} ${argument}` }) });
+      if ($('#float-left').dataset.showing === name && !$('#float-left').hidden) await floatIdeas(name);
+      if (!state.tag) await loadFeed();
+      notice(name === 'idea' ? 'writing idea saved.' : 'project idea saved.');
+    }
     else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
     else if (name === 'onthisday') {
       const now = new Date(), pad = value => String(value).padStart(2, '0');

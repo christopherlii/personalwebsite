@@ -8,6 +8,7 @@ import { normalizeTag } from './public/tags.js';
 import { photoApi, PhotoError } from './photos.mjs';
 import { TranscriptionError, transcribe } from './transcription.mjs';
 import { liveDictation } from './live-dictation.mjs';
+import { IdeaError, ideaApi, indexIdeas } from './ideas.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -85,6 +86,36 @@ async function listThoughts(env, query, saved, cursor, tag = null) {
   return { entries: await withPublicationState(results.slice(0, 40), env), next: results.length > 40 ? (query ? cursor + 40 : results[39].seq) : null };
 }
 
+// A separate, add-only door for an outside assistant (instinct, over iMessage).
+// Its key can create thoughts and nothing else: it can't read, list, or edit.
+async function inbox(request, env, context) {
+  if (!/^[a-f0-9]{64}$/.test(env.JOURNAL_INBOX_TOKEN_HASH || '')) fail(404, 'Not found.');
+  if (request.method !== 'POST') fail(405, 'Method not allowed.');
+  await limit(env, 'inbox:minute', 30, 60 * 1000);
+  const token = (request.headers.get('Authorization') || '').match(/^Bearer ([A-Za-z0-9_-]{32,256})$/)?.[1];
+  const presented = token ? await digest(token) : '0'.repeat(64);
+  let difference = 0;
+  for (let i = 0; i < 64; i++) difference |= presented.charCodeAt(i) ^ env.JOURNAL_INBOX_TOKEN_HASH.charCodeAt(i);
+  if (!token || difference) fail(401, 'Invalid inbox key.');
+  const data = await readBody(request);
+  const body = bodyText(data.text ?? data.body).trim();
+  const title = titleText(data.title ?? '').trim();
+  const source = data.source === undefined ? 'imessage' : /^[a-z0-9 -]{1,24}$/.test(data.source) ? data.source : fail(400, 'Invalid source.');
+  // A retried message with the same id is saved once.
+  const id = data.id === undefined ? crypto.randomUUID() : uuid(data.id) ? data.id : fail(400, 'Invalid thought.');
+  const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(id).first();
+  if (existing) {
+    if (existing.body !== body || existing.title !== title) fail(409, 'This thought already exists.');
+    return json({ ok: true, id, existing: true });
+  }
+  const now = new Date().toISOString();
+  const entry = await env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`)
+    .bind(id, title, body, source, now, now).first();
+  await indexTags(entry, env); await indexIdeas(entry, env);
+  if (env.AI && context) context.waitUntil(indexEntry(entry, env).catch(() => {}));
+  return json({ ok: true, id }, 201);
+}
+
 async function api(request, env, url, context) {
   const path = url.pathname;
   const configured = Boolean(env.JOURNAL_DB && validPasswordConfig(env.JOURNAL_PASSWORD_HASH));
@@ -92,6 +123,7 @@ async function api(request, env, url, context) {
     if (path === '/api/session' && request.method === 'GET') return json({ authenticated: false, ready: false });
     fail(503, 'The journal is unavailable. Try again later.');
   }
+  if (path === '/api/inbox') return inbox(request, env, context);
   if (!['GET', 'HEAD'].includes(request.method)) {
     if (request.headers.get('Origin') !== url.origin || request.headers.get('X-Journal') !== '1') fail(403, 'Request not allowed.');
   }
@@ -137,6 +169,8 @@ async function api(request, env, url, context) {
     result.thoughts = await withPublicationState(result.thoughts, env);
     return json(result);
   }
+  const idea = await ideaApi(request, env, path, readBody);
+  if (idea) return idea;
   const publication = await publicationApi(request, env, path, readBody);
   if (publication) return publication;
   if (path === '/api/logout' && request.method === 'POST') {
@@ -201,14 +235,14 @@ async function api(request, env, url, context) {
     const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(data.id).first();
     if (existing) {
       if (existing.body !== body || existing.title !== title || Boolean(existing.is_draft) !== isDraft) fail(409, 'This thought already exists.');
-      await indexTags(existing,env);
+      await indexTags(existing,env); await indexIdeas(existing,env);
       return json({ entry: (await withPublicationState([existing], env))[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
     }
     const now = new Date().toISOString();
     const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at, is_draft) VALUES (?, ?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now, isDraft ? 1 : 0)];
     if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET title = '', body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ? AND title = ?").bind(data.draft_version, data.body, data.title || ''));
     const result = await env.JOURNAL_DB.batch(statements);
-    await indexTags(result[0].results[0],env);
+    await indexTags(result[0].results[0],env); await indexIdeas(result[0].results[0],env);
     if (!isDraft && env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
     return json({ entry: { ...result[0].results[0], published_slug: null, published_title: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
@@ -252,7 +286,7 @@ async function api(request, env, url, context) {
         if (finishing && !current.is_draft && current.body === body && (title === null || current.title === title)) return json({ entry: (await withPublicationState([current], env))[0] });
         result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET title = COALESCE(?, title), body = ?, is_draft = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND updated_at = ? AND (? IS NULL OR revision = ?) RETURNING ${thoughtColumns}`).bind(title, body, finishing ? 0 : current.is_draft, new Date().toISOString(), id, data.updated_at, revision, revision).first();
         if (!result) fail(409, 'This thought changed. Reload before editing.');
-        await indexTags(result,env);
+        await indexTags(result,env); await indexIdeas(result,env);
         if (!result.is_draft && env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
       } else {
         if (Object.hasOwn(data, 'is_draft')) fail(400, 'Include the draft text before posting.');
@@ -272,7 +306,7 @@ async function api(request, env, url, context) {
     }
   }
   if (path === '/api/export' && request.method === 'GET') {
-    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, liked, created_at, updated_at, source_date, is_draft, revision FROM thoughts ORDER BY seq').all();
+    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, liked, source, created_at, updated_at, source_date, is_draft, revision FROM thoughts ORDER BY seq').all();
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();
@@ -313,11 +347,11 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof TranscriptionError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof TranscriptionError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     if(response.status===101)return response;
