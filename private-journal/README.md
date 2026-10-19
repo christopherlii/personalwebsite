@@ -56,9 +56,9 @@ was typed; inside a longer note the line stays as its tag (styled as you type)
 and Enter moves on. The same lines anywhere in a note
 (`/idea …`, `/project …`, one per line) are indexed when it is saved
 (`ideas.mjs`, `thought_ideas`) and render as a blue idea / purple project tag.
-Bare `/idea` or `/project` floats that list up on the left, open ideas first;
+Bare `/idea` or `/project` (or `/ideas`, `/projects`, which only list) floats that list up on the left, open ideas first;
 clicking one opens its note and highlights the line, and hover offers
-written / started (kept through later edits of the note). `/focus` hides everything but the
+written / started (kept through later edits of the note). `/timeline` shows or hides the timeline, `/focus` hides everything but the
 page (Esc or `/focus` again restores it), `/random` opens a random thought,
 `/onthisday` floats this date's thoughts from earlier years up on the left (in
 the browser's time zone; imported posts use their dates), `/read <link>` saves

@@ -530,7 +530,7 @@ try {
   const draftIs = body => page.waitForFunction(async body => (await (await fetch('./api/draft')).json()).body === body, body);
   await draftIs('');
   await typeCommand('/');
-  assert.equal(await page.locator('#command-menu li').count(), 10, 'a bare slash lists every command');
+  assert.equal(await page.locator('#command-menu li').count(), 13, 'a bare slash lists every command');
   await page.keyboard.type('fo');
   assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);
   await page.waitForTimeout(900);
@@ -585,11 +585,20 @@ try {
   await typeCommand('/project'); await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'project ideas');
   assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['a 9pm memories app']);
+  await typeCommand('/ideas'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'writing ideas');
+  assert.equal(await page.locator('#float-left .float-idea').count(), 2, '/ideas only lists, it never creates');
+  await typeCommand('/timeline'); await page.keyboard.press('Enter');
+  await page.locator('#timeline').waitFor({ state: 'hidden' });
+  await typeCommand('/timeline'); await page.keyboard.press('Enter');
+  await page.locator('#timeline').waitFor({ state: 'visible' });
+  await typeCommand('/projects'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'project ideas');
   // Up in an empty field recalls recent commands.
   await typeCommand(''); await page.keyboard.press('ArrowUp');
-  assert.equal(await page.locator('#body').inputValue(), '/project');
+  assert.equal(await page.locator('#body').inputValue(), '/projects');
   await page.keyboard.press('ArrowUp');
-  assert.equal(await page.locator('#body').inputValue(), '/idea');
+  assert.equal(await page.locator('#body').inputValue(), '/timeline');
   await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
   assert.equal(await page.locator('#body').inputValue(), '', 'down past the newest clears the field');
   const essay = (await api('thoughts', 'POST', { id: crypto.randomUUID(), title: 'an unfinished essay', body: 'still writing this one', is_draft: true })).data.entry;
