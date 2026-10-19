@@ -11,6 +11,7 @@ import { plainPhotoLinks } from './photo-links.js';
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
 Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerHistory: null });
+Object.assign(state, { readerDraftTimer:null, readerConflict:false, readerAutosaving:false });
 state.tag = null;
 let readerEditor = null;
 let composerEditor = null;
@@ -44,7 +45,7 @@ async function findThoughts(query, signal, exclude = '') {
   const result = await api(`link-suggestions?q=${encodeURIComponent(query)}${exclude ? `&exclude=${exclude}` : ''}`, { signal });
   return result.entries;
 }
-function clearReaderEditor() { readerEditor?.destroy(); readerEditor = null; $('#live-editor').replaceChildren(); }
+function clearReaderEditor() { clearTimeout(state.readerDraftTimer); readerEditor?.destroy(); readerEditor = null; $('#live-editor').replaceChildren(); }
 
 function notice(message = '') { $('#notice').textContent = message; $('#notice').hidden = !message; }
 function draftStatus(message) {
@@ -85,6 +86,7 @@ function showLogin(message = '') {
   state.generation++;
   state.controller?.abort();
   clearTimeout(state.draftTimer);
+  clearTimeout(state.readerDraftTimer);
   clearTimeout(state.searchTimer);
   state.readerGeneration++;
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -126,6 +128,7 @@ function updateComposer() {
   composerEditor?.setValue($('#body').value);
   composerEditor?.setReadOnly(state.posting);
   $('#post').disabled = !$('#body').value.trim() || state.posting;
+  $('#save-essay').disabled = $('#post').disabled;
   $('#dictate-composer').disabled = state.posting || dictation.phase === 'transcribing';
 }
 
@@ -228,10 +231,14 @@ function renderReader(entry = state.readerEntry) {
 }
 function readerControls() {
   const editing = state.readerEditing;
-  const busy = Boolean(state.readerSaving);
+  const draft = Boolean(state.readerEntry?.is_draft);
+  const busy = Boolean(state.readerSaving) && !state.readerAutosaving;
   for (const id of ['reader-edit', 'reader-bookmark', 'reader-like']) $(`#${id}`).hidden = editing || !state.readerEntry;
-  $('#reader-menu-toggle').hidden = editing || !state.readerEntry;
-  $('#reader-save').hidden = !editing; $('#reader-cancel').hidden = !editing;
+  $('#reader-menu-toggle').hidden = (editing && !draft) || !state.readerEntry;
+  $('#reader-save').hidden = !editing || draft; $('#reader-cancel').hidden = !editing || draft;
+  $('#reader-post').hidden = !draft;
+  $('#reader-draft-label').hidden = !draft;
+  $('#reader-public').hidden = draft;
   $('#dictate-reader').hidden = !editing;
   $('#dictate-reader').disabled = busy || (dictation.owner === 'reader' && dictation.phase === 'transcribing');
   $('#edit-form').hidden = !editing;
@@ -240,6 +247,7 @@ function readerControls() {
   readerEditor?.setReadOnly(busy);
   for (const control of document.querySelectorAll('.reader-actions button, #edit-form input, #edit-form textarea')) control.disabled = busy;
   $('#reader-save').disabled = busy || !$('#edit-body').value.trim();
+  $('#reader-post').disabled = busy || state.readerConflict || !$('#edit-body').value.trim();
   const saved = Boolean(state.readerEntry?.bookmarked), liked = Boolean(state.readerEntry?.liked);
   $('#reader-bookmark').textContent = saved ? 'unsave' : 'save';
   $('#reader-bookmark').setAttribute('aria-pressed', String(saved));
@@ -263,35 +271,54 @@ function stopEditing() {
   state.readerEditing = false; state.readerDirty = false; clearReaderEditor();
   $('#reader-error').textContent = ''; renderReader(); readerControls();
 }
-async function saveReader() {
-  if(!await photos.finish())throw new Error('Photo upload failed. Try adding the photo again.');
-  if (dictation.owner === 'reader' && !await dictation.stop()) throw new Error('Dictation was not saved. Try again.');
-  if (state.readerSaving) return state.readerSaving;
-  if (!state.readerDirty) { stopEditing(); return; }
-  const title = $('#edit-thought-title').value, body = $('#edit-body').value;
-  if (!body.trim()) throw new Error('A thought needs some text.');
+async function saveReader({autosave=false,post=false}={}) {
+  clearTimeout(state.readerDraftTimer);
+  if (!autosave) {
+    if(!await photos.finish())throw new Error('Photo upload failed. Try adding the photo again.');
+    if (dictation.owner === 'reader' && !await dictation.stop()) throw new Error('Dictation was not saved. Try again.');
+  }
+  if (state.readerSaving) { await state.readerSaving; return saveReader({autosave,post}); }
+  if (state.readerConflict) throw new Error('This draft changed elsewhere. Copy your text before reloading.');
+  if (!state.readerEntry) return;
+  const draft = Boolean(state.readerEntry.is_draft);
+  if (!state.readerDirty && !post) { if (!draft) stopEditing(); return; }
+  state.readerAutosaving = autosave;
   state.readerSaving = (async () => {
-    const { entry } = await api(`thoughts/${state.readerEntry.id}`, { method: 'PATCH', body: JSON.stringify({ title, body, updated_at: state.readerEntry.updated_at }) });
-    updateEntry(entry); stopEditing();
+    do {
+      const title = $('#edit-thought-title').value, body = $('#edit-body').value;
+      if (!body.trim()) throw new Error('Add some text before saving.');
+      state.readerDirty = false;
+      $('#edit-form').dataset.draftState = 'saving';
+      try {
+        const { entry } = await api(`thoughts/${state.readerEntry.id}`, { method:'PATCH', body:JSON.stringify({title,body,updated_at:state.readerEntry.updated_at,revision:state.readerEntry.revision,...(post?{is_draft:false}:{})}) });
+        updateEntry(entry);
+        if (post || !draft) { stopEditing(); return; }
+        state.readerDirty = $('#edit-thought-title').value !== entry.title || $('#edit-body').value !== entry.body;
+      } catch(error) { state.readerDirty=true;state.readerConflict=error.status===409;if(state.readerConflict&&draft)error.message='This draft changed elsewhere. Copy your text before reloading.';throw error; }
+    } while(state.readerDirty);
+    $('#edit-form').dataset.draftState = 'saved';
+    $('#reader-error').textContent = ''; $('#reader-retry').hidden = true;
   })();
   readerControls();
   try { await state.readerSaving; }
-  finally { state.readerSaving = null; readerControls(); }
+  catch(error) { $('#edit-form').dataset.draftState='error';$('#reader-retry').hidden=state.readerConflict;throw error; }
+  finally { state.readerSaving = null; state.readerAutosaving=false;readerControls(); }
 }
 async function showRoute() {
   if (!state.authenticated) return;
-  if(!await photos.finish()){history.replaceState(state.readerHistory||null,'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
-  if(!await dictation.stop()){history.replaceState(state.readerHistory||null,'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
+  if(!await photos.finish()){history.replaceState({...state.readerHistory,journalNavigation:false},'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
+  if(!await dictation.stop()){history.replaceState({...state.readerHistory,journalNavigation:false},'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
   const id = readerId();
   readingView.hide();
   $('#reader-back').href = readerBackTarget();
-  if (state.readerDirty && id !== state.readerEntry?.id) {
+  if ((state.readerDirty || state.readerSaving) && id !== state.readerEntry?.id) {
     try { await saveReader(); }
     catch (error) {
       if (generation !== state.readerGeneration) return;
-      history.replaceState(state.readerHistory, '', `#thought/${state.readerEntry.id}`);
+      history.replaceState({...state.readerHistory,journalNavigation:false}, '', `#thought/${state.readerEntry.id}`);
+      state.readerHistory=history.state;
       $('#reader-back').href = state.readerHistory?.previousThought ? `#thought/${state.readerHistory.previousThought}` : '#';
       $('#reader-error').textContent = error.message; return;
     }
@@ -327,6 +354,7 @@ async function showRoute() {
     state.readerEditing = false; clearReaderEditor();
     renderReader(); readerControls();
     $('#reader-error').textContent = '';
+    if (entry.is_draft) beginEditing(false);
     document.title = 'journal';
   } catch (error) {
     if (generation !== state.readerGeneration || !state.authenticated) return;
@@ -395,6 +423,7 @@ function bodyContent(body, query, linkify = true) {
 
 function entryTags(entry) {
   const status = document.createDocumentFragment();
+  if (entry?.is_draft) { const label=document.createElement('span');label.className='entry-tag entry-draft';label.textContent='draft';status.append(label); }
   if (entry?.published_slug) {
     const published = document.createElement('a'); published.className = 'entry-tag entry-published'; published.textContent = 'published';
     published.href = `https://christopherli.dev/#thought/${encodeURIComponent(entry.published_slug)}`;
@@ -559,6 +588,7 @@ $('#composer').addEventListener('keydown', event => {
 });
 $('#composer').addEventListener('submit', async event => {
   event.preventDefault();
+  const essay = event.submitter?.id === 'save-essay';
   if(!await photos.finish())return;
   if (dictation.owner === 'composer' && !await dictation.stop()) return;
   if (state.posting || !$('#body').value.trim()) return;
@@ -571,12 +601,13 @@ $('#composer').addEventListener('submit', async event => {
     await saveDraft().catch(() => {});
     const body = $('#body').value;
     const title = $('#title').value;
-    if (!state.pendingPost || state.pendingPost.body !== body || state.pendingPost.title !== title) state.pendingPost = { id: crypto.randomUUID(), title, body };
+    if (!state.pendingPost || state.pendingPost.body !== body || state.pendingPost.title !== title || Boolean(state.pendingPost.is_draft) !== essay) state.pendingPost = { id: crypto.randomUUID(), title, body, ...(essay?{is_draft:true}:{}) };
     const data = await api('thoughts', { method: 'POST', body: JSON.stringify({ ...state.pendingPost, draft_version: state.draft.version }) });
     state.pendingPost = null; state.dirty = false; state.conflict = false; state.draft = data.draft;
     $('#body').value = data.draft.body; $('#title').value = data.draft.title || '';
     draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
     await setView('all');
+    if (essay) navigateThought(data.entry.id);
   } catch (error) { notice(error.message); }
   finally { state.posting = false; $('#body').disabled = false; $('#title').disabled = false; updateComposer(); }
 });
@@ -641,12 +672,13 @@ $('#edit-form').addEventListener('submit', async event => {
   try { await saveReader(); }
   catch (error) { $('#reader-error').textContent = error.message; }
 });
-$('#reader-edit').addEventListener('click', () => {
+function beginEditing(focus=true) {
   if (!state.readerEntry) return;
   closeMenus();
   $('#edit-thought-title').value = state.readerEntry.title || '';
   $('#edit-body').value = state.readerEntry.body;
   state.readerEditing = true; state.readerDirty = false;
+  state.readerConflict=false;$('#reader-retry').hidden=true;$('#edit-form').dataset.draftState='saved';
   $('#reader-error').textContent = ''; readerControls(); clearReaderEditor();
   readerEditor = createLiveEditor($('#live-editor'), {
     value: state.readerEntry.body,
@@ -655,16 +687,22 @@ $('#reader-edit').addEventListener('click', () => {
     onChange(value) { $('#edit-body').value = value; changedReader(); },
     onLimit() { $('#reader-error').textContent = 'Thoughts can contain up to 20,000 characters.'; }
   });
-  readerEditor.focus();
-});
+  if(focus)readerEditor.focus();
+}
+$('#reader-edit').addEventListener('click', () => beginEditing());
 function changedReader() {
   state.readerDirty = $('#edit-thought-title').value !== state.readerEntry.title || $('#edit-body').value !== state.readerEntry.body;
+  if(state.readerEntry.is_draft)$('#edit-form').dataset.draftState=state.readerDirty?'unsaved':state.readerSaving?'saving':'saved';
   readerControls();
+  clearTimeout(state.readerDraftTimer);
+  if(state.readerEntry.is_draft && state.readerDirty && !state.readerConflict)state.readerDraftTimer=setTimeout(()=>saveReader({autosave:true}).catch(error=>{$('#reader-error').textContent=error.message;}),650);
 }
 $('#edit-form').addEventListener('input', event => {
   if (event.target.id === 'edit-thought-title') changedReader();
 });
 $('#reader-cancel').addEventListener('click', stopEditing);
+$('#reader-post').addEventListener('click',()=>saveReader({post:true}).catch(error=>{$('#reader-error').textContent=error.message;}));
+$('#reader-retry').addEventListener('click',()=>saveReader({autosave:true}).catch(error=>{$('#reader-error').textContent=error.message;}));
 async function toggleReaderMark(control, field) {
   const entry = state.readerEntry; if (!entry) return;
   control.disabled = true;
@@ -690,8 +728,12 @@ $('#reader-delete').addEventListener('click', () => {
 $('#delete-form').addEventListener('submit', async event => {
   event.preventDefault(); const submit = event.submitter; submit.disabled = true;
   try {
+    if(!await photos.finish() || !await dictation.stop())return;
+    clearTimeout(state.readerDraftTimer);
+    if(state.readerSaving)await state.readerSaving.catch(()=>{});
     await api(`thoughts/${state.selected.id}`, { method: 'DELETE' });
     state.entries.delete(state.selected.id);
+    if(state.readerEntry?.id===state.selected.id){state.readerDirty=false;state.readerEntry=null;state.readerEditing=false;clearReaderEditor();}
     $('#delete-dialog').close(); await loadFeed(); location.hash = '';
   } catch (error) { $('#delete-error').textContent = error.message; }
   finally { submit.disabled = false; }
@@ -789,6 +831,7 @@ $('#logout').addEventListener('click', async () => {
   try {
     if(!await photos.finish())return;
     if(!await dictation.stop())return;
+    if(state.readerEntry?.is_draft && (state.readerDirty || state.readerSaving))await saveReader();
     await saveDraft();
     if (state.publicDirty) await savePublication();
     if (state.dirty) { notice('copy or post your unsaved draft before locking.'); return; }
@@ -803,7 +846,7 @@ $('#logout').addEventListener('click', async () => {
     showLogin();
   } catch (error) { notice(error.message); }
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { dictation.cancel(); if (state.dirty) saveDraft().catch(() => {}); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { dictation.cancel(); if (state.dirty) saveDraft().catch(() => {});if(state.readerEntry?.is_draft && state.readerDirty)saveReader({autosave:true}).catch(error=>{$('#reader-error').textContent=error.message;}); } });
 window.addEventListener('pagehide', () => dictation.cancel());
 window.addEventListener('beforeunload', event => {
   if (dictation.owner || photos.busy || state.dirty || state.saving || state.posting || state.publicDirty || state.publicBusy || state.readerDirty || state.readerSaving) { event.preventDefault(); event.returnValue = ''; }

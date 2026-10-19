@@ -56,6 +56,48 @@ function client(env = { JOURNAL_DB: database(), JOURNAL_PASSWORD_HASH: config },
 const thought = body => ({ id: crypto.randomUUID(), body });
 const publicDraft = (body = 'the public version') => ({ slug: 'a-public-note', title: 'a public note', body, date: '2026-10-17', tags: ['writing'], description: 'a public description', cover: '/static/images/blogs/example/cover.jpg', coverPosition: 'center 40%' });
 
+test('essay drafts share the timeline and retain their original identity and start date when edited or posted',async()=>{
+  const c=client();await c.login();
+  const input={id:crypto.randomUUID(),title:'an unfinished essay',body:'  a first paragraph\n\n',is_draft:true};
+  const created=await c.call('/api/thoughts','POST',input);assert.equal(created.status,201);const draft=created.data.entry;
+  assert.equal(draft.is_draft,1);assert.equal(draft.revision,0);assert.equal(draft.body,input.body);
+  assert.equal((await c.call('/api/thoughts','POST',input)).status,200,'creation retry does not duplicate the draft');
+  const second=(await c.call('/api/thoughts','POST',{...thought('another essay in progress'),is_draft:true})).data.entry;
+  const posted=(await c.call('/api/thoughts','POST',thought('a later thought'))).data.entry;
+  const saved=await c.call(`/api/thoughts/${draft.id}`,'PATCH',{body:'a first paragraph\n\nmore writing\n',title:'a developing essay',updated_at:draft.updated_at,revision:draft.revision});
+  assert.equal(saved.status,200);assert.equal(saved.data.entry.is_draft,1);assert.equal(saved.data.entry.body.endsWith('\n'),true);assert.equal(saved.data.entry.revision,1);
+  const finish={body:saved.data.entry.body,title:saved.data.entry.title,is_draft:false,updated_at:saved.data.entry.updated_at,revision:1};
+  const finished=await c.call(`/api/thoughts/${draft.id}`,'PATCH',finish);assert.equal(finished.status,200);assert.equal(finished.data.entry.is_draft,0);
+  assert.equal(finished.data.entry.id,draft.id);assert.equal(finished.data.entry.created_at,draft.created_at);assert.equal(finished.data.entry.seq,draft.seq);
+  assert.equal((await c.call(`/api/thoughts/${draft.id}`,'PATCH',finish)).status,200,'posting retry is idempotent');
+  assert.deepEqual((await c.call('/api/thoughts')).data.entries.map(e=>e.id),[posted.id,second.id,draft.id]);
+  assert.equal((await c.call('/api/thoughts?q=progress')).data.entries[0].is_draft,1);
+  assert.equal((await c.call('/api/export')).data.entries.find(e=>e.id===second.id).is_draft,1);
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('essay autosave rejects stale revisions and cannot restore draft state after posting',async()=>{
+  const c=client();await c.login();const entry=(await c.call('/api/thoughts','POST',{...thought('a draft'),is_draft:true})).data.entry;
+  const input={body:'saved on another tab',updated_at:entry.updated_at,revision:entry.revision};
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`,'PATCH',{body:'no revision',updated_at:entry.updated_at})).status,400);
+  const saved=(await c.call(`/api/thoughts/${entry.id}`,'PATCH',input)).data.entry;
+  c.env.JOURNAL_DB.sqlite.prepare('UPDATE thoughts SET updated_at=? WHERE id=?').run(entry.updated_at,entry.id);
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`,'PATCH',{...input,body:'stale overwrite'})).status,409,'revision protects even identical timestamps');
+  const finished=await c.call(`/api/thoughts/${entry.id}`,'PATCH',{body:saved.body,is_draft:false,updated_at:entry.updated_at,revision:saved.revision});assert.equal(finished.status,200);
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`,'PATCH',{...input,body:'late autosave'})).status,409);
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`,'PATCH',{body:saved.body,is_draft:true,updated_at:finished.data.entry.updated_at,revision:finished.data.entry.revision})).status,400);
+  assert.equal((await c.call(`/api/thoughts/${entry.id}`)).data.entry.is_draft,0);c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('unfinished essays cannot enter the public publishing flow',async()=>{
+  const c=client();await c.login();const entry=(await c.call('/api/thoughts','POST',{...thought('private unfinished writing'),is_draft:true})).data.entry;
+  const path=`/api/thoughts/${entry.id}/publication`;
+  assert.equal((await c.call(path)).status,409);assert.equal((await c.call(path,'PUT',{draft:publicDraft(),version:0})).status,409);
+  assert.deepEqual((await c.call('/public/posts/index.json')).data,[]);
+  assert.equal((await c.call('/api/thoughts','POST',{...thought('invalid'),is_draft:'true'})).status,400);
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
 test('live dictation requires the owner session, same-origin upgrade, and an available binding',async()=>{
  const c=client(),upgrade={Upgrade:'websocket'};
  assert.equal((await c.call('/api/dictation','GET',undefined,upgrade)).status,401);await c.login();

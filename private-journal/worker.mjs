@@ -193,21 +193,23 @@ async function api(request, env, url, context) {
   }
   if (path === '/api/thoughts' && request.method === 'POST') {
     const data = await readBody(request);
-    const body = bodyText(data.body).trim();
-    const title = titleText(data.title).trim();
+    if (data.is_draft !== undefined && typeof data.is_draft !== 'boolean') fail(400, 'Invalid draft state.');
+    const isDraft = data.is_draft === true;
+    const body = isDraft ? bodyText(data.body) : bodyText(data.body).trim();
+    const title = isDraft ? titleText(data.title) : titleText(data.title).trim();
     if (!uuid(data.id)) fail(400, 'Invalid thought.');
     const existing = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(data.id).first();
     if (existing) {
-      if (existing.body !== body || existing.title !== title) fail(409, 'This thought already exists.');
+      if (existing.body !== body || existing.title !== title || Boolean(existing.is_draft) !== isDraft) fail(409, 'This thought already exists.');
       await indexTags(existing,env);
       return json({ entry: (await withPublicationState([existing], env))[0], draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() });
     }
     const now = new Date().toISOString();
-    const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now)];
+    const statements = [env.JOURNAL_DB.prepare(`INSERT INTO thoughts(id, title, body, created_at, updated_at, is_draft) VALUES (?, ?, ?, ?, ?, ?) RETURNING ${thoughtColumns}`).bind(data.id, title, body, now, now, isDraft ? 1 : 0)];
     if (Number.isSafeInteger(data.draft_version)) statements.push(env.JOURNAL_DB.prepare("UPDATE draft SET title = '', body = '', version = version + 1 WHERE id = 1 AND version = ? AND body = ? AND title = ?").bind(data.draft_version, data.body, data.title || ''));
     const result = await env.JOURNAL_DB.batch(statements);
     await indexTags(result[0].results[0],env);
-    if (env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
+    if (!isDraft && env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
     return json({ entry: { ...result[0].results[0], published_slug: null, published_title: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
@@ -222,14 +224,22 @@ async function api(request, env, url, context) {
       const data = await readBody(request);
       let result;
       if (Object.hasOwn(data, 'body')) {
-        const body = bodyText(data.body).trim();
-        const title = Object.hasOwn(data, 'title') ? titleText(data.title).trim() : null;
+        const current = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts WHERE id = ?`).bind(id).first();
+        if (!current) fail(404, 'Thought not found.');
+        if (Object.hasOwn(data, 'is_draft') && data.is_draft !== false) fail(400, 'Invalid draft state.');
+        const finishing = data.is_draft === false;
+        const body = current.is_draft && !finishing ? bodyText(data.body) : bodyText(data.body).trim();
+        const title = Object.hasOwn(data, 'title') ? current.is_draft && !finishing ? titleText(data.title) : titleText(data.title).trim() : null;
         if (typeof data.updated_at !== 'string') fail(400, 'Missing thought version.');
-        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET title = COALESCE(?, title), body = ?, updated_at = ? WHERE id = ? AND updated_at = ? RETURNING ${thoughtColumns}`).bind(title, body, new Date().toISOString(), id, data.updated_at).first();
+        const revision = data.revision ?? null;
+        if ((current.is_draft || finishing || revision !== null) && (!Number.isSafeInteger(revision) || revision < 0)) fail(400, 'Missing thought revision.');
+        if (finishing && !current.is_draft && current.body === body && (title === null || current.title === title)) return json({ entry: (await withPublicationState([current], env))[0] });
+        result = await env.JOURNAL_DB.prepare(`UPDATE thoughts SET title = COALESCE(?, title), body = ?, is_draft = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND updated_at = ? AND (? IS NULL OR revision = ?) RETURNING ${thoughtColumns}`).bind(title, body, finishing ? 0 : current.is_draft, new Date().toISOString(), id, data.updated_at, revision, revision).first();
         if (!result) fail(409, 'This thought changed. Reload before editing.');
         await indexTags(result,env);
-        if (env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
+        if (!result.is_draft && env.AI && context) context.waitUntil(indexEntry(result, env).catch(() => {}));
       } else {
+        if (Object.hasOwn(data, 'is_draft')) fail(400, 'Include the draft text before posting.');
         // Saved (stored as bookmarked) and liked toggle independently.
         const marks = ['bookmarked', 'liked'].filter(field => Object.hasOwn(data, field));
         if (!marks.length || marks.some(field => typeof data[field] !== 'boolean')) fail(400, 'Invalid change.');
@@ -246,7 +256,7 @@ async function api(request, env, url, context) {
     }
   }
   if (path === '/api/export' && request.method === 'GET') {
-    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, liked, created_at, updated_at, source_date FROM thoughts ORDER BY seq').all();
+    const { results } = await env.JOURNAL_DB.prepare('SELECT id, title, body, bookmarked, liked, created_at, updated_at, source_date, is_draft, revision FROM thoughts ORDER BY seq').all();
     const draft = await env.JOURNAL_DB.prepare('SELECT title, body FROM draft WHERE id = 1').first();
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();

@@ -226,7 +226,7 @@ textarea::placeholder {
 .composer-tools { display:flex; align-items:center; gap:16px; min-width:0 }
 .composer-toolbar button { min-height:30px; color:var(--muted); font-size:11px; white-space:nowrap }
 .composer-toolbar .post:enabled { color:var(--fg) }
-.compose-actions { display:flex; align-items:center; flex-shrink:0 }
+.compose-actions { display:flex; align-items:center; gap:16px; flex-shrink:0 }
 .writing-feedback { text-align:right; min-height:16px; margin-top:2px; font-size:10px; line-height:16px; color:var(--muted) }
 .writing-feedback>[role=status]:empty { display:none }
 .draft-feedback { display:flex; justify-content:flex-end; align-items:baseline; gap:12px }
@@ -264,6 +264,7 @@ textarea::placeholder {
 .entry-published:hover { text-decoration:underline; text-underline-offset:3px }
 .entry-saved { background:#f7efcf; color:#7a5c0a }
 .entry-liked { background:#f8e3e0; color:#a12e22 }
+.entry-draft { color:var(--muted); padding-left:0; padding-right:0 }
 .thought-title {
   display:flex;
   flex-wrap:wrap;
