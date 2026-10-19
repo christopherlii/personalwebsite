@@ -212,6 +212,22 @@ async function api(request, env, url, context) {
     if (!isDraft && env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
     return json({ entry: { ...result[0].results[0], published_slug: null, published_title: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
+  if (path === '/api/thoughts/random' && request.method === 'GET') {
+    const entry = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts ORDER BY RANDOM() LIMIT 1`).first();
+    if (!entry) fail(404, 'No thoughts yet.');
+    return json({ entry: (await withPublicationState([entry], env))[0] });
+  }
+  if (path === '/api/thoughts/on-this-day' && request.method === 'GET') {
+    // The browser sends its own date and UTC offset so "today" is the owner's day.
+    const day = url.searchParams.get('day') || '', year = url.searchParams.get('year') || '', offset = Number(url.searchParams.get('offset'));
+    if (!/^\d\d-\d\d$/.test(day) || !/^\d{4}$/.test(year) || !Number.isInteger(offset) || Math.abs(offset) > 840) fail(400, 'Invalid date.');
+    const shift = `${offset} minutes`;
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT ${thoughtSelect} FROM thoughts t
+      WHERE COALESCE(substr(t.source_date, 6, 5), strftime('%m-%d', t.created_at, ?)) = ?
+      AND COALESCE(substr(t.source_date, 1, 4), strftime('%Y', t.created_at, ?)) < ?
+      ORDER BY COALESCE(t.source_date, t.created_at) DESC LIMIT 40`).bind(shift, day, shift, year).all();
+    return json({ entries: await withPublicationState(results, env) });
+  }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
     const id = thought[1];
@@ -297,7 +313,7 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {

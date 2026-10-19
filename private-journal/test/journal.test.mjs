@@ -318,6 +318,28 @@ test('saved and liked toggle independently and survive reads, filters, and expor
   for (const body of [{}, { liked: 'yes' }, { liked: true, bookmarked: 1 }, { pinned: true }]) assert.equal((await c.call(`/api/thoughts/${entry.id}`, 'PATCH', body)).status, 400);
 });
 
+test('random and on-this-day lookups for the command bar', async () => {
+  const c = client();
+  assert.equal((await c.call('/api/thoughts/random')).status, 401);
+  await c.login();
+  assert.equal((await c.call('/api/thoughts/random')).status, 404, 'an empty journal has nothing to open');
+  const only = (await c.call('/api/thoughts', 'POST', thought('the only thought'))).data.entry;
+  assert.equal((await c.call('/api/thoughts/random')).data.entry.id, only.id);
+  const db = c.env.JOURNAL_DB.sqlite;
+  const insert = (id, body, created, source = null) => db.prepare('INSERT INTO thoughts(id, title, body, created_at, updated_at, source_date) VALUES (?, ?, ?, ?, ?, ?)').run(id, '', body, created, created, source);
+  const lastYear = crypto.randomUUID(), imported = crypto.randomUUID(), lateUtc = crypto.randomUUID(), thisYear = crypto.randomUUID(), otherDay = crypto.randomUUID();
+  insert(lastYear, 'a year ago today', '2025-10-19T18:00:00.000Z');
+  insert(imported, 'an imported letter', '2026-10-01T00:00:00.000Z', '2024-10-19');
+  insert(lateUtc, 'late at night in california', '2025-10-20T05:30:00.000Z');
+  insert(thisYear, 'earlier today', '2026-10-19T16:00:00.000Z');
+  insert(otherDay, 'a different day', '2025-10-18T18:00:00.000Z');
+  const ids = (await c.call('/api/thoughts/on-this-day?day=10-19&year=2026&offset=-420')).data.entries.map(entry => entry.id);
+  assert.deepEqual(ids, [lateUtc, lastYear, imported], 'earlier years only, in the owner\'s time zone, with imported dates, newest first');
+  assert.ok(!ids.includes(thisYear) && !ids.includes(otherDay));
+  assert.ok(!(await c.call('/api/thoughts/on-this-day?day=10-19&year=2026&offset=0')).data.entries.some(entry => entry.id === lateUtc), 'the UTC day differs');
+  for (const query of ['day=1019&year=2026&offset=0', 'day=10-19&year=26&offset=0', 'day=10-19&year=2026&offset=9999', 'day=10-19&year=2026&offset=x']) assert.equal((await c.call(`/api/thoughts/on-this-day?${query}`)).status, 400);
+});
+
 test('editor styles use a fresh shell nonce while scripts and arbitrary inline styles stay restricted', async () => {
   const c = client();
   c.env.ASSETS = { fetch: async () => new Response('<!doctype html><html><head></head><body></body></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '1', ETag: 'original' } }) };

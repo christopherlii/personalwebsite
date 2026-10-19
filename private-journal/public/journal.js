@@ -7,6 +7,7 @@ import { markdownTags, normalizeTag } from './tags.js';
 import { createDictation } from './dictation.js';
 import { createPhotos } from './photos.js';
 import { plainPhotoLinks } from './photo-links.js';
+import { createCommands, commandMatches } from './commands.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -78,6 +79,7 @@ document.addEventListener('keydown', event => {
   open.focus({ preventScroll: true });
 });
 function showLogin(message = '') {
+  setFocus(false);
   photos.cancel();
   dictation.cancel();
   closeMenus();
@@ -169,6 +171,10 @@ async function saveDraft() {
 }
 
 function changedDraft() {
+  commands.update();
+  // A command in progress is neither a draft nor a search: the timeline and
+  // the saved draft stay as they were until it runs or turns back into writing.
+  if (commandMatches($('#body').value).length) { clearTimeout(state.draftTimer); clearTimeout(state.searchTimer); updateComposer(); return; }
   state.dirty = true;
   updateComposer();
   searchFromComposer();
@@ -568,6 +574,54 @@ async function setView(view) {
   state.view = view;
   await searchFromComposer(true);
 }
+
+function setFocus(on) { document.body.classList.toggle('focus-mode', on); }
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.body.classList.contains('focus-mode') && !document.querySelector('dialog[open]')) setFocus(false);
+});
+function clearFloat(side) { const float = $(`#float-${side}`); float.replaceChildren(); float.hidden = true; }
+// Results float up beside the writing as plain text: no panel, no border.
+function floatThoughts(side, heading, entries, emptyText) {
+  const float = $(`#float-${side}`);
+  const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = heading;
+  const items = entries.map((entry, index) => {
+    const item = document.createElement('button'); item.type = 'button'; item.className = 'float-item';
+    item.style.animationDelay = `${(index + 1) * 40}ms`;
+    const date = document.createElement('span'); date.className = 'float-date';
+    date.textContent = new Date(entry.source_date ? `${entry.source_date}T12:00:00` : entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
+    const text = document.createElement('span'); text.className = 'float-text';
+    text.textContent = entry.title || entry.published_title || plainPhotoLinks(plainThoughtLinks(entry.body)).slice(0, 120);
+    item.append(date, text); item.addEventListener('click', () => navigateThought(entry.id));
+    return item;
+  });
+  if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; items.push(empty); }
+  float.replaceChildren(title, ...items); float.hidden = false;
+}
+async function runCommand(name, argument) {
+  notice();
+  try {
+    if (name === 'focus') setFocus(!document.body.classList.contains('focus-mode'));
+    else if (name === 'lock') $('#logout').click();
+    else if (name === 'cl') clearFloat('left');
+    else if (name === 'cr') clearFloat('right');
+    else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
+    else if (name === 'onthisday') {
+      const now = new Date(), pad = value => String(value).padStart(2, '0');
+      const params = new URLSearchParams({ day: `${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, year: String(now.getFullYear()), offset: String(-now.getTimezoneOffset()) });
+      const { entries } = await api(`thoughts/on-this-day?${params}`);
+      floatThoughts('left', 'on this day', entries, 'nothing from this day in earlier years.');
+    } else if (name === 'read') {
+      if (!argument) { location.hash = '#reading'; return; }
+      const data = await api('reading', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), url: argument }) });
+      notice(data.existing ? 'already in read later.' : 'saved to read later.');
+    }
+  } catch (error) { notice(error.status === 404 && name === 'random' ? 'no thoughts yet.' : error.message); }
+}
+const commands = createCommands({
+  getText: () => $('#body').value,
+  fill(text) { $('#body').value = text; composerEditor?.setValue(text); changedDraft(); composerEditor?.focus(); },
+  run: runCommand
+});
 
 $('#login-form').addEventListener('submit', async event => {
   event.preventDefault(); $('#unlock').disabled = true; $('#login-message').textContent = 'unlocking…';
