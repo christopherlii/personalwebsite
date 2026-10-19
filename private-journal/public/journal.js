@@ -681,6 +681,8 @@ async function runCommand(name, argument, context = {}) {
       receipt(name === 'idea' ? 'idea saved' : 'project saved');
       await flyIdea(name, argument, context.rect);
     }
+    else if (name === 'ideas' || name === 'projects') await floatIdeas(name === 'ideas' ? 'idea' : 'project');
+    else if (name === 'timeline') $('#toggle-timeline').click();
     else if (name === 'draft') {
       const { entries } = await api('thoughts/drafts');
       floatBullets('essay drafts', entries.map(entry => ({ text: entry.title || plainPhotoLinks(plainThoughtLinks(entry.body)).slice(0, 120), open: () => navigateThought(entry.id) })), 'no essay drafts. keep one with ⌘S.');
