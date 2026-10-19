@@ -24,6 +24,21 @@ const wikiLinks = {
     ]));
   } }]
 };
+// "/idea" and "/project" at the start of a line take the tag style as you
+// type, so a captured idea looks the same here as it will once saved.
+const ideaMarkers = StateField.define({
+  create: state => ideaRanges(state),
+  update: (value, transaction) => transaction.docChanged ? ideaRanges(transaction.state) : value,
+  provide: field => EditorView.decorations.from(field)
+});
+function ideaRanges(state) {
+  const ranges = [];
+  for (let number = 1; number <= state.doc.lines; number++) {
+    const line = state.doc.line(number), match = /^([ \t]*)\/(idea|project)(?=[ \t]+\S)/i.exec(line.text);
+    if (match) ranges.push(Decoration.mark({ class: `cm-idea-marker cm-idea-marker-${match[2].toLowerCase()}` }).range(line.from + match[1].length, line.from + match[0].length));
+  }
+  return RangeSet.of(ranges);
+}
 const hiddenTargets = StateField.define({
   create: state => targetRanges(state),
   update: (value, transaction) => transaction.docChanged || syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? targetRanges(transaction.state) : value
@@ -182,7 +197,7 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
     doc: value, selection: { anchor: value.length },
     extensions: [
       EditorView.cspNonce.of(nonce),
-      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets, liveSpeech,
+      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets, ideaMarkers, liveSpeech,
       EditorView.atomicRanges.of(view => view.state.field(hiddenTargets)),
       placeholder(emptyText),
       autocompletion({ override: [completions(findThoughts)], icons: false, maxRenderedOptions: 8, activateOnTypingDelay: 180 }),
@@ -215,6 +230,20 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
   const view = new EditorView({ parent, state: makeState(value) });
   return {
     focus() { view.focus(); },
+    // The line under a collapsed cursor, for commands typed on any line.
+    cursorLine() {
+      const { main } = view.state.selection;
+      if (!main.empty || destroyed) return null;
+      const line = view.state.doc.lineAt(main.head);
+      return { text: line.text, from: line.from, to: line.to, alone: view.state.doc.lines === 1 };
+    },
+    removeLine(from, to) {
+      if (readOnly || destroyed) return;
+      const length = view.state.doc.length;
+      const start = to < length ? from : Math.max(0, from - 1), end = to < length ? to + 1 : to;
+      view.dispatch({ changes: { from: start, to: end }, selection: { anchor: start }, userEvent: 'delete.command' });
+    },
+    lineRect(from) { return destroyed ? null : view.coordsAtPos(from); },
     previewText(text) {
       if (readOnly || destroyed) return false;
       if (view.state.doc.length - (view.state.selection.main.to-view.state.selection.main.from) + text.length > 20000) { onLimit(); return false; }

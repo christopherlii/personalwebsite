@@ -548,33 +548,58 @@ try {
   assert.equal(await page.locator('#float-left .float-heading').textContent(), 'on this day');
   await typeCommand('/cl'); await page.keyboard.press('Enter');
   await page.locator('#float-left').waitFor({ state: 'hidden' });
+  const receiptIs = text => page.waitForFunction(text => document.querySelector('#command-receipt').textContent === text, text);
+  // A standalone idea goes only to the ideas list, never the timeline.
+  const thoughtsBefore = (await api('export')).data.entries.length;
   await typeCommand('/idea trains as thinking rooms'); await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('#notice').textContent === 'writing idea saved.');
-  await typeCommand('/project a 9pm memories app'); await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('#notice').textContent === 'project idea saved.');
-  await typeCommand('/idea'); await page.keyboard.press('Enter');
+  await receiptIs('idea saved');
   await page.locator('#float-left .float-idea').first().waitFor();
-  assert.equal(await page.locator('#float-left .float-heading').textContent(), 'writing ideas');
-  assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['trains as thinking rooms'], 'project ideas are listed separately');
-  await page.locator('#float-left .float-item').first().click();
+  assert.equal(await page.locator('#float-left .float-heading').textContent(), 'writing ideas', 'the list rises to meet a saved idea');
+  assert.equal((await api('export')).data.entries.length, thoughtsBefore, 'a standalone idea adds no timeline note');
+  await typeCommand('/project a 9pm memories app'); await page.keyboard.press('Enter');
+  await receiptIs('project saved');
+  // Inside a longer note, an idea line stays put as its tag; Enter moves on.
+  await typeCommand('a long walk after work.'); await page.keyboard.press('Enter');
+  await page.keyboard.type('/idea walking as thinking'); await page.keyboard.press('Enter');
+  await receiptIs('idea noted');
+  await page.keyboard.type('more about the walk.');
+  assert.equal(await page.locator('#body').inputValue(), 'a long walk after work.\n/idea walking as thinking\nmore about the walk.');
+  assert.equal(await page.locator('#composer-editor .cm-idea-marker-idea').textContent(), '/idea', 'the editor shows the idea tag as you type');
+  // An action on its own line runs and removes only that line.
+  await page.keyboard.press('Enter'); await page.keyboard.type('/cl'); await page.keyboard.press('Enter');
+  await receiptIs('cleared the left');
+  assert.equal(await page.locator('#body').inputValue(), 'a long walk after work.\n/idea walking as thinking\nmore about the walk.');
+  const postedWalk = page.waitForResponse(response => response.url().endsWith('/api/thoughts') && response.request().method() === 'POST');
+  await page.locator('#post').click(); const walk = (await (await postedWalk).json()).entry;
+  await typeCommand('/idea'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('#float-left .float-text').length === 2);
+  assert.deepEqual((await page.locator('#float-left .float-text').allTextContents()).sort(), ['trains as thinking rooms', 'walking as thinking'], 'the loose idea and the idea from a note are listed together');
+  assert.ok(!(await page.locator('#float-left .float-text').allTextContents()).includes('a 9pm memories app'), 'project ideas are listed separately');
+  await page.locator('#float-left .float-item', { hasText: 'walking as thinking' }).click();
   await page.locator('#reader-content .idea-line.is-revealed').waitFor();
   assert.equal(await page.locator('#reader-content .idea-line .entry-idea').textContent(), 'idea', 'the idea line renders as a tag in its note');
   await backToFeed();
-  await page.locator('#float-left .float-idea').first().hover(); await page.locator('#float-left .float-done').first().click();
+  await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).hover();
+  await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).locator('.float-done').click();
   await page.locator('#float-left .float-idea.is-done').waitFor();
   await typeCommand('/project'); await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'project ideas');
+  assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['a 9pm memories app']);
+  // Up in an empty field recalls recent commands.
+  await typeCommand(''); await page.keyboard.press('ArrowUp');
+  assert.equal(await page.locator('#body').inputValue(), '/project');
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.locator('#body').inputValue(), '/idea');
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+  assert.equal(await page.locator('#body').inputValue(), '', 'down past the newest clears the field');
   const essay = (await api('thoughts', 'POST', { id: crypto.randomUUID(), title: 'an unfinished essay', body: 'still writing this one', is_draft: true })).data.entry;
   await typeCommand('/draft'); await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'essay drafts');
   assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['an unfinished essay']);
   await page.locator('#float-left .float-item').first().click();
   await page.waitForFunction(id => location.hash === `#thought/${id}`, essay.id);
-  await backToFeed(); await api(`thoughts/${essay.id}`, 'DELETE', {});
-  for (const text of ['/idea trains as thinking rooms', '/project a 9pm memories app']) {
-    const entry = (await api('export')).data.entries.find(item => item.body === text);
-    await api(`thoughts/${entry.id}`, 'DELETE', {});
-  }
+  await backToFeed();
+  for (const id of [essay.id, walk.id]) await api(`thoughts/${id}`, 'DELETE', {});
   await typeCommand('/cl'); await page.keyboard.press('Enter');
   await typeCommand('/shrug at the sky');
   assert.equal(await page.locator('#command-menu').isHidden(), true, 'a line that is not a command stays writing');
