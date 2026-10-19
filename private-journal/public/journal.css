@@ -178,8 +178,15 @@ h1,h2 {
   z-index:3;
   left:0;
   right:0;
-  margin:4px 0 0;
-  padding:4px 0 12px;
+  margin:0;
+  padding:12px 0 28px;
+  /* About six commands tall: the next one fades out to hint at the rest,
+     which scroll into view with the arrow keys. */
+  max-height:176px;
+  overflow-y:auto;
+  scrollbar-width:none;
+  scroll-padding:12px 0 28px;
+  mask-image:linear-gradient(to bottom, transparent, #000 12px, #000 calc(100% - 30px), transparent);
   list-style:none;
   background:var(--bg);
   font-size:12px
@@ -191,6 +198,7 @@ h1,h2 {
 .cm-idea-marker { padding:1px 5px; font-size:11px }
 .cm-idea-marker-idea { background:#e3ecf7; color:#1f4f8a }
 .cm-idea-marker-project { background:#ece6f6; color:#5b3d8f }
+.cm-idea-marker-curious { background:#f8ead3; color:#8a5a12 }
 .command-menu li { display:flex; align-items:baseline; gap:14px; padding:3px 0; cursor:pointer; color:var(--muted) }
 .command-menu .command-name { min-width:84px; color:var(--muted) }
 .command-menu [aria-selected=true] .command-name { color:var(--fg) }
@@ -333,6 +341,7 @@ textarea::placeholder {
 .entry-liked { background:#f8e3e0; color:#a12e22 }
 .entry-idea { background:#e3ecf7; color:#1f4f8a }
 .entry-project { background:#ece6f6; color:#5b3d8f }
+.entry-curious { background:#f8ead3; color:#8a5a12 }
 .idea-line .entry-tag { margin-right:2px }
 /* An idea is its own line even when Markdown runs its lines together. */
 .idea-line { display:block; width:fit-content; transition:background-color 900ms ease }

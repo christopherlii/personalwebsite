@@ -330,26 +330,26 @@ test('the drafts lookup lists unfinished essays, newest edit first', async () =>
   assert.ok(!entries.some(entry => entry.id === finished.id));
 });
 
-test('random and on-this-day lookups for the command bar', async () => {
+test('random lookup for the command bar, and on this day is gone', async () => {
   const c = client();
   assert.equal((await c.call('/api/thoughts/random')).status, 401);
   await c.login();
   assert.equal((await c.call('/api/thoughts/random')).status, 404, 'an empty journal has nothing to open');
   const only = (await c.call('/api/thoughts', 'POST', thought('the only thought'))).data.entry;
   assert.equal((await c.call('/api/thoughts/random')).data.entry.id, only.id);
-  const db = c.env.JOURNAL_DB.sqlite;
-  const insert = (id, body, created, source = null) => db.prepare('INSERT INTO thoughts(id, title, body, created_at, updated_at, source_date) VALUES (?, ?, ?, ?, ?, ?)').run(id, '', body, created, created, source);
-  const lastYear = crypto.randomUUID(), imported = crypto.randomUUID(), lateUtc = crypto.randomUUID(), thisYear = crypto.randomUUID(), otherDay = crypto.randomUUID();
-  insert(lastYear, 'a year ago today', '2025-10-19T18:00:00.000Z');
-  insert(imported, 'an imported letter', '2026-10-01T00:00:00.000Z', '2024-10-19');
-  insert(lateUtc, 'late at night in california', '2025-10-20T05:30:00.000Z');
-  insert(thisYear, 'earlier today', '2026-10-19T16:00:00.000Z');
-  insert(otherDay, 'a different day', '2025-10-18T18:00:00.000Z');
-  const ids = (await c.call('/api/thoughts/on-this-day?day=10-19&year=2026&offset=-420')).data.entries.map(entry => entry.id);
-  assert.deepEqual(ids, [lateUtc, lastYear, imported], 'earlier years only, in the owner\'s time zone, with imported dates, newest first');
-  assert.ok(!ids.includes(thisYear) && !ids.includes(otherDay));
-  assert.ok(!(await c.call('/api/thoughts/on-this-day?day=10-19&year=2026&offset=0')).data.entries.some(entry => entry.id === lateUtc), 'the UTC day differs');
-  for (const query of ['day=1019&year=2026&offset=0', 'day=10-19&year=26&offset=0', 'day=10-19&year=2026&offset=9999', 'day=10-19&year=2026&offset=x']) assert.equal((await c.call(`/api/thoughts/on-this-day?${query}`)).status, 400);
+  assert.equal((await c.call('/api/thoughts/on-this-day?day=10-19&year=2026&offset=0')).status, 404);
+});
+
+test('curiosities file under their own kind, from /curious and /hm lines and on their own', async () => {
+  const c = client(); await c.login();
+  const note = (await c.call('/api/thoughts', 'POST', thought('walked home.\n/hm why do cities feel quieter in fog\n/curious what makes a place feel like home\n/idea fog as a mood'))).data.entry;
+  const curious = (await c.call('/api/ideas?kind=curious')).data.ideas;
+  assert.deepEqual(curious.map(item => item.text).sort(), ['what makes a place feel like home', 'why do cities feel quieter in fog']);
+  assert.ok(curious.every(item => item.thought_id === note.id && item.kind === 'curious'));
+  assert.deepEqual((await c.call('/api/ideas?kind=idea')).data.ideas.map(item => item.text), ['fog as a mood'], 'curiosities stay out of ideas');
+  const loose = await c.call('/api/ideas', 'POST', { id: crypto.randomUUID().replaceAll('-', ''), kind: 'curious', text: 'why do we romanticize leaving' });
+  assert.equal(loose.status, 201); assert.equal(loose.data.idea.kind, 'curious');
+  assert.equal((await c.call('/api/ideas?kind=curious')).data.ideas.length, 3);
 });
 
 test('/idea and /project lines are indexed, keep their done mark through edits, and link back to their note', async () => {

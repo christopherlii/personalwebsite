@@ -5,13 +5,14 @@ const $ = selector => document.querySelector(selector);
 export const COMMANDS = [
   { name: 'idea', hint: 'log a writing idea, or list them', takes: 'idea', captures: true },
   { name: 'project', hint: 'log a project idea, or list them', takes: 'idea', captures: true },
-  { name: 'ideas', hint: 'your writing ideas' },
-  { name: 'projects', hint: 'your project ideas' },
+  { name: 'curious', hint: 'log a curiosity, or list them', takes: 'idea', captures: true },
+  { name: 'hm', hint: 'log a curiosity, or list them', takes: 'idea', captures: true, shortcut: true },
+  { name: 'ideas', hint: 'your writing ideas', shortcut: true },
+  { name: 'projects', hint: 'your project ideas', shortcut: true },
   { name: 'timeline', hint: 'show or hide the timeline' },
   { name: 'draft', hint: 'your essay drafts' },
   { name: 'focus', hint: 'hide everything but the page' },
   { name: 'random', hint: 'open a random thought' },
-  { name: 'onthisday', hint: 'this date in earlier years' },
   { name: 'read', hint: 'save a link, or open read later', takes: 'link' },
   { name: 'lock', hint: 'lock the journal' },
   { name: 'cl', hint: 'clear the left side' },
@@ -30,7 +31,9 @@ export function parseCommand(text) {
 export function commandMatches(text) {
   const command = parseCommand(text);
   if (!command) return [];
-  return command.spaced ? COMMANDS.filter(item => item.name === command.name) : COMMANDS.filter(item => item.name.startsWith(command.name));
+  // Shortcuts (/hm, /ideas, /projects) only appear once you start typing them.
+  return command.spaced ? COMMANDS.filter(item => item.name === command.name)
+    : COMMANDS.filter(item => item.name.startsWith(command.name) && (command.name || !item.shortcut));
 }
 
 export function createCommands({ getEditor, fill, run, receipt }) {
@@ -49,6 +52,7 @@ export function createCommands({ getEditor, fill, run, receipt }) {
       return item;
     }));
     menu.hidden = !matches.length;
+    menu.children[active]?.scrollIntoView({ block: 'nearest' });
     menu.setAttribute('aria-activedescendant', matches[active] ? `command-${matches[active].name}` : '');
   }
 
@@ -74,7 +78,7 @@ export function createCommands({ getEditor, fill, run, receipt }) {
     hide();
     // "/idea …" inside a longer note stays there as its tag; the idea is
     // indexed when the note is saved, and Enter just moves to the next line.
-    if (chosen.captures && argument && !line.alone) { receipt(chosen.name === 'idea' ? 'idea noted' : 'project noted'); return false; }
+    if (chosen.captures && argument && !line.alone) { receipt({ idea: 'idea noted', project: 'project noted' }[chosen.name] || 'curiosity noted'); return false; }
     const rect = editor.lineRect(line.from);
     if (line.alone) fill(''); else editor.removeLine(line.from, line.to);
     run(chosen.name, argument, { standalone: line.alone, rect });

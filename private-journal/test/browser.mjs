@@ -530,7 +530,7 @@ try {
   const draftIs = body => page.waitForFunction(async body => (await (await fetch('./api/draft')).json()).body === body, body);
   await draftIs('');
   await typeCommand('/');
-  assert.equal(await page.locator('#command-menu li').count(), 13, 'a bare slash lists every command');
+  assert.equal(await page.locator('#command-menu li').count(), 11, 'a bare slash lists every command but the shortcuts');
   await page.keyboard.type('fo');
   assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);
   await page.waitForTimeout(900);
@@ -543,9 +543,12 @@ try {
   await page.waitForFunction(() => !document.body.classList.contains('focus-mode'));
   await typeCommand('/re'); await page.keyboard.press('Tab');
   assert.equal(await page.locator('#body').inputValue(), '/read ', 'tab completes a command that takes a link');
-  await typeCommand('/onthisday'); await page.keyboard.press('Enter');
-  await page.locator('#float-left .float-heading').waitFor();
-  assert.equal(await page.locator('#float-left .float-heading').textContent(), 'on this day');
+  await typeCommand('/hm why do cities feel quieter in fog'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#command-receipt').textContent === 'curiosity saved');
+  await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'curiosities');
+  assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['why do cities feel quieter in fog']);
+  await page.locator('#float-left .float-idea').first().hover();
+  assert.equal(await page.locator('#float-left .float-done').first().textContent(), 'looked into');
   await typeCommand('/cl'); await page.keyboard.press('Enter');
   await page.locator('#float-left').waitFor({ state: 'hidden' });
   const receiptIs = text => page.waitForFunction(text => document.querySelector('#command-receipt').textContent === text, text);
@@ -636,7 +639,7 @@ try {
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
   await page.locator('#journal-menu-toggle').click(); await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'command bar', 'writing and project ideas', 'essay drafts list', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'command bar', 'writing and project ideas', 'curiosities', 'essay drafts list', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

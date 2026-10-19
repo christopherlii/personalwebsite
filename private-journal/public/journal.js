@@ -8,7 +8,7 @@ import { createDictation } from './dictation.js';
 import { createPhotos } from './photos.js';
 import { plainPhotoLinks } from './photo-links.js';
 import { createCommands, commandMatches } from './commands.js';
-import { IDEA_KINDS } from './ideas.js';
+import { IDEA_KINDS, IDEA_WORDS, IDEA_WORD_PATTERN } from './ideas.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -580,14 +580,14 @@ async function setView(view) {
 // "/idea …" and "/project …" lines render as a small tag followed by the idea.
 function decorateIdeas(root) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [];
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) if (/\/(idea|project)[ \t]/i.test(node.data) && !node.parentElement.closest('code,pre,a')) nodes.push(node);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) if (new RegExp(`\\/(${IDEA_WORD_PATTERN})[ \\t]`, 'i').test(node.data) && !node.parentElement.closest('code,pre,a')) nodes.push(node);
   for (const node of nodes) {
     // A match at the very start of this text node only counts at a line start.
     const lineStart = !node.previousSibling || node.previousSibling.nodeName === 'BR';
     const fragment = document.createDocumentFragment(); let last = 0;
-    for (const match of node.data.matchAll(/(^|\n)[ \t]*\/(idea|project)[ \t]+([^\n]*)/gi)) {
+    for (const match of node.data.matchAll(new RegExp(`(^|\\n)[ \\t]*\\/(${IDEA_WORD_PATTERN})[ \\t]+([^\\n]*)`, 'gi'))) {
       if (match.index === 0 && !match[1] && !lineStart) continue;
-      const start = match.index + match[1].length, kind = match[2].toLowerCase(), value = match[3];
+      const start = match.index + match[1].length, kind = IDEA_WORDS[match[2].toLowerCase()], value = match[3];
       fragment.append(node.data.slice(last, start));
       const line = document.createElement('span'); line.className = 'idea-line'; line.dataset.key = `${kind}\n${value.trim()}`;
       const tag = document.createElement('span'); tag.className = `entry-tag entry-${kind}`; tag.textContent = kind;
@@ -608,7 +608,7 @@ function revealIdea(id) {
 async function floatIdeas(kind) {
   let data;
   do { data = await api(`ideas?kind=${kind}`); } while (data.indexing);
-  const float = $('#float-left'), finished = kind === 'idea' ? 'written' : 'started';
+  const float = $('#float-left'), finished = { idea: 'written', project: 'started', curious: 'looked into' }[kind];
   const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = IDEA_KINDS[kind];
   const items = data.ideas.map((idea, index) => {
     const item = document.createElement('div'); item.className = `float-idea${idea.done_at ? ' is-done' : ''}`;
@@ -650,22 +650,6 @@ document.addEventListener('keydown', event => {
 });
 function clearFloat(side) { const float = $(`#float-${side}`); float.replaceChildren(); float.hidden = true; delete float.dataset.showing; }
 // Results float up beside the writing as plain text: no panel, no border.
-function floatThoughts(side, heading, entries, emptyText) {
-  const float = $(`#float-${side}`);
-  const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = heading;
-  const items = entries.map((entry, index) => {
-    const item = document.createElement('button'); item.type = 'button'; item.className = 'float-item';
-    item.style.animationDelay = `${(index + 1) * 40}ms`;
-    const date = document.createElement('span'); date.className = 'float-date';
-    date.textContent = new Date(entry.source_date ? `${entry.source_date}T12:00:00` : entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
-    const text = document.createElement('span'); text.className = 'float-text';
-    text.textContent = entry.title || entry.published_title || plainPhotoLinks(plainThoughtLinks(entry.body)).slice(0, 120);
-    item.append(date, text); item.addEventListener('click', () => navigateThought(entry.id));
-    return item;
-  });
-  if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; items.push(empty); }
-  float.replaceChildren(title, ...items); float.hidden = false; delete float.dataset.showing;
-}
 async function runCommand(name, argument, context = {}) {
   notice();
   try {
@@ -673,13 +657,14 @@ async function runCommand(name, argument, context = {}) {
     else if (name === 'lock') $('#logout').click();
     else if (name === 'cl') { clearFloat('left'); receipt('cleared the left'); }
     else if (name === 'cr') { clearFloat('right'); receipt('cleared the right'); }
-    else if (name === 'idea' || name === 'project') {
-      if (!argument) { await floatIdeas(name); return; }
+    else if (Object.hasOwn(IDEA_WORDS, name)) {
+      const kind = IDEA_WORDS[name];
+      if (!argument) { await floatIdeas(kind); return; }
       // An idea logged on its own lives only in the ideas list, linked to the
       // note written just before it, and flies there from where it was typed.
-      await api('ideas', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID().replaceAll('-', ''), kind: name, text: argument }) });
-      receipt(name === 'idea' ? 'idea saved' : 'project saved');
-      await flyIdea(name, argument, context.rect);
+      await api('ideas', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID().replaceAll('-', ''), kind, text: argument }) });
+      receipt({ idea: 'idea saved', project: 'project saved', curious: 'curiosity saved' }[kind]);
+      await flyIdea(kind, argument, context.rect);
     }
     else if (name === 'ideas' || name === 'projects') await floatIdeas(name === 'ideas' ? 'idea' : 'project');
     else if (name === 'timeline') $('#toggle-timeline').click();
@@ -688,12 +673,7 @@ async function runCommand(name, argument, context = {}) {
       floatBullets('essay drafts', entries.map(entry => ({ text: entry.title || plainPhotoLinks(plainThoughtLinks(entry.body)).slice(0, 120), open: () => navigateThought(entry.id) })), 'no essay drafts. keep one with ⌘S.');
     }
     else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
-    else if (name === 'onthisday') {
-      const now = new Date(), pad = value => String(value).padStart(2, '0');
-      const params = new URLSearchParams({ day: `${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, year: String(now.getFullYear()), offset: String(-now.getTimezoneOffset()) });
-      const { entries } = await api(`thoughts/on-this-day?${params}`);
-      floatThoughts('left', 'on this day', entries, 'nothing from this day in earlier years.');
-    } else if (name === 'read') {
+    else if (name === 'read') {
       if (!argument) { location.hash = '#reading'; return; }
       const data = await api('reading', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), url: argument }) });
       receipt(data.existing ? 'already in read later' : 'saved to read later');

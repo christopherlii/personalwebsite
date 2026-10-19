@@ -49,8 +49,8 @@ that could still become a command opens a menu (arrows, Tab to complete, Enter
 to run, Esc to dismiss) and is neither searched nor saved as a draft; any other
 line starting with `/` stays ordinary writing. Commands work on any line: an action on a line of a longer note runs and removes
 just that line, a faint receipt under the writing says what happened, and Up in
-an empty field recalls recent commands. `/idea <text>` and `/project <text>`
-on their own log a loose idea (`loose_ideas`) that lives only in the ideas
+an empty field recalls recent commands. `/idea <text>`, `/project <text>`, and `/curious <text>`
+(or `/hm`, filed as a curiosity with an amber tag; done reads "looked into") on their own log a loose idea (`loose_ideas`) that lives only in the ideas
 list, linked to the note written just before, and flies there from where it
 was typed; inside a longer note the line stays as its tag (styled as you type)
 and Enter moves on. The same lines anywhere in a note
@@ -60,8 +60,7 @@ Bare `/idea` or `/project` (or `/ideas`, `/projects`, which only list) floats th
 clicking one opens its note and highlights the line, and hover offers
 written / started (kept through later edits of the note). `/timeline` shows or hides the timeline, `/focus` hides everything but the
 page (Esc or `/focus` again restores it), `/random` opens a random thought,
-`/onthisday` floats this date's thoughts from earlier years up on the left (in
-the browser's time zone; imported posts use their dates), `/read <link>` saves
+`/read <link>` saves
 to read later and bare `/read` opens it, `/lock` locks, and `/cl` / `/cr` clear
 whatever is floating on the left / right. Floats are plain text in the margins
 beside the writing, not panels; below 1124px they sit under the composer. Tapping Shift
