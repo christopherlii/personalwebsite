@@ -11,6 +11,8 @@ import { readingURL, readingMetadata, fetchReadingMetadata, indexReading, relate
 import { tagNames, markdownTags } from '../public/tags.js';
 import { indexTags } from '../tags.mjs';
 import { imageInfo } from '../photos.mjs';
+import { articleBlocks } from '../works.mjs';
+import { pdfBlocks, splitParts } from '../public/pdf-text.js';
 import { photoSource } from '../public/photo-links.js';
 
 const password = 'a-test-only-passphrase-that-is-not-a-secret';
@@ -396,6 +398,82 @@ test('standalone ideas live only in the ideas list, linked to the note written b
   assert.equal(kept.thought_id, null, 'deleting the context note keeps the idea, unlinked');
   assert.ok((await c.call('/api/export')).data.ideas.some(idea => idea.id === id), 'ideas are in the export');
   for (const body of [{ id: 'x', kind: 'idea', text: 'a' }, { id: hex(), kind: 'quote', text: 'a' }, { id: hex(), kind: 'idea', text: '  ' }, { id: hex(), kind: 'idea', text: 'two\nlines' }]) assert.equal((await c.call('/api/ideas', 'POST', body)).status, 400);
+});
+
+test('articles keep their writing and lose the page around it', () => {
+  const html = `<html><head><title>fallback title</title><meta property="og:title" content="On Walking &amp; Thinking"><meta name="author" content="Rebecca Solnit">
+    <script>alert(1)</script><style>p{}</style></head><body><nav><a>home</a><p>menu text that should not appear</p></nav>
+    <header><h1>site header</h1></header><aside><p>subscribe to the newsletter!</p></aside>
+    <article><header><h1>On Walking &amp; Thinking</h1><p>by rebecca</p></header>
+      <p>Walking is how the body measures itself against the earth.</p>
+      <h2>The mind at three miles an hour</h2><p>A walker can <em>think</em> &mdash; <a href="#">slowly</a>.</p>
+      <ul><li>pace</li><li>place</li><li>x</li></ul><blockquote><p>All truly great thoughts are conceived by walking.</p></blockquote>
+      <pre><code>if (walking) {\n  think();\n}</code></pre><figure><img src="a.jpg"><figcaption>a caption</figcaption></figure>
+      <script>document.cookie</script></article><footer><p>© 2026 footer</p></footer></body></html>`;
+  const { title, author, blocks } = articleBlocks(html);
+  assert.equal(title, 'On Walking & Thinking'); assert.equal(author, 'Rebecca Solnit');
+  assert.deepEqual(blocks, [
+    { t: 'p', x: 'Walking is how the body measures itself against the earth.' },
+    { t: 'h2', x: 'The mind at three miles an hour' },
+    { t: 'p', x: 'A walker can think — slowly.' },
+    { t: 'li', x: 'pace' }, { t: 'li', x: 'place' },
+    { t: 'quote', x: 'All truly great thoughts are conceived by walking.' },
+    { t: 'pre', x: 'if (walking) {\n  think();\n}' }
+  ], 'only the article text: no nav, chrome, captions, scripts, or markup');
+  assert.equal(articleBlocks('<body><div>' + 'a long run of text from a page built only of divs. '.repeat(2) + '</div><div>' + 'another long run of text that stands as its own paragraph here. '.repeat(2) + '</div></body>').blocks.length, 2, 'div-only pages fall back to text runs');
+});
+
+test('pdf text becomes headings and paragraphs without page furniture', () => {
+  const L = (y, str, size = 11, x = 72) => ({ str, x, y, size, width: str.length * size * 0.5 });
+  const page = (n, lines) => ({ items: [L(760, 'THE LONG WALK', 9, 250), ...lines, L(40, String(n), 9, 300)] });
+  const blocks = pdfBlocks([
+    page(1, [L(700, 'Chapter One', 22), L(660, 'The road out of town was long and the morn-'), L(646, 'ing was cold. We walked for hours.'), L(632, 'Nobody spoke.', 11, 90), L(600, 'Later, the sun came up over the'), L(586, 'ridge and everything changed.')]),
+    page(2, [L(700, 'and nothing was the same after'), L(686, 'that day.'), L(650, 'A Smaller Heading', 14), L(620, 'Another paragraph begins here.')]),
+    page(3, [L(700, 'Final words on the third page.')])
+  ]);
+  assert.deepEqual(blocks.map(block => `${block.t}: ${block.x}`), [
+    'h2: Chapter One',
+    'p: The road out of town was long and the morning was cold. We walked for hours.',
+    'p: Nobody spoke.',
+    'p: Later, the sun came up over the ridge and everything changed. and nothing was the same after that day.',
+    'h3: A Smaller Heading', 'p: Another paragraph begins here.', 'p: Final words on the third page.'
+  ]);
+  const parts = splitParts(Array.from({ length: 4000 }, (_, i) => ({ t: 'p', x: `paragraph ${i} `.repeat(10) })));
+  assert.ok(parts.length > 1 && parts.every(part => JSON.stringify(part).length <= 150000) && parts.flat().length === 4000, 'long books split into bounded parts');
+});
+
+test('the shelf opens articles by link and takes books part by part', async () => {
+  const c = client(); await c.login();
+  const original = globalThis.fetch;
+  const page = `<html><head><title>A Quiet Essay</title></head><body><article><p>${'The first paragraph of a quiet essay. '.repeat(3)}</p><h2>Part two</h2><p>The second part.</p></article></body></html>`;
+  let fetches = 0;
+  globalThis.fetch = async () => { fetches++; return new Response(page, { headers: { 'Content-Type': 'text/html' } }); };
+  try {
+    const id = crypto.randomUUID();
+    const created = await c.call('/api/works', 'POST', { id, url: 'https://essays.example.org/quiet?utm_source=x' });
+    assert.equal(created.status, 201);
+    assert.deepEqual([created.data.work.kind, created.data.work.title, created.data.work.site, created.data.work.url, created.data.work.status], ['article', 'A Quiet Essay', 'essays.example.org', 'https://essays.example.org/quiet', 'reading']);
+    assert.deepEqual((await c.call(`/api/works/${id}/parts/0`)).data.blocks.map(block => block.t), ['p', 'h2', 'p']);
+    const again = await c.call('/api/works', 'POST', { id: crypto.randomUUID(), url: 'https://essays.example.org/quiet' });
+    assert.equal(again.data.work.id, id, 'the same link opens the same article'); assert.equal(fetches, 1);
+    assert.equal((await c.call(`/api/works/${id}`, 'PATCH', { position: 0.42 })).data.work.position, 0.42);
+    assert.equal((await c.call(`/api/works/${id}`, 'PATCH', { position: 2 })).status, 400);
+    assert.equal((await c.call(`/api/works/${id}/parts/0`, 'PUT', { blocks: [{ t: 'p', x: 'x' }] })).status, 409, 'articles are fetched, never uploaded');
+    globalThis.fetch = async () => { throw new Error('offline'); };
+    assert.equal((await c.call('/api/works', 'POST', { id: crypto.randomUUID(), url: 'https://paywalled.example.org/a' })).status, 422);
+    assert.equal((await c.call('/api/works', 'POST', { id: crypto.randomUUID(), url: 'http://127.0.0.1/admin' })).status, 400, 'private addresses are refused');
+  } finally { globalThis.fetch = original; }
+  const book = crypto.randomUUID();
+  const made = await c.call('/api/works', 'POST', { id: book, kind: 'book', title: 'A Long Walk', author: 'Someone', parts: 2 });
+  assert.equal(made.status, 201); assert.equal(made.data.work.kind, 'book');
+  assert.equal((await c.call(`/api/works/${book}/parts/0`, 'PUT', { blocks: [{ t: 'h2', x: 'Chapter One' }, { t: 'p', x: 'It began.' }] })).status, 200);
+  assert.equal((await c.call(`/api/works/${book}/parts/1`, 'PUT', { blocks: [{ t: 'script', x: 'nope' }] })).status, 400, 'only known block kinds are stored');
+  assert.equal((await c.call(`/api/works/${book}/parts/2`, 'PUT', { blocks: [{ t: 'p', x: 'x' }] })).status, 404);
+  assert.deepEqual((await c.call('/api/works?status=reading')).data.works.map(work => work.title).sort(), ['A Long Walk', 'A Quiet Essay']);
+  assert.equal((await c.call('/api/works', 'POST', { id: crypto.randomUUID(), kind: 'book', title: '', parts: 1 })).status, 400);
+  await c.call(`/api/works/${book}`, 'DELETE');
+  assert.equal((await c.env.JOURNAL_DB.prepare('SELECT count(*) AS n FROM work_parts WHERE work_id = ?').bind(book).first()).n, 0, 'deleting a book deletes its text');
+  assert.ok((await c.call('/api/export')).data.works.some(work => work.title === 'A Quiet Essay'), 'the shelf is in the export');
 });
 
 test('the inbox adds thoughts with its own key and can do nothing else', async () => {

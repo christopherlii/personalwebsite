@@ -11,6 +11,7 @@
     "test:tags": "node test/browser-tags.mjs",
     "test:dictation": "node test/browser-dictation.mjs",
     "test:photos": "node test/browser-photos.mjs",
+    "test:shelf": "node test/browser-shelf.mjs",
     "test:essays": "node test/browser-essays.mjs",
     "db:local": "wrangler d1 migrations apply JOURNAL_DB --local",
     "password": "node scripts/password.mjs",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "esbuild": "0.28.2",
+    "pdfjs-dist": "6.4.299",
     "wrangler": "4.151.1"
   },
   "dependencies": {

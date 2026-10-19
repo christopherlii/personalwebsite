@@ -42,8 +42,10 @@ export function readingMetadata(html) {
   const paragraphs = [...article.matchAll(/<(?:p|h[1-3])\b[^>]*>([\s\S]*?)<\/(?:p|h[1-3])\s*>/gi)].map(m => text(m[1].replace(/<[^>]*>/g, ' '))).filter(Boolean);
   return { title: title.replace(/<[^>]*>/g, '').slice(0, 160), excerpt: [description, ...paragraphs].filter(Boolean).join('\n\n').slice(0, 8000) };
 }
-export async function fetchReadingMetadata(address, fetcher = fetch) {
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 4500);
+// Fetches a public page as text, following at most three redirects (each
+// re-checked as public) and stopping at the byte limit. Null on any failure.
+export async function fetchPage(address, fetcher = fetch, limit = 196608, timeout = 4500) {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeout);
   let reader;
   try {
     let url = readingURL(address), response;
@@ -51,20 +53,24 @@ export async function fetchReadingMetadata(address, fetcher = fetch) {
       response = await fetcher(url, { redirect: 'manual', signal: controller.signal, headers: { Accept:'text/html', 'User-Agent':'ChristopherJournal/1.0' } });
       if (![301,302,303,307,308].includes(response.status)) break;
       await response.body?.cancel();
-      if (redirects === 3 || !response.headers.get('Location')) return {};
+      if (redirects === 3 || !response.headers.get('Location')) return null;
       url = readingURL(new URL(response.headers.get('Location'), url).href);
     }
-    if (!response.ok || !response.headers.get('Content-Type')?.includes('text/html')) { await response.body?.cancel(); return {}; }
-    reader = response.body?.getReader(); if (!reader) return {};
+    if (!response.ok || !response.headers.get('Content-Type')?.includes('text/html')) { await response.body?.cancel(); return null; }
+    reader = response.body?.getReader(); if (!reader) return null;
     const decoder = new TextDecoder(); let html = '', bytes = 0;
     while (true) {
       const { value, done } = await reader.read(); if (done) break;
-      const remaining = 196608 - bytes; html += decoder.decode(value.subarray(0, remaining), { stream:true }); bytes += value.length;
-      if (bytes >= 196608) { await reader.cancel(); break; }
+      const remaining = limit - bytes; html += decoder.decode(value.subarray(0, remaining), { stream:true }); bytes += value.length;
+      if (bytes >= limit) { await reader.cancel(); break; }
     }
-    html += decoder.decode(); return readingMetadata(html);
-  } catch { return {}; }
+    html += decoder.decode(); return { html, url };
+  } catch { return null; }
   finally { await reader?.cancel().catch(() => {}); clearTimeout(timer); }
+}
+export async function fetchReadingMetadata(address, fetcher = fetch) {
+  const page = await fetchPage(address, fetcher);
+  return page ? readingMetadata(page.html) : {};
 }
 export async function indexReading(entry, env) {
   if (!env.AI) return;

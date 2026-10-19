@@ -9,6 +9,7 @@ import { createPhotos } from './photos.js';
 import { plainPhotoLinks } from './photo-links.js';
 import { createCommands, commandMatches } from './commands.js';
 import { IDEA_KINDS, IDEA_WORDS, IDEA_WORD_PATTERN } from './ideas.js';
+import { createShelf } from './shelf.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -18,6 +19,8 @@ state.tag = null;
 let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
+const shelf = createShelf({ api, status: message => notice(message) });
+const workId = () => location.hash.match(/^#read\/([a-f0-9-]{36})$/)?.[1];
 const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEditor:readerEditor,
   onBusy(busy){for(const id of ['composer-editor','live-editor'])document.getElementById(id).setAttribute('aria-busy',String(busy));},
   onMessage(owner,message){if(owner==='composer')notice(message);else $('#reader-error').textContent=message;}
@@ -94,6 +97,7 @@ function showLogin(message = '') {
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('#app').hidden = true;
   $('#reader').hidden = true;
+  $('#work').hidden = true; shelf.close();
   readingView.hide(); readingView.hideRelated();
   $('#reader-content').replaceChildren();
   $('#login').hidden = false;
@@ -195,7 +199,7 @@ async function enter() {
   $('#title').value = unsaved?.title ?? draft.title ?? '';
   state.authenticated = true;
   $('#login').hidden = true;
-  $('#app').hidden = Boolean(readerId()) || location.hash === '#reading';
+  $('#app').hidden = Boolean(readerId() || workId()) || location.hash === '#reading';
   $('#boot-status').hidden = true;
   $('#password').value = '';
   if (!composerEditor) composerEditor = createLiveEditor($('#composer-editor'), {
@@ -208,7 +212,7 @@ async function enter() {
   });
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
-  if (readerId() || location.hash === '#reading' || routeTag()) await showRoute();
+  if (readerId() || workId() || location.hash === '#reading' || routeTag()) await showRoute();
   else await searchFromComposer(true);
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
@@ -330,6 +334,19 @@ async function showRoute() {
     }
     if (generation !== state.readerGeneration) return;
   }
+  // An article or book from the shelf, read with nothing else on the page.
+  if (workId()) {
+    if (!$('#app').hidden) state.feedScroll = window.scrollY;
+    $('#app').hidden = true; $('#reader').hidden = true; readingView.hideRelated();
+    state.readerEntry = null; state.readerEditing = false; clearReaderEditor(); closeMenus();
+    $('#work').hidden = false; document.title = 'reading';
+    try { const work = await shelf.open(workId()); if (work) document.title = work.title; notice(); }
+    catch (error) { $('#work-content').replaceChildren(); notice(error.message); }
+    $('#work-content').focus({ preventScroll: true });
+    return;
+  }
+  const leavingWork = !$('#work').hidden;
+  $('#work').hidden = true; shelf.close();
   if (location.hash === '#reading') {
     $('#app').hidden = true; $('#reader').hidden = true; readingView.hideRelated();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
@@ -337,7 +354,7 @@ async function showRoute() {
   }
   if (!id) {
     const tag=routeTag(),tagChanged=tag!==state.tag;state.tag=tag;
-    const wasReading = !$('#reader').hidden;
+    const wasReading = !$('#reader').hidden || leavingWork;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
     state.readerHistory = null;
@@ -644,6 +661,16 @@ function floatBullets(heading, items, emptyText) {
   if (!rows.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; rows.push(empty); }
   float.replaceChildren(title, ...rows); float.hidden = false; delete float.dataset.showing;
 }
+// A PDF dropped anywhere on the journal becomes a book on the shelf.
+const isPdf = file => file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+document.addEventListener('dragover', event => { if (state.authenticated && event.dataTransfer?.types.includes('Files')) event.preventDefault(); });
+document.addEventListener('drop', async event => {
+  const file = [...(event.dataTransfer?.files || [])].find(isPdf);
+  if (!state.authenticated || !file) return;
+  event.preventDefault();
+  try { const work = await shelf.addPdf(file); notice(); location.hash = `#read/${work.id}`; }
+  catch (error) { notice(error.message); }
+});
 function setFocus(on) { document.body.classList.toggle('focus-mode', on); }
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && document.body.classList.contains('focus-mode') && !document.querySelector('dialog[open]')) setFocus(false);
@@ -674,9 +701,13 @@ async function runCommand(name, argument, context = {}) {
     }
     else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
     else if (name === 'read') {
-      if (!argument) { location.hash = '#reading'; return; }
-      const data = await api('reading', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), url: argument }) });
-      receipt(data.existing ? 'already in read later' : 'saved to read later');
+      if (!argument) {
+        const works = await shelf.list();
+        floatBullets('reading', works.map(work => ({ text: work.title, open: () => { location.hash = `#read/${work.id}`; } })), 'nothing on the shelf yet. /read a link, or drop in a pdf.');
+        return;
+      }
+      const work = await shelf.addArticle(argument);
+      notice(); location.hash = `#read/${work.id}`;
     }
   } catch (error) { notice(error.status === 404 && name === 'random' ? 'no thoughts yet.' : error.message); }
 }

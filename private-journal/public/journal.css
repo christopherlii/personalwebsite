@@ -234,6 +234,18 @@ h1,h2 {
 }
 .focus-mode .page-header,.focus-mode #timeline,.focus-mode #tag-filter,.focus-mode .composer-toolbar,.focus-mode .writing-feedback,.focus-mode .float,.focus-mode #notice { display:none }
 .focus-mode .composer-section { margin-top:18svh }
+/* The shelf reader: the text and a way back, set for long reading. */
+.work-reader .reader-toolbar { margin-bottom:72px }
+.work-content { outline:none; color:var(--body); font:16px/1.75 var(--font-body); overflow-wrap:anywhere }
+.work-content .work-title { margin:0 0 6px; color:var(--fg); font:500 28px/1.25 var(--font-display) }
+.work-content .work-meta { margin:0 0 48px; color:var(--muted); font-size:12px }
+.work-content p { margin:0 0 1.15em }
+.work-content h2 { margin:2.2em 0 .7em; color:var(--fg); font:500 20px/1.35 var(--font-display) }
+.work-content h3 { margin:1.8em 0 .6em; color:var(--fg); font:600 15px/1.45 var(--font-body) }
+.work-content ul { margin:0 0 1.15em; padding-left:1.2em }
+.work-content li { margin-bottom:.35em }
+.work-content blockquote { margin:0 0 1.15em; padding-left:18px; border-left:1px solid var(--track); color:var(--muted) }
+.work-content pre { margin:0 0 1.15em; overflow-x:auto; font:13px/1.6 ui-monospace,Menlo,monospace; white-space:pre }
 /* Only the writing is at full strength; everything around it stays faint
    until you reach for it. */
 .page-header .site-name,.utilities button,#timeline .thought,.float,.tag-filter,.feed-footer { opacity:.5; transition:opacity 200ms ease,color 200ms ease }

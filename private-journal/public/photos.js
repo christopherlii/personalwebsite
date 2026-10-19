@@ -47,7 +47,7 @@ export function createPhotos({api,getEditor,onBusy,onMessage}){
     const parent=document.getElementById(id);
     parent.addEventListener('paste',event=>{const files=[...(event.clipboardData?.files||[])];if(!files.length)return;const selected=selection(owner);if(!selected)return;event.preventDefault();add(files,selected);},true);
     parent.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
-    parent.addEventListener('drop',event=>{const files=[...(event.dataTransfer?.files||[])];if(!files.length)return;const selected=selection(owner);if(!selected)return;event.preventDefault();event.stopPropagation();add(files,selected);},true);
+    parent.addEventListener('drop',event=>{const files=[...(event.dataTransfer?.files||[])];if(!files.length||files.some(file=>file.type==='application/pdf'||/\.pdf$/i.test(file.name)))return;const selected=selection(owner);if(!selected)return;event.preventDefault();event.stopPropagation();add(files,selected);},true);
   }
   return{get busy(){return Boolean(job);},cancel,async finish(){try{await job;return true;}catch{return false;}}};
 }

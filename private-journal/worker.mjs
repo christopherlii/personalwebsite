@@ -9,6 +9,7 @@ import { photoApi, PhotoError } from './photos.mjs';
 import { TranscriptionError, transcribe } from './transcription.mjs';
 import { liveDictation } from './live-dictation.mjs';
 import { IdeaError, ideaApi, indexIdeas } from './ideas.mjs';
+import { WorkError, workApi } from './works.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -171,6 +172,8 @@ async function api(request, env, url, context) {
   }
   const idea = await ideaApi(request, env, path, readBody);
   if (idea) return idea;
+  const work = await workApi(request, env, path, readBody, limit);
+  if (work) return work;
   const publication = await publicationApi(request, env, path, readBody);
   if (publication) return publication;
   if (path === '/api/logout' && request.method === 'POST') {
@@ -309,6 +312,8 @@ async function api(request, env, url, context) {
       reading: reading.results,
       photos:photos.results,
       ideas: ideas.results,
+      works: (await env.JOURNAL_DB.prepare('SELECT * FROM works ORDER BY started_at').all()).results,
+      work_parts: (await env.JOURNAL_DB.prepare('SELECT work_id, part, blocks FROM work_parts ORDER BY work_id, part').all()).results.map(row => ({ ...row, blocks: JSON.parse(row.blocks) })),
       publications: publications.results.map(row => ({ ...row, draft: JSON.parse(row.draft), published: row.published ? JSON.parse(row.published) : null }))
     }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
@@ -342,11 +347,11 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/shelf.js', '/pdf-text.js', '/vendor/pdf.min.mjs', '/vendor/pdf.worker.min.mjs', '/vendor/pdfjs-LICENSE.txt', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof TranscriptionError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof WorkError || error instanceof TranscriptionError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     if(response.status===101)return response;

@@ -13,7 +13,7 @@ export const COMMANDS = [
   { name: 'draft', hint: 'your essay drafts' },
   { name: 'focus', hint: 'hide everything but the page' },
   { name: 'random', hint: 'open a random thought' },
-  { name: 'read', hint: 'save a link, or open read later', takes: 'link' },
+  { name: 'read', hint: 'read a link, or list your shelf', takes: 'link' },
   { name: 'lock', hint: 'lock the journal' },
   { name: 'cl', hint: 'clear the left side' },
   { name: 'cr', hint: 'clear the right side' }
