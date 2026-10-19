@@ -42,7 +42,7 @@ valid. Previews have no line clamp and never expand inline; copy retains the
 complete original source, and open shows the complete writing.
 Reading links require the same
 session and work on reload and under `/journal/`.
-Only an explicit post or save draft creates a new
+Only an explicit post or Cmd/Ctrl+S creates a new
 entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. The writing field
 doubles as a command bar (`public/commands.js`): a single line starting with `/`
 that could still become a command opens a menu (arrows, Tab to complete, Enter
@@ -71,7 +71,8 @@ runtime assets.
 
 ## Essay drafts
 
-Choose save draft beside post to keep a piece in progress. It becomes a private
+Press Cmd/Ctrl+S in the composer to keep a piece in progress (the composer
+itself autosaves as you type). It becomes a private
 timeline entry with a muted draft label and opens in the existing live Markdown
 editor. Multiple essays can be kept independently; edits autosave after a pause,
 without closing the editor or stopping dictation. Back and lock flush edits.

@@ -5,6 +5,7 @@ const $ = selector => document.querySelector(selector);
 export const COMMANDS = [
   { name: 'idea', hint: 'log a writing idea, or list them', takes: 'idea' },
   { name: 'project', hint: 'log a project idea, or list them', takes: 'idea' },
+  { name: 'draft', hint: 'your essay drafts' },
   { name: 'focus', hint: 'hide everything but the page' },
   { name: 'random', hint: 'open a random thought' },
   { name: 'onthisday', hint: 'this date in earlier years' },

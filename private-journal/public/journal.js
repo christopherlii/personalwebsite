@@ -26,7 +26,6 @@ const dictation = createDictation({
   onUnavailable() { api('session').then(session => { if (!session.authenticated) showLogin('your session ended. unlock to continue.'); }).catch(() => {}); },
   onState(owner, value) {
     const button = $(`#dictate-${owner}`), recording = value === 'starting' || value === 'listening';
-    button.textContent = recording ? 'stop' : 'dictate';
     button.setAttribute('aria-pressed', String(recording));
     button.setAttribute('aria-label', recording ? 'stop dictation' : value === 'transcribing' ? 'transcribing recording' : 'start dictation');
     button.disabled = value === 'transcribing';
@@ -615,9 +614,8 @@ async function floatIdeas(kind) {
     const item = document.createElement('div'); item.className = `float-idea${idea.done_at ? ' is-done' : ''}`;
     item.style.animationDelay = `${(index + 1) * 40}ms`;
     const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
-    const date = document.createElement('span'); date.className = 'float-date'; date.textContent = new Date(idea.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toLowerCase();
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
-    open.append(date, text);
+    open.append(text);
     open.addEventListener('click', () => { state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` }; navigateThought(idea.thought_id); });
     const done = document.createElement('button'); done.type = 'button'; done.className = 'float-done';
     done.textContent = idea.done_at ? 'undo' : finished; done.setAttribute('aria-label', idea.done_at ? `mark not ${finished}` : `mark ${finished}`);
@@ -631,6 +629,19 @@ async function floatIdeas(kind) {
   });
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = `no ${IDEA_KINDS[kind]} yet. log one with /${kind} …`; items.push(empty); }
   float.replaceChildren(title, ...items); float.hidden = false; float.dataset.showing = kind;
+}
+function floatBullets(heading, items, emptyText) {
+  const float = $('#float-left');
+  const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = heading;
+  const rows = items.map((item, index) => {
+    const row = document.createElement('div'); row.className = 'float-idea'; row.style.animationDelay = `${(index + 1) * 40}ms`;
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
+    const text = document.createElement('span'); text.className = 'float-text'; text.textContent = item.text;
+    open.append(text); open.addEventListener('click', item.open); row.append(open);
+    return row;
+  });
+  if (!rows.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; rows.push(empty); }
+  float.replaceChildren(title, ...rows); float.hidden = false; delete float.dataset.showing;
 }
 function setFocus(on) { document.body.classList.toggle('focus-mode', on); }
 document.addEventListener('keydown', event => {
@@ -669,6 +680,10 @@ async function runCommand(name, argument) {
       if (!state.tag) await loadFeed();
       notice(name === 'idea' ? 'writing idea saved.' : 'project idea saved.');
     }
+    else if (name === 'draft') {
+      const { entries } = await api('thoughts/drafts');
+      floatBullets('essay drafts', entries.map(entry => ({ text: entry.title || plainPhotoLinks(plainThoughtLinks(entry.body)).slice(0, 120), open: () => navigateThought(entry.id) })), 'no essay drafts. keep one with ⌘S.');
+    }
     else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
     else if (name === 'onthisday') {
       const now = new Date(), pad = value => String(value).padStart(2, '0');
@@ -703,6 +718,8 @@ $('#title').addEventListener('input', changedDraft);
 $('#retry-draft').addEventListener('click', () => saveDraft().catch(() => {}));
 $('#composer').addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !$('#post').disabled) { event.preventDefault(); $('#composer').requestSubmit(); }
+  // Cmd/Ctrl+S keeps the piece as an essay draft on the timeline (the old save draft button).
+  else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!$('#save-essay').disabled) $('#composer').requestSubmit($('#save-essay')); }
   else if (event.target.id === 'title' && event.key === 'Enter') { event.preventDefault(); composerEditor?.focus(); }
 });
 $('#composer').addEventListener('submit', async event => {
