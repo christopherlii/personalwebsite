@@ -34,8 +34,8 @@ const ideaMarkers = StateField.define({
 function ideaRanges(state) {
   const ranges = [];
   for (let number = 1; number <= state.doc.lines; number++) {
-    const line = state.doc.line(number), match = /^([ \t]*)\/(idea|project)(?=[ \t]+\S)/i.exec(line.text);
-    if (match) ranges.push(Decoration.mark({ class: `cm-idea-marker cm-idea-marker-${match[2].toLowerCase()}` }).range(line.from + match[1].length, line.from + match[0].length));
+    const line = state.doc.line(number), match = /^([ \t]*)\/(idea|project|curious|hm)(?=[ \t]+\S)/i.exec(line.text);
+    if (match) ranges.push(Decoration.mark({ class: `cm-idea-marker cm-idea-marker-${match[2].toLowerCase() === 'hm' ? 'curious' : match[2].toLowerCase()}` }).range(line.from + match[1].length, line.from + match[0].length));
   }
   return RangeSet.of(ranges);
 }

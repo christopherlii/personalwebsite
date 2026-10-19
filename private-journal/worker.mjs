@@ -255,17 +255,6 @@ async function api(request, env, url, context) {
     if (!entry) fail(404, 'No thoughts yet.');
     return json({ entry: (await withPublicationState([entry], env))[0] });
   }
-  if (path === '/api/thoughts/on-this-day' && request.method === 'GET') {
-    // The browser sends its own date and UTC offset so "today" is the owner's day.
-    const day = url.searchParams.get('day') || '', year = url.searchParams.get('year') || '', offset = Number(url.searchParams.get('offset'));
-    if (!/^\d\d-\d\d$/.test(day) || !/^\d{4}$/.test(year) || !Number.isInteger(offset) || Math.abs(offset) > 840) fail(400, 'Invalid date.');
-    const shift = `${offset} minutes`;
-    const { results } = await env.JOURNAL_DB.prepare(`SELECT ${thoughtSelect} FROM thoughts t
-      WHERE COALESCE(substr(t.source_date, 6, 5), strftime('%m-%d', t.created_at, ?)) = ?
-      AND COALESCE(substr(t.source_date, 1, 4), strftime('%Y', t.created_at, ?)) < ?
-      ORDER BY COALESCE(t.source_date, t.created_at) DESC LIMIT 40`).bind(shift, day, shift, year).all();
-    return json({ entries: await withPublicationState(results, env) });
-  }
   const thought = path.match(/^\/api\/thoughts\/([a-f0-9-]+)$/);
   if (thought && uuid(thought[1])) {
     const id = thought[1];
