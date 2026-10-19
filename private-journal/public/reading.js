@@ -70,7 +70,7 @@ export function createReading({api,navigateThought}) {
         const fragment=document.createDocumentFragment();
         for(const thought of data.thoughts){
           const row=node('div','related-item');row.append(node('p','reading-meta',thought.published_slug?'your writing':'thought'));
-          const open=node('button','related-title',thought.title||plainThoughtLinks(thought.body));open.type='button';open.addEventListener('click',()=>navigateThought(thought.id));row.append(open);fragment.append(row);
+          const open=node('button','related-title',thought.title||plainThoughtLinks(thought.body).replace(/^[ \t]*\/(idea|project)[ \t]+/gim,''));open.type='button';open.addEventListener('click',()=>navigateThought(thought.id));row.append(open);fragment.append(row);
         }
         for(const saved of data.reading){const row=node('div','related-item');row.append(node('p','reading-meta',host(saved.url)),external(saved));fragment.append(row);}
         relatedHasResults=Boolean(fragment.childNodes.length);

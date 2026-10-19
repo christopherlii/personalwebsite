@@ -530,7 +530,7 @@ try {
   const draftIs = body => page.waitForFunction(async body => (await (await fetch('./api/draft')).json()).body === body, body);
   await draftIs('');
   await typeCommand('/');
-  assert.equal(await page.locator('#command-menu li').count(), 7, 'a bare slash lists every command');
+  assert.equal(await page.locator('#command-menu li').count(), 9, 'a bare slash lists every command');
   await page.keyboard.type('fo');
   assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);
   await page.waitForTimeout(900);
@@ -548,6 +548,27 @@ try {
   assert.equal(await page.locator('#float-left .float-heading').textContent(), 'on this day');
   await typeCommand('/cl'); await page.keyboard.press('Enter');
   await page.locator('#float-left').waitFor({ state: 'hidden' });
+  await typeCommand('/idea trains as thinking rooms'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#notice').textContent === 'writing idea saved.');
+  await typeCommand('/project a 9pm memories app'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#notice').textContent === 'project idea saved.');
+  await typeCommand('/idea'); await page.keyboard.press('Enter');
+  await page.locator('#float-left .float-idea').first().waitFor();
+  assert.equal(await page.locator('#float-left .float-heading').textContent(), 'writing ideas');
+  assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['trains as thinking rooms'], 'project ideas are listed separately');
+  await page.locator('#float-left .float-item').first().click();
+  await page.locator('#reader-content .idea-line.is-revealed').waitFor();
+  assert.equal(await page.locator('#reader-content .idea-line .entry-idea').textContent(), 'idea', 'the idea line renders as a tag in its note');
+  await backToFeed();
+  await page.locator('#float-left .float-idea').first().hover(); await page.locator('#float-left .float-done').first().click();
+  await page.locator('#float-left .float-idea.is-done').waitFor();
+  await typeCommand('/project'); await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'project ideas');
+  for (const text of ['/idea trains as thinking rooms', '/project a 9pm memories app']) {
+    const entry = (await api('export')).data.entries.find(item => item.body === text);
+    await api(`thoughts/${entry.id}`, 'DELETE', {});
+  }
+  await typeCommand('/cl'); await page.keyboard.press('Enter');
   await typeCommand('/shrug at the sky');
   assert.equal(await page.locator('#command-menu').isHidden(), true, 'a line that is not a command stays writing');
   await page.waitForFunction(async () => (await (await fetch('./api/draft')).json()).body === '/shrug at the sky');
@@ -574,7 +595,7 @@ try {
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'command bar', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'command bar', 'writing and project ideas', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});
