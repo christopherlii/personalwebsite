@@ -198,12 +198,15 @@ h1,h2 {
   flex-direction:column;
   gap:14px
 }
-.float-left { right:calc(100% + 56px); align-items:flex-end; text-align:right }
+.float-left { right:calc(100% + 56px); align-items:flex-start; text-align:left }
 .float-right { left:calc(100% + 56px); align-items:flex-start; text-align:left }
 .float-heading,.float-empty { color:var(--muted); font-size:10px }
 .float-item { display:flex; flex-direction:column; gap:2px; padding:0; text-align:inherit; font-size:12px; line-height:1.45; color:var(--body); background:none }
 .float-date { color:var(--muted); font-size:10px }
-.float-idea { display:flex; flex-direction:column; align-items:inherit; gap:2px }
+.float-idea { display:flex; align-items:baseline; gap:8px; margin-top:-8px }
+.float-idea .float-item { position:relative; padding-left:12px }
+.float-idea .float-item::before { content:'•'; position:absolute; left:0; color:var(--muted) }
+.float-idea .float-done { flex-shrink:0 }
 .float-done { padding:0; font-size:10px; color:var(--muted); background:none; opacity:0; transition:opacity 120ms ease-out }
 .float-idea:hover .float-done,.float-done:focus-visible { opacity:1 }
 @media(hover:none) { .float-done { opacity:1 } }
@@ -216,6 +219,14 @@ h1,h2 {
 }
 .focus-mode .page-header,.focus-mode #timeline,.focus-mode #tag-filter,.focus-mode .composer-toolbar,.focus-mode .writing-feedback,.focus-mode .float,.focus-mode #notice { display:none }
 .focus-mode .composer-section { margin-top:18svh }
+/* Only the writing is at full strength; everything around it stays faint
+   until you reach for it. */
+.page-header,#timeline .thought,.float,.tag-filter,.feed-footer { opacity:.5; transition:opacity 200ms ease }
+.page-header:hover,.page-header:focus-within,#timeline .thought:hover,#timeline .thought:focus-within,.float:hover,.float:focus-within,.tag-filter:hover,.feed-footer:focus-within { opacity:1 }
+@media(hover:none) { .page-header,#timeline .thought,.float,.tag-filter,.feed-footer { opacity:.7 } }
+.icon { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; display:block }
+.composer-toolbar .post,.dictate-toggle { display:inline-flex; align-items:center; justify-content:center; width:30px }
+.dictate-toggle[aria-pressed=true] { color:#a12e22 }
 #timeline::before {
   content:'';
   display:block;
@@ -278,8 +289,6 @@ textarea::placeholder {
 .draft-feedback button { padding:0; font-size:10px }
 .dictation-controls { display:flex; align-items:center; gap:16px; min-height:30px; margin-top:8px }
 .tool-button { min-height:30px; padding:6px 0; color:var(--muted); font:400 11px/1.5 var(--font-body); text-align:left }
-.dictate-toggle { width:44px }
-.dictate-toggle[aria-pressed=true] { color:var(--fg) }
 @media(pointer:coarse) { .composer-toolbar button,.dictation-controls button { min-height:44px } }
 .thought {
   padding-bottom:64px;

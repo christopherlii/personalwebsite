@@ -246,6 +246,10 @@ async function api(request, env, url, context) {
     if (!isDraft && env.AI && context) context.waitUntil(indexEntry(result[0].results[0], env).catch(() => {}));
     return json({ entry: { ...result[0].results[0], published_slug: null, published_title: null }, draft: await env.JOURNAL_DB.prepare('SELECT title, body, version FROM draft WHERE id = 1').first() }, 201);
   }
+  if (path === '/api/thoughts/drafts' && request.method === 'GET') {
+    const { results } = await env.JOURNAL_DB.prepare(`SELECT id, title, substr(body, 1, 200) AS body, updated_at FROM thoughts WHERE is_draft = 1 ORDER BY updated_at DESC LIMIT 50`).all();
+    return json({ entries: results });
+  }
   if (path === '/api/thoughts/random' && request.method === 'GET') {
     const entry = await env.JOURNAL_DB.prepare(`SELECT ${thoughtColumns} FROM thoughts ORDER BY RANDOM() LIMIT 1`).first();
     if (!entry) fail(404, 'No thoughts yet.');

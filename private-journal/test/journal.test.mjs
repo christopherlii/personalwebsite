@@ -318,6 +318,18 @@ test('saved and liked toggle independently and survive reads, filters, and expor
   for (const body of [{}, { liked: 'yes' }, { liked: true, bookmarked: 1 }, { pinned: true }]) assert.equal((await c.call(`/api/thoughts/${entry.id}`, 'PATCH', body)).status, 400);
 });
 
+test('the drafts lookup lists unfinished essays, newest edit first', async () => {
+  const c = client(); await c.login();
+  const finished = (await c.call('/api/thoughts', 'POST', thought('a finished thought'))).data.entry;
+  const older = (await c.call('/api/thoughts', 'POST', { ...thought('an older essay in progress'), is_draft: true })).data.entry;
+  const newer = (await c.call('/api/thoughts', 'POST', { ...thought('a newer essay in progress'), title: 'newer', is_draft: true })).data.entry;
+  c.env.JOURNAL_DB.sqlite.prepare('UPDATE thoughts SET updated_at = ? WHERE id = ?').run('2000-01-01T00:00:00.000Z', older.id);
+  const entries = (await c.call('/api/thoughts/drafts')).data.entries;
+  assert.deepEqual(entries.map(entry => entry.id), [newer.id, older.id]);
+  assert.equal(entries[0].title, 'newer');
+  assert.ok(!entries.some(entry => entry.id === finished.id));
+});
+
 test('random and on-this-day lookups for the command bar', async () => {
   const c = client();
   assert.equal((await c.call('/api/thoughts/random')).status, 401);
