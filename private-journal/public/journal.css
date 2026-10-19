@@ -168,9 +168,49 @@ h1,h2 {
   background:#d4d4d4
 }
 .composer-section {
+  position:relative;
   margin-left:26px;
   margin-bottom:16px
 }
+#composer { position:relative }
+.command-menu {
+  position:absolute;
+  z-index:3;
+  left:0;
+  right:0;
+  margin:4px 0 0;
+  padding:4px 0 12px;
+  list-style:none;
+  background:var(--bg);
+  font-size:12px
+}
+.command-menu li { display:flex; align-items:baseline; gap:14px; padding:3px 0; cursor:pointer; color:var(--muted) }
+.command-menu .command-name { min-width:84px; color:var(--muted) }
+.command-menu [aria-selected=true] .command-name { color:var(--fg) }
+.command-menu [aria-selected=true] .command-hint { color:var(--body) }
+/* Things you have float up on the left, things from elsewhere on the right:
+   plain text in the empty margins, no panel. */
+.float {
+  position:absolute;
+  top:0;
+  width:220px;
+  display:flex;
+  flex-direction:column;
+  gap:14px
+}
+.float-left { right:calc(100% + 56px); align-items:flex-end; text-align:right }
+.float-right { left:calc(100% + 56px); align-items:flex-start; text-align:left }
+.float-heading,.float-empty { color:var(--muted); font-size:10px }
+.float-item { display:flex; flex-direction:column; gap:2px; padding:0; text-align:inherit; font-size:12px; line-height:1.45; color:var(--body); background:none }
+.float-date { color:var(--muted); font-size:10px }
+.float>* { animation:float-up 360ms cubic-bezier(.2,.7,.2,1) backwards }
+@keyframes float-up { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
+@media(max-width:1124px) {
+  .float { position:static; width:auto; margin-top:28px }
+  .float-left,.float-right { align-items:flex-start; text-align:left }
+}
+.focus-mode .page-header,.focus-mode #timeline,.focus-mode #tag-filter,.focus-mode .composer-toolbar,.focus-mode .writing-feedback,.focus-mode .float,.focus-mode #notice { display:none }
+.focus-mode .composer-section { margin-top:18svh }
 #timeline::before {
   content:'';
   display:block;

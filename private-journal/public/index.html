@@ -42,6 +42,7 @@
           <input id="title" class="title-input" placeholder="no title" maxlength="160" autocomplete="off">
         </div>
         <div id="composer-editor"></div>
+        <ul id="command-menu" class="command-menu" role="listbox" aria-label="commands" hidden></ul>
         <textarea id="body" hidden aria-hidden="true" tabindex="-1"></textarea>
         <div class="composer-toolbar">
           <div class="composer-tools">
@@ -54,6 +55,8 @@
           <div class="draft-feedback"><span id="draft-status" role="status"></span><button type="button" id="retry-draft" hidden>retry</button></div>
         </div>
       </form>
+      <aside id="float-left" class="float float-left" aria-label="your thoughts" hidden></aside>
+      <aside id="float-right" class="float float-right" aria-label="further reading" hidden></aside>
     </section>
     <p id="notice" class="notice" role="status" hidden></p>
     <p id="copy-status" class="sr-only" role="status"></p>

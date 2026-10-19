@@ -524,6 +524,40 @@ try {
   assert.equal((await api('thoughts')).status, 401, 'double Shift locks like the lock button');
   await page.locator('#password').fill(password); await page.locator('#unlock').click();
   await page.locator('#app').waitFor({ state: 'visible' });
+  // The writing field doubles as a command bar.
+  const composer = page.locator('#composer-editor .cm-content');
+  const typeCommand = async text => { await composer.click(); await composer.press('ControlOrMeta+a'); await composer.press('Backspace'); await page.keyboard.type(text); };
+  const draftIs = body => page.waitForFunction(async body => (await (await fetch('./api/draft')).json()).body === body, body);
+  await draftIs('');
+  await typeCommand('/');
+  assert.equal(await page.locator('#command-menu li').count(), 7, 'a bare slash lists every command');
+  await page.keyboard.type('fo');
+  assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);
+  await page.waitForTimeout(900);
+  assert.equal((await api('draft')).data.body, '', 'a command in progress is never saved as a draft');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.body.classList.contains('focus-mode'));
+  assert.equal(await page.locator('.page-header').isVisible(), false, 'focus hides everything but the page');
+  assert.equal(await page.locator('#body').inputValue(), '', 'running a command clears it');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.body.classList.contains('focus-mode'));
+  await typeCommand('/re'); await page.keyboard.press('Tab');
+  assert.equal(await page.locator('#body').inputValue(), '/read ', 'tab completes a command that takes a link');
+  await typeCommand('/onthisday'); await page.keyboard.press('Enter');
+  await page.locator('#float-left .float-heading').waitFor();
+  assert.equal(await page.locator('#float-left .float-heading').textContent(), 'on this day');
+  await typeCommand('/cl'); await page.keyboard.press('Enter');
+  await page.locator('#float-left').waitFor({ state: 'hidden' });
+  await typeCommand('/shrug at the sky');
+  assert.equal(await page.locator('#command-menu').isHidden(), true, 'a line that is not a command stays writing');
+  await page.waitForFunction(async () => (await (await fetch('./api/draft')).json()).body === '/shrug at the sky');
+  await typeCommand('/random'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter');
+  await page.locator('#reader').waitFor({ state: 'visible' });
+  await backToFeed(); await draftIs('');
+  await typeCommand('/lock'); await page.keyboard.press('Enter');
+  await page.locator('#login').waitFor({ state: 'visible' });
+  await page.locator('#password').fill(password); await page.locator('#unlock').click();
+  await page.locator('#app').waitFor({ state: 'visible' });
   for (const id of ids) await api(`thoughts/${id}`, 'DELETE', {});
   assert.deepEqual(errors, []);
   // The same UI must keep every request under /journal/ when mounted there.
@@ -540,7 +574,7 @@ try {
   assert.equal(await page.locator('#body').evaluate(element => getComputedStyle(element).fontSize), '14px');
   await page.locator('#logout').click();
   await page.locator('#login').waitFor({ state: 'visible' });
-  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
+  console.log(JSON.stringify({ passed: true, checks: ['login', 'HttpOnly session', 'draft restore', 'post', 'fixed previews and reading page', 'save and like', 'double Shift lock', 'command bar', 'shared input search', 'retained list while searching', 'debounced semantic request', 'stale request cancellation', 'hide timeline', 'quiet text controls', 'stationary menus on desktop/mobile', 'private reading links and reload', 'explicit posting', 'full-page Markdown editing', 'live Markdown, cursor syntax, copy, undo/redo, and cancel', 'save on back', 'edit conflict preservation', 'HTML safety', 'public draft isolation', 'font loading', 'title autosave/post/edit', 'date rail', 'draft conflict', 'logout revocation'], screenshots: artifacts }));
 } catch (error) {
   console.error(JSON.stringify({ pageErrors: errors, notice: await page.locator('#notice').textContent().catch(() => ''), feed: await page.locator('#feed-status').textContent().catch(() => '') }));
   await page.screenshot({path: `${artifacts}/failure.png`, fullPage:true}).catch(() => {});

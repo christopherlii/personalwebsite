@@ -43,7 +43,17 @@ complete original source, and open shows the complete writing.
 Reading links require the same
 session and work on reload and under `/journal/`.
 Only an explicit post or save draft creates a new
-entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. Tapping Shift
+entry. Enter inserts a new line; Cmd/Ctrl+Enter also posts. The writing field
+doubles as a command bar (`public/commands.js`): a single line starting with `/`
+that could still become a command opens a menu (arrows, Tab to complete, Enter
+to run, Esc to dismiss) and is neither searched nor saved as a draft; any other
+line starting with `/` stays ordinary writing. `/focus` hides everything but the
+page (Esc or `/focus` again restores it), `/random` opens a random thought,
+`/onthisday` floats this date's thoughts from earlier years up on the left (in
+the browser's time zone; imported posts use their dates), `/read <link>` saves
+to read later and bare `/read` opens it, `/lock` locks, and `/cl` / `/cr` clear
+whatever is floating on the left / right. Floats are plain text in the margins
+beside the writing, not panels; below 1124px they sit under the composer. Tapping Shift
 twice within 400ms locks the journal like the lock button; a tap only counts
 when no other key is pressed while Shift is held. Entries have no
 280-character limit (the storage limit is 20,000 body characters and 160 title
