@@ -552,7 +552,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'curiosities');
   assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['why do cities feel quieter in fog']);
   await page.locator('#float-left .float-idea').first().hover();
-  assert.equal(await page.locator('#float-left .float-done').first().textContent(), 'looked into');
+  assert.equal(await page.locator('#float-left .float-done:not(.float-remove)').first().textContent(), 'looked into');
   await typeCommand('/cl'); await page.keyboard.press('Enter');
   await page.locator('#float-left').waitFor({ state: 'hidden' });
   const receiptIs = text => page.waitForFunction(text => document.querySelector('#command-receipt').textContent === text, text);
@@ -587,11 +587,14 @@ try {
   assert.equal(await page.locator('#reader-content .idea-line .entry-idea').textContent(), 'idea', 'the idea line renders as a tag in its note');
   await backToFeed();
   await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).hover();
-  await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).locator('.float-done').click();
+  await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).locator('.float-done:not(.float-remove)').click();
   await page.locator('#float-left .float-idea.is-done').waitFor();
   await typeCommand('/project'); await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'project ideas');
   assert.deepEqual(await page.locator('#float-left .float-text').allTextContents(), ['a 9pm memories app']);
+  await page.locator('#float-left .float-idea').first().hover(); await page.locator('#float-left .float-remove').first().click();
+  await page.waitForFunction(() => !document.querySelector('#float-left .float-idea'));
+  assert.ok(!(await api('ideas?kind=project')).data.ideas.length, 'the x removes an idea from the list');
   await typeCommand('/ideas'); await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.querySelector('#float-left .float-heading')?.textContent === 'writing ideas');
   assert.equal(await page.locator('#float-left .float-idea').count(), 2, '/ideas only lists, it never creates');

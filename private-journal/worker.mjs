@@ -304,7 +304,7 @@ async function api(request, env, url, context) {
     const publications = await env.JOURNAL_DB.prepare('SELECT * FROM publications').all();
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();
     const photos=await env.JOURNAL_DB.prepare('SELECT id,mime,width,height,bytes,created_at FROM photos ORDER BY created_at').all();
-    const ideas = await env.JOURNAL_DB.prepare(`SELECT id, kind, text, thought_id, created_at, done_at, 'line' AS origin FROM thought_ideas UNION ALL SELECT id, kind, text, context_id, created_at, done_at, 'loose' FROM loose_ideas ORDER BY created_at`).all();
+    const ideas = await env.JOURNAL_DB.prepare(`SELECT id, kind, text, thought_id, created_at, done_at, dismissed_at, 'line' AS origin FROM thought_ideas UNION ALL SELECT id, kind, text, context_id, created_at, done_at, NULL, 'loose' FROM loose_ideas ORDER BY created_at`).all();
     return json({ format: 'christopher-journal-v2', exported_at: new Date().toISOString(), entries: results, draft,
       reading: reading.results,
       photos:photos.results,

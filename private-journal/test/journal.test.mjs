@@ -398,6 +398,28 @@ test('standalone ideas live only in the ideas list, linked to the note written b
   for (const body of [{ id: 'x', kind: 'idea', text: 'a' }, { id: hex(), kind: 'quote', text: 'a' }, { id: hex(), kind: 'idea', text: '  ' }, { id: hex(), kind: 'idea', text: 'two\nlines' }]) assert.equal((await c.call('/api/ideas', 'POST', body)).status, 400);
 });
 
+test('ideas link only to a note written just before, and can be crossed off', async () => {
+  const c = client(); await c.login();
+  const hex = () => crypto.randomUUID().replaceAll('-', '');
+  const old = (await c.call('/api/thoughts', 'POST', thought('an old imported blog post'))).data.entry;
+  c.env.JOURNAL_DB.sqlite.prepare('UPDATE thoughts SET created_at = ?, updated_at = ? WHERE id = ?').run('2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z', old.id);
+  const alone = (await c.call('/api/ideas', 'POST', { id: hex(), kind: 'idea', text: 'an idea with nothing behind it' })).data.idea;
+  assert.equal(alone.thought_id, null, 'an old note is not context');
+  const fresh = (await c.call('/api/thoughts', 'POST', thought('what i was just writing'))).data.entry;
+  assert.equal((await c.call('/api/ideas', 'POST', { id: hex(), kind: 'idea', text: 'an idea right after it' })).data.idea.thought_id, fresh.id, 'a note from the last half hour is');
+  const note = (await c.call('/api/thoughts', 'POST', thought('a note\n/idea keep this one\n/idea cross this one off'))).data.entry;
+  const listed = (await c.call('/api/ideas?kind=idea')).data.ideas;
+  const off = listed.find(idea => idea.text === 'cross this one off');
+  assert.equal((await c.call(`/api/ideas/${off.id}`, 'DELETE')).status, 200);
+  assert.equal((await c.call(`/api/ideas/${alone.id}`, 'DELETE')).status, 200);
+  const after = (await c.call('/api/ideas?kind=idea')).data.ideas.map(idea => idea.text);
+  assert.ok(!after.includes('cross this one off') && !after.includes('an idea with nothing behind it') && after.includes('keep this one'));
+  assert.equal((await c.call(`/api/thoughts/${note.id}`)).data.entry.body, 'a note\n/idea keep this one\n/idea cross this one off', "crossing off leaves the note's text alone");
+  await c.call(`/api/thoughts/${note.id}`, 'PATCH', { body: 'a note, edited\n/idea keep this one\n/idea cross this one off', updated_at: note.updated_at });
+  assert.ok(!(await c.call('/api/ideas?kind=idea')).data.ideas.some(idea => idea.text === 'cross this one off'), 'a crossed-off idea stays off after the note is edited');
+  assert.equal((await c.call(`/api/ideas/${alone.id}`, 'DELETE')).status, 404);
+});
+
 test('the inbox adds thoughts with its own key and can do nothing else', async () => {
   const c = client(); await c.login();
   const post = (body, token, headers = {}) => worker.fetch(new Request('https://journal.example/api/inbox', {
