@@ -623,6 +623,11 @@ async function floatIdeas(kind) {
   if (float.dataset.showing !== kind && cached) return;
   if (!cached || JSON.stringify(cached) !== JSON.stringify(fresh)) renderIdeas(kind, fresh, !cached);
 }
+function startWriting(text) {
+  if (!$('#title').value.trim() && !$('#body').value.trim()) { $('#title').value = text; changedDraft(); receipt('write it'); }
+  else receipt('finish what you are writing first');
+  composerEditor?.focus();
+}
 function prefetchIdeas() { setTimeout(() => { for (const kind of Object.keys(IDEA_KINDS)) fetchIdeas(kind).catch(() => {}); }, 400); }
 function renderIdeas(kind, ideas, animate) {
   const float = $('#float-left'), finished = { idea: 'written', project: 'started', curious: 'looked into' }[kind];
@@ -634,7 +639,12 @@ function renderIdeas(kind, ideas, animate) {
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
     open.append(text);
     // A line idea opens at its line; a loose one opens the note it followed.
-    open.addEventListener('click', () => { if (!idea.thought_id) return; if (idea.origin === 'line') state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` }; navigateThought(idea.thought_id); });
+    open.addEventListener('click', () => {
+      // An idea with no note behind it is an invitation: start writing it.
+      if (!idea.thought_id) { startWriting(idea.text); return; }
+      if (idea.origin === 'line') state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` };
+      navigateThought(idea.thought_id);
+    });
     const done = document.createElement('button'); done.type = 'button'; done.className = 'float-done';
     done.textContent = idea.done_at ? 'undo' : finished; done.setAttribute('aria-label', idea.done_at ? `mark not ${finished}` : `mark ${finished}`);
     done.addEventListener('click', async () => {
@@ -642,7 +652,17 @@ function renderIdeas(kind, ideas, animate) {
       try { await api(`ideas/${idea.id}`, { method: 'PATCH', body: JSON.stringify({ done: !idea.done_at }) }); await floatIdeas(kind); }
       catch (error) { done.disabled = false; notice(error.message); }
     });
-    item.append(open, done);
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'float-done float-remove';
+    remove.textContent = '✕'; remove.setAttribute('aria-label', 'remove from the list');
+    remove.addEventListener('click', async () => {
+      remove.disabled = true;
+      try {
+        await api(`ideas/${idea.id}`, { method: 'DELETE' });
+        ideaLists.set(kind, (ideaLists.get(kind) || []).filter(other => other.id !== idea.id));
+        renderIdeas(kind, ideaLists.get(kind), false);
+      } catch (error) { remove.disabled = false; notice(error.message); }
+    });
+    item.append(open, done, remove);
     return item;
   });
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = `no ${IDEA_KINDS[kind]} yet. log one with /${kind} …`; items.push(empty); }

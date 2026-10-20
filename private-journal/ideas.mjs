@@ -36,7 +36,7 @@ export async function ideaApi(request, env, path, readBody) {
     if (!Object.hasOwn(IDEA_KINDS, kind)) fail(400, 'Invalid idea kind.');
     const indexing = await repairIdeaIndex(env);
     const { results } = await env.JOURNAL_DB.prepare(`SELECT * FROM (
-      SELECT id, kind, text, thought_id, created_at, done_at, 'line' AS origin FROM thought_ideas WHERE kind = ?
+      SELECT id, kind, text, thought_id, created_at, done_at, 'line' AS origin FROM thought_ideas WHERE kind = ? AND dismissed_at IS NULL
       UNION ALL SELECT id, kind, text, context_id, created_at, done_at, 'loose' FROM loose_ideas WHERE kind = ?
     ) ORDER BY done_at IS NOT NULL, COALESCE(done_at, created_at) DESC LIMIT 200`).bind(kind, kind).all();
     return Response.json({ ideas: results, indexing });
@@ -48,10 +48,12 @@ export async function ideaApi(request, env, path, readBody) {
     if (!text || text.length > 280 || /[\r\n]/.test(text)) fail(400, 'Write an idea of up to 280 characters on one line.');
     const existing = await env.JOURNAL_DB.prepare('SELECT id, kind, text, context_id AS thought_id, created_at, done_at FROM loose_ideas WHERE id = ?').bind(data.id).first();
     if (existing) return Response.json({ idea: { ...existing, origin: 'loose' } });
-    // Context is whatever was written just before the idea.
+    // Context is the note you were just writing, if any: one touched in the
+    // last 30 minutes. Otherwise the idea stands alone.
+    const now = new Date(), recent = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
     const idea = await env.JOURNAL_DB.prepare(`INSERT INTO loose_ideas(id, kind, text, context_id, created_at)
-      VALUES (?, ?, ?, (SELECT id FROM thoughts ORDER BY seq DESC LIMIT 1), ?) RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`)
-      .bind(data.id, data.kind, text, new Date().toISOString()).first();
+      VALUES (?, ?, ?, (SELECT id FROM thoughts WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 1), ?) RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`)
+      .bind(data.id, data.kind, text, recent, now.toISOString()).first();
     return Response.json({ idea: { ...idea, origin: 'loose' } }, { status: 201 });
   }
   const idea = path.match(/^\/api\/ideas\/([a-f0-9]{32})$/);
@@ -63,6 +65,14 @@ export async function ideaApi(request, env, path, readBody) {
       || await env.JOURNAL_DB.prepare(`UPDATE loose_ideas SET done_at = ? WHERE id = ? RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`).bind(done, idea[1]).first();
     if (!row) fail(404, 'Idea not found.');
     return Response.json({ idea: row });
+  }
+  // Crossing an idea off: a standalone one is deleted; one from a note leaves
+  // the list but stays in the note's text.
+  if (idea && request.method === 'DELETE') {
+    const removed = await env.JOURNAL_DB.prepare('DELETE FROM loose_ideas WHERE id = ? RETURNING id').bind(idea[1]).first()
+      || await env.JOURNAL_DB.prepare('UPDATE thought_ideas SET dismissed_at = ? WHERE id = ? RETURNING id').bind(new Date().toISOString(), idea[1]).first();
+    if (!removed) fail(404, 'Idea not found.');
+    return Response.json({ ok: true });
   }
   return null;
 }
