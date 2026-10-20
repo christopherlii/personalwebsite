@@ -23,9 +23,11 @@ export async function indexIdeas(entry, env) {
 
 export async function repairIdeaIndex(env) {
   const pending = 'FROM thoughts t LEFT JOIN thought_idea_index i ON i.thought_id = t.id WHERE i.thought_id IS NULL';
-  const { results } = await env.JOURNAL_DB.prepare(`SELECT t.id, t.body, t.updated_at ${pending} ORDER BY t.seq LIMIT 8`).all();
-  for (const entry of results) await indexIdeas(entry, env);
-  return Boolean(await env.JOURNAL_DB.prepare(`SELECT t.id ${pending} LIMIT 1`).first());
+  const { results } = await env.JOURNAL_DB.prepare(`SELECT t.id, t.body, t.updated_at ${pending} ORDER BY t.seq LIMIT 25`).all();
+  // Usually nothing is pending, so the common case costs a single query.
+  if (!results.length) return false;
+  await Promise.all(results.map(entry => indexIdeas(entry, env)));
+  return results.length === 25 && Boolean(await env.JOURNAL_DB.prepare(`SELECT t.id ${pending} LIMIT 1`).first());
 }
 
 export async function ideaApi(request, env, path, readBody) {

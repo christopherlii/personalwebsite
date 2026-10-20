@@ -210,6 +210,7 @@ async function enter() {
   updateComposer();
   if (readerId() || location.hash === '#reading' || routeTag()) await showRoute();
   else await searchFromComposer(true);
+  prefetchIdeas();
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
 
@@ -605,14 +606,30 @@ function revealIdea(id) {
   line.scrollIntoView({ block: 'center' }); line.classList.add('is-revealed');
   setTimeout(() => line.classList.remove('is-revealed'), 2400);
 }
-async function floatIdeas(kind) {
+// Lists are fetched ahead (after unlocking) and kept, so /idea shows at once;
+// a fresh copy follows and replaces the list only if something changed.
+const ideaLists = new Map();
+async function fetchIdeas(kind) {
   let data;
   do { data = await api(`ideas?kind=${kind}`); } while (data.indexing);
+  ideaLists.set(kind, data.ideas);
+  return data.ideas;
+}
+async function floatIdeas(kind) {
+  const cached = ideaLists.get(kind);
+  if (cached) renderIdeas(kind, cached, true);
+  const fresh = await fetchIdeas(kind);
+  const float = $('#float-left');
+  if (float.dataset.showing !== kind && cached) return;
+  if (!cached || JSON.stringify(cached) !== JSON.stringify(fresh)) renderIdeas(kind, fresh, !cached);
+}
+function prefetchIdeas() { setTimeout(() => { for (const kind of Object.keys(IDEA_KINDS)) fetchIdeas(kind).catch(() => {}); }, 400); }
+function renderIdeas(kind, ideas, animate) {
   const float = $('#float-left'), finished = { idea: 'written', project: 'started', curious: 'looked into' }[kind];
   const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = IDEA_KINDS[kind];
-  const items = data.ideas.map((idea, index) => {
+  const items = ideas.map((idea, index) => {
     const item = document.createElement('div'); item.className = `float-idea${idea.done_at ? ' is-done' : ''}`;
-    item.style.animationDelay = `${(index + 1) * 40}ms`;
+    item.style.animationDelay = `${Math.min(index + 1, 8) * 18}ms`;
     const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
     open.append(text);
@@ -629,13 +646,14 @@ async function floatIdeas(kind) {
     return item;
   });
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = `no ${IDEA_KINDS[kind]} yet. log one with /${kind} …`; items.push(empty); }
+  float.classList.toggle('is-quiet', !animate);
   float.replaceChildren(title, ...items); float.hidden = false; float.dataset.showing = kind;
 }
 function floatBullets(heading, items, emptyText) {
-  const float = $('#float-left');
+  const float = $('#float-left'); float.classList.remove('is-quiet');
   const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = heading;
   const rows = items.map((item, index) => {
-    const row = document.createElement('div'); row.className = 'float-idea'; row.style.animationDelay = `${(index + 1) * 40}ms`;
+    const row = document.createElement('div'); row.className = 'float-idea'; row.style.animationDelay = `${Math.min(index + 1, 8) * 18}ms`;
     const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = item.text;
     open.append(text); open.addEventListener('click', item.open); row.append(open);
@@ -746,6 +764,7 @@ $('#composer').addEventListener('submit', async event => {
     state.pendingPost = null; state.dirty = false; state.conflict = false; state.draft = data.draft;
     $('#body').value = data.draft.body; $('#title').value = data.draft.title || '';
     draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
+    prefetchIdeas();
     await setView('all');
     if (essay) navigateThought(data.entry.id);
   } catch (error) { notice(error.message); }
@@ -989,6 +1008,7 @@ $('#logout').addEventListener('click', async () => {
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     composerEditor?.setValue('');
     state.tag=null;
+    ideaLists.clear();
     readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     showLogin();
