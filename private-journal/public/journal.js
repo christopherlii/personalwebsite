@@ -15,6 +15,7 @@ const state = { authenticated: false, view: 'all', query: '', cursor: null, entr
 Object.assign(state, { readerEntry: null, readerEditing: false, readerDirty: false, readerSaving: null, readerHistory: null });
 Object.assign(state, { readerDraftTimer:null, readerConflict:false, readerAutosaving:false });
 state.tag = null;
+state.ideaDraft = null;
 let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
@@ -172,6 +173,7 @@ async function saveDraft() {
 
 function changedDraft() {
   commands.update();
+  if (state.ideaDraft && !$('#title').value.trim() && !$('#body').value.trim()) forgetIdeaDraft();
   // A command in progress is neither a draft nor a search: the timeline and
   // the saved draft stay as they were until it runs or turns back into writing.
   if (commandMatches($('#body').value).length) { clearTimeout(state.draftTimer); clearTimeout(state.searchTimer); updateComposer(); return; }
@@ -623,37 +625,39 @@ async function floatIdeas(kind) {
   if (float.dataset.showing !== kind && cached) return;
   if (!cached || JSON.stringify(cached) !== JSON.stringify(fresh)) renderIdeas(kind, fresh, !cached);
 }
-function startWriting(text) {
-  if (!$('#title').value.trim() && !$('#body').value.trim()) { $('#title').value = text; changedDraft(); receipt('write it'); }
-  else receipt('finish what you are writing first');
-  composerEditor?.focus();
+// Loading an idea makes it the draft's title. Posting that draft marks the
+// idea written; an idea from a note keeps a quiet link back to it.
+function loadIdea(idea) {
+  if ($('#title').value.trim() || $('#body').value.trim()) { receipt('finish what you are writing first'); composerEditor?.focus(); return; }
+  $('#title').value = idea.text; state.ideaDraft = idea;
+  $('#draft-origin').hidden = !(idea.origin === 'line' && idea.thought_id);
+  changedDraft(); composerEditor?.focus();
 }
+function forgetIdeaDraft() { state.ideaDraft = null; $('#draft-origin').hidden = true; }
+async function markIdeaWritten() {
+  const idea = state.ideaDraft; forgetIdeaDraft();
+  if (!idea || idea.done_at) return;
+  await api(`ideas/${idea.id}`, { method: 'PATCH', body: JSON.stringify({ done: true }) }).catch(() => {});
+  const kind = idea.kind;
+  ideaLists.set(kind, await fetchIdeas(kind).catch(() => ideaLists.get(kind) || []));
+  if ($('#float-left').dataset.showing === kind && !$('#float-left').hidden) renderIdeas(kind, ideaLists.get(kind), false);
+}
+$('#draft-origin a').addEventListener('click', event => {
+  event.preventDefault();
+  const idea = state.ideaDraft; if (!idea?.thought_id) return;
+  state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` };
+  navigateThought(idea.thought_id);
+}); 
 function prefetchIdeas() { setTimeout(() => { for (const kind of Object.keys(IDEA_KINDS)) fetchIdeas(kind).catch(() => {}); }, 400); }
 function renderIdeas(kind, ideas, animate) {
-  const float = $('#float-left'), finished = { idea: 'written', project: 'started', curious: 'looked into' }[kind];
+  const float = $('#float-left');
   const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = IDEA_KINDS[kind];
   const items = ideas.map((idea, index) => {
     const item = document.createElement('div'); item.className = `float-idea${idea.done_at ? ' is-done' : ''}`;
     item.style.animationDelay = `${Math.min(index + 1, 8) * 18}ms`;
-    const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
-    const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
-    open.append(text);
-    // A line idea opens at its line; a loose one opens the note it followed.
-    open.addEventListener('click', () => {
-      // An idea with no note behind it is an invitation: start writing it.
-      if (!idea.thought_id) { startWriting(idea.text); return; }
-      if (idea.origin === 'line') state.revealIdea = { thought: idea.thought_id, key: `${idea.kind}\n${idea.text}` };
-      navigateThought(idea.thought_id);
-    });
-    const done = document.createElement('button'); done.type = 'button'; done.className = 'float-done';
-    done.textContent = idea.done_at ? 'undo' : finished; done.setAttribute('aria-label', idea.done_at ? `mark not ${finished}` : `mark ${finished}`);
-    done.addEventListener('click', async () => {
-      done.disabled = true;
-      try { await api(`ideas/${idea.id}`, { method: 'PATCH', body: JSON.stringify({ done: !idea.done_at }) }); await floatIdeas(kind); }
-      catch (error) { done.disabled = false; notice(error.message); }
-    });
-    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'float-done float-remove';
-    remove.textContent = '✕'; remove.setAttribute('aria-label', 'remove from the list');
+    // The bullet is the way out: on hover it turns into an x that removes the idea.
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'float-bullet float-remove';
+    remove.setAttribute('aria-label', 'remove from the list');
     remove.addEventListener('click', async () => {
       remove.disabled = true;
       try {
@@ -662,7 +666,12 @@ function renderIdeas(kind, ideas, animate) {
         renderIdeas(kind, ideaLists.get(kind), false);
       } catch (error) { remove.disabled = false; notice(error.message); }
     });
-    item.append(open, done, remove);
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
+    const text = document.createElement('span'); text.className = 'float-text'; text.textContent = idea.text;
+    open.append(text);
+    // An idea is the start of a draft: pressing it loads it into the writing.
+    open.addEventListener('click', () => loadIdea(idea));
+    item.append(remove, open);
     return item;
   });
   if (!items.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = `no ${IDEA_KINDS[kind]} yet. log one with /${kind} …`; items.push(empty); }
@@ -674,9 +683,10 @@ function floatBullets(heading, items, emptyText) {
   const title = document.createElement('p'); title.className = 'float-heading'; title.textContent = heading;
   const rows = items.map((item, index) => {
     const row = document.createElement('div'); row.className = 'float-idea'; row.style.animationDelay = `${Math.min(index + 1, 8) * 18}ms`;
+    const bullet = document.createElement('span'); bullet.className = 'float-bullet'; bullet.setAttribute('aria-hidden', 'true');
     const open = document.createElement('button'); open.type = 'button'; open.className = 'float-item';
     const text = document.createElement('span'); text.className = 'float-text'; text.textContent = item.text;
-    open.append(text); open.addEventListener('click', item.open); row.append(open);
+    open.append(text); open.addEventListener('click', item.open); row.append(bullet, open);
     return row;
   });
   if (!rows.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; rows.push(empty); }
@@ -784,6 +794,7 @@ $('#composer').addEventListener('submit', async event => {
     state.pendingPost = null; state.dirty = false; state.conflict = false; state.draft = data.draft;
     $('#body').value = data.draft.body; $('#title').value = data.draft.title || '';
     draftStatus(hasDraft(data.draft) ? 'draft saved' : '');
+    if (!essay && state.ideaDraft) await markIdeaWritten();
     prefetchIdeas();
     await setView('all');
     if (essay) navigateThought(data.entry.id);
@@ -1028,7 +1039,7 @@ $('#logout').addEventListener('click', async () => {
     for (const area of document.querySelectorAll('textarea')) area.value = '';
     composerEditor?.setValue('');
     state.tag=null;
-    ideaLists.clear();
+    ideaLists.clear(); forgetIdeaDraft();
     readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     showLogin();

@@ -213,18 +213,18 @@ h1,h2 {
   flex-direction:column;
   gap:14px
 }
-.float-left { right:calc(100% + 56px); align-items:flex-start; text-align:left }
+/* Ideas sit close to the writing: as wide as the longest one, 40px away. */
+.float-left { right:calc(100% + 40px); width:max-content; max-width:220px; align-items:flex-start; text-align:left }
 .float-right { left:calc(100% + 56px); align-items:flex-start; text-align:left }
 .float-heading,.float-empty { color:var(--muted); font-size:10px }
 .float-item { display:flex; flex-direction:column; gap:2px; padding:0; text-align:inherit; font-size:12px; line-height:1.45; color:var(--body); background:none }
 .float-date { color:var(--muted); font-size:10px }
-.float-idea { display:flex; align-items:baseline; gap:8px; margin-top:-8px }
-.float-idea .float-item { position:relative; padding-left:12px }
-.float-idea .float-item::before { content:'•'; position:absolute; left:0; color:var(--muted) }
-.float-idea .float-done { flex-shrink:0 }
-.float-done { padding:0; font-size:10px; color:var(--muted); background:none; opacity:0; transition:opacity 120ms ease-out }
-.float-idea:hover .float-done,.float-done:focus-visible { opacity:1 }
-@media(hover:none) { .float-done { opacity:1 } }
+.float-idea { display:flex; align-items:baseline; margin-top:-8px }
+.float-bullet { flex-shrink:0; width:12px; padding:0; background:none; color:var(--muted); font-size:12px; line-height:1.45; text-align:left }
+.float-bullet::before { content:'•' }
+.float-remove { cursor:pointer }
+/* The bullet turns into an x on hover; pressing it removes the idea. */
+.float-idea:hover .float-remove::before,.float-remove:focus-visible::before { content:'×' }
 .float-idea.is-done .float-text { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--track) }
 .float>* { animation:float-up 240ms cubic-bezier(.2,.7,.2,1) backwards }
 /* A refreshed list that is already showing updates in place, without replaying. */
@@ -279,6 +279,9 @@ textarea::placeholder {
   background:var(--bg);
   font:500 14px/1.55 var(--font-body)
 }
+.draft-origin { margin:-4px 0 8px; font-size:10px }
+.draft-origin a { color:var(--muted); text-decoration:none }
+.draft-origin a:hover { color:var(--fg) }
 .title-input::placeholder {
   color:var(--muted);
   font-weight:400
