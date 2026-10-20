@@ -777,6 +777,14 @@ document.addEventListener('keyup', event => {
   if (event.timeStamp - shiftTap.last < 400 && state.authenticated) { shiftTap.last = -Infinity; $('#logout').click(); }
   else shiftTap.last = event.timeStamp;
 });
+// Typing anywhere on the timeline writes in the box, no click needed. Keys
+// meant for another field, shortcuts, and space (which scrolls) are left alone.
+document.addEventListener('keydown', event => {
+  if (!state.authenticated || $('#app').hidden || event.defaultPrevented || event.isComposing) return;
+  if (event.key.length !== 1 || event.key === ' ' || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.target.closest?.('input, textarea, select, [contenteditable=true], dialog')) return;
+  composerEditor?.focus();
+});
 document.addEventListener('keydown', event => {
   if (state.authenticated && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); if (state.readerEditing) readerEditor?.focus(); else composerEditor?.focus(); }
 });
