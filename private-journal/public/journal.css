@@ -234,8 +234,9 @@ h1,h2 {
   .float { position:static; width:auto; margin-top:28px }
   .float-left,.float-right { align-items:flex-start; text-align:left }
 }
-.focus-mode .page-header,.focus-mode #timeline,.focus-mode #tag-filter,.focus-mode .composer-toolbar,.focus-mode .writing-feedback,.focus-mode .float,.focus-mode #notice { display:none }
-.focus-mode .composer-section { margin-top:18svh }
+.focus-mode .journal-menu,.focus-mode #timeline,.focus-mode #tag-filter,.focus-mode .composer-toolbar,.focus-mode .writing-feedback,.focus-mode .float,.focus-mode #notice { display:none }
+/* The controls keep their space, so the name and the writing stay exactly put. */
+.focus-mode .utilities { visibility:hidden }
 /* Only the writing is at full strength; everything around it stays faint
    until you reach for it. */
 .page-header .site-name,.utilities button,#timeline .thought,.float,.tag-filter,.feed-footer { opacity:.5; transition:opacity 200ms ease,color 200ms ease }

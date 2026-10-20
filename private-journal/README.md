@@ -59,7 +59,7 @@ and Enter moves on. The same lines anywhere in a note
 Bare `/idea` or `/project` (or `/ideas`, `/projects`, which only list) floats that list up on the left, open ideas first;
 clicking one opens its note and highlights the line, and hover offers
 written / started (kept through later edits of the note). `/timeline` shows or hides the timeline, `/focus` hides everything but the
-page (Esc or `/focus` again restores it), `/random` opens a random thought,
+name and the page (Esc or `/focus` again restores it), `/random` opens a random thought,
 `/read <link>` saves
 to read later and bare `/read` opens it, `/lock` locks, and `/cl` / `/cr` clear
 whatever is floating on the left / right. Floats are plain text in the margins
