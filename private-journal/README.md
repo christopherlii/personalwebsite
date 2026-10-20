@@ -57,8 +57,10 @@ and Enter moves on. The same lines anywhere in a note
 (`/idea …`, `/project …`, one per line) are indexed when it is saved
 (`ideas.mjs`, `thought_ideas`) and render as a blue idea / purple project tag.
 Bare `/idea` or `/project` (or `/ideas`, `/projects`, which only list) floats that list up on the left, open ideas first;
-clicking one opens its note and highlights the line, and hover offers
-written / started (kept through later edits of the note). `/timeline` shows or hides the timeline, `/focus` hides everything but the
+pressing one loads it as a draft's title (an idea from a note adds a "from a
+note" link back to its line), and posting that draft marks it written. On
+hover the bullet turns into an x that removes it; one from a note leaves the
+list while the note keeps its text. `/timeline` shows or hides the timeline, `/focus` hides everything but the
 name and the page (Esc or `/focus` again restores it), `/random` opens a random thought,
 `/read <link>` saves
 to read later and bare `/read` opens it, `/lock` locks, and `/cl` / `/cr` clear
