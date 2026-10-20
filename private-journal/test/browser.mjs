@@ -532,12 +532,16 @@ try {
   await typeCommand('/');
   assert.equal(await page.locator('#command-menu li').count(), 11, 'a bare slash lists every command but the shortcuts');
   await page.keyboard.type('fo');
+  const beforeFocus = await page.locator('#composer-editor').boundingBox();
   assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);
   await page.waitForTimeout(900);
   assert.equal((await api('draft')).data.body, '', 'a command in progress is never saved as a draft');
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.body.classList.contains('focus-mode'));
-  assert.equal(await page.locator('.page-header').isVisible(), false, 'focus hides everything but the page');
+  assert.equal(await page.locator('.utilities').isVisible(), false, 'focus hides the controls');
+  assert.equal(await page.locator('.page-header .site-name').isVisible(), true, 'focus keeps the name');
+  assert.equal(await page.locator('#timeline').isVisible(), false, 'focus hides the timeline');
+  assert.equal((await page.locator('#composer-editor').boundingBox()).y, beforeFocus.y, 'the writing stays exactly in place');
   assert.equal(await page.locator('#body').inputValue(), '', 'running a command clears it');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.body.classList.contains('focus-mode'));

@@ -11,7 +11,7 @@ export const COMMANDS = [
   { name: 'projects', hint: 'your project ideas', shortcut: true },
   { name: 'timeline', hint: 'show or hide the timeline' },
   { name: 'draft', hint: 'your essay drafts' },
-  { name: 'focus', hint: 'hide everything but the page' },
+  { name: 'focus', hint: 'hide everything but your name and the page' },
   { name: 'random', hint: 'open a random thought' },
   { name: 'read', hint: 'save a link, or open read later', takes: 'link' },
   { name: 'lock', hint: 'lock the journal' },
