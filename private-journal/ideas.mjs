@@ -48,12 +48,10 @@ export async function ideaApi(request, env, path, readBody) {
     if (!text || text.length > 280 || /[\r\n]/.test(text)) fail(400, 'Write an idea of up to 280 characters on one line.');
     const existing = await env.JOURNAL_DB.prepare('SELECT id, kind, text, context_id AS thought_id, created_at, done_at FROM loose_ideas WHERE id = ?').bind(data.id).first();
     if (existing) return Response.json({ idea: { ...existing, origin: 'loose' } });
-    // Context is the note you were just writing, if any: one touched in the
-    // last 30 minutes. Otherwise the idea stands alone.
-    const now = new Date(), recent = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-    const idea = await env.JOURNAL_DB.prepare(`INSERT INTO loose_ideas(id, kind, text, context_id, created_at)
-      VALUES (?, ?, ?, (SELECT id FROM thoughts WHERE updated_at >= ? ORDER BY updated_at DESC LIMIT 1), ?) RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`)
-      .bind(data.id, data.kind, text, recent, now.toISOString()).first();
+    // A standalone idea stands alone; an idea written in a note links to it.
+    const idea = await env.JOURNAL_DB.prepare(`INSERT INTO loose_ideas(id, kind, text, created_at)
+      VALUES (?, ?, ?, ?) RETURNING id, kind, text, context_id AS thought_id, created_at, done_at`)
+      .bind(data.id, data.kind, text, new Date().toISOString()).first();
     return Response.json({ idea: { ...idea, origin: 'loose' } }, { status: 201 });
   }
   const idea = path.match(/^\/api\/ideas\/([a-f0-9]{32})$/);

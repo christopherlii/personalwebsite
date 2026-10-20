@@ -375,7 +375,7 @@ test('/idea and /project lines are indexed, keep their done mark through edits, 
   assert.equal((await c.call(`/api/ideas/${after[0].id}`, 'PATCH', { done: 'yes' })).status, 400);
 });
 
-test('standalone ideas live only in the ideas list, linked to the note written before them', async () => {
+test('standalone ideas live only in the ideas list and link to no note', async () => {
   const c = client(); await c.login();
   const hex = () => crypto.randomUUID().replaceAll('-', '');
   const early = hex();
@@ -384,7 +384,7 @@ test('standalone ideas live only in the ideas list, linked to the note written b
   const before = (await c.call('/api/thoughts', 'POST', thought('what i was writing just before'))).data.entry;
   const id = hex();
   const created = (await c.call('/api/ideas', 'POST', { id, kind: 'project', text: '  a 9pm memories app  ' })).data.idea;
-  assert.deepEqual([created.text, created.thought_id, created.origin], ['a 9pm memories app', before.id, 'loose']);
+  assert.deepEqual([created.text, created.thought_id, created.origin], ['a 9pm memories app', null, 'loose'], 'a standalone idea stands alone, even right after a note');
   assert.equal((await c.call('/api/ideas', 'POST', { id, kind: 'project', text: 'a 9pm memories app' })).data.idea.id, id, 'a retried save is kept once');
   assert.equal((await c.call('/api/thoughts')).data.entries.length, 1, 'no timeline note is created');
   await c.call('/api/thoughts', 'POST', thought('a note\n/project a line project'));
@@ -398,7 +398,7 @@ test('standalone ideas live only in the ideas list, linked to the note written b
   for (const body of [{ id: 'x', kind: 'idea', text: 'a' }, { id: hex(), kind: 'quote', text: 'a' }, { id: hex(), kind: 'idea', text: '  ' }, { id: hex(), kind: 'idea', text: 'two\nlines' }]) assert.equal((await c.call('/api/ideas', 'POST', body)).status, 400);
 });
 
-test('ideas link only to a note written just before, and can be crossed off', async () => {
+test('standalone ideas never link to a note, and ideas can be crossed off', async () => {
   const c = client(); await c.login();
   const hex = () => crypto.randomUUID().replaceAll('-', '');
   const old = (await c.call('/api/thoughts', 'POST', thought('an old imported blog post'))).data.entry;
@@ -406,7 +406,8 @@ test('ideas link only to a note written just before, and can be crossed off', as
   const alone = (await c.call('/api/ideas', 'POST', { id: hex(), kind: 'idea', text: 'an idea with nothing behind it' })).data.idea;
   assert.equal(alone.thought_id, null, 'an old note is not context');
   const fresh = (await c.call('/api/thoughts', 'POST', thought('what i was just writing'))).data.entry;
-  assert.equal((await c.call('/api/ideas', 'POST', { id: hex(), kind: 'idea', text: 'an idea right after it' })).data.idea.thought_id, fresh.id, 'a note from the last half hour is');
+  assert.equal((await c.call('/api/ideas', 'POST', { id: hex(), kind: 'idea', text: 'an idea right after it' })).data.idea.thought_id, null, 'nor is a note written a moment ago');
+  void fresh;
   const note = (await c.call('/api/thoughts', 'POST', thought('a note\n/idea keep this one\n/idea cross this one off'))).data.entry;
   const listed = (await c.call('/api/ideas?kind=idea')).data.ideas;
   const off = listed.find(idea => idea.text === 'cross this one off');
