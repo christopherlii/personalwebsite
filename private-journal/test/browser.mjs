@@ -586,6 +586,9 @@ try {
   await page.locator('#reader-content .idea-line.is-revealed').waitFor();
   assert.equal(await page.locator('#reader-content .idea-line .entry-idea').textContent(), 'idea', 'the idea line renders as a tag in its note');
   await backToFeed();
+  await page.locator('#float-left .float-item', { hasText: 'trains as thinking rooms' }).click();
+  assert.equal(await page.locator('#title').inputValue(), 'trains as thinking rooms', 'a standalone idea starts a note when clicked');
+  await page.locator('#title').fill(''); await page.locator('#title').dispatchEvent('input');
   await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).hover();
   await page.locator('#float-left .float-idea', { hasText: 'walking as thinking' }).locator('.float-done:not(.float-remove)').click();
   await page.locator('#float-left .float-idea.is-done').waitFor();

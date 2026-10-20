@@ -51,7 +51,7 @@ line starting with `/` stays ordinary writing. Commands work on any line: an act
 just that line, a faint receipt under the writing says what happened, and Up in
 an empty field recalls recent commands. `/idea <text>`, `/project <text>`, and `/curious <text>`
 (or `/hm`, filed as a curiosity with an amber tag; done reads "looked into") on their own log a loose idea (`loose_ideas`) that lives only in the ideas
-list, linked to the note written just before, and flies there from where it
+list (it links to no note; clicking it starts writing it) and flies there from where it
 was typed; inside a longer note the line stays as its tag (styled as you type)
 and Enter moves on. The same lines anywhere in a note
 (`/idea …`, `/project …`, one per line) are indexed when it is saved
