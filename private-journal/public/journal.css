@@ -226,7 +226,9 @@ h1,h2 {
 .float-idea:hover .float-done,.float-done:focus-visible { opacity:1 }
 @media(hover:none) { .float-done { opacity:1 } }
 .float-idea.is-done .float-text { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--track) }
-.float>* { animation:float-up 360ms cubic-bezier(.2,.7,.2,1) backwards }
+.float>* { animation:float-up 240ms cubic-bezier(.2,.7,.2,1) backwards }
+/* A refreshed list that is already showing updates in place, without replaying. */
+.float.is-quiet>* { animation:none }
 @keyframes float-up { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
 @media(max-width:1124px) {
   .float { position:static; width:auto; margin-top:28px }
