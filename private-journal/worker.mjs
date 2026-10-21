@@ -9,6 +9,8 @@ import { photoApi, PhotoError } from './photos.mjs';
 import { TranscriptionError, transcribe } from './transcription.mjs';
 import { liveDictation } from './live-dictation.mjs';
 import { IdeaError, ideaApi, indexIdeas } from './ideas.mjs';
+import { GoalError, goalApi } from './goals.mjs';
+import { DocumentError, documentApi } from './documents.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -171,6 +173,10 @@ async function api(request, env, url, context) {
   }
   const idea = await ideaApi(request, env, path, readBody);
   if (idea) return idea;
+  const goal = await goalApi(request, env, path, readBody);
+  if (goal) return goal;
+  const document = await documentApi(request, env, path, readBody, limit);
+  if (document) return document;
   const publication = await publicationApi(request, env, path, readBody);
   if (publication) return publication;
   if (path === '/api/logout' && request.method === 'POST') {
@@ -305,10 +311,16 @@ async function api(request, env, url, context) {
     const reading = await env.JOURNAL_DB.prepare('SELECT id,url,title,excerpt,read_at,created_at FROM reading ORDER BY seq').all();
     const photos=await env.JOURNAL_DB.prepare('SELECT id,mime,width,height,bytes,created_at FROM photos ORDER BY created_at').all();
     const ideas = await env.JOURNAL_DB.prepare(`SELECT id, kind, text, thought_id, created_at, done_at, dismissed_at, 'line' AS origin FROM thought_ideas UNION ALL SELECT id, kind, text, context_id, created_at, done_at, NULL, 'loose' FROM loose_ideas ORDER BY created_at`).all();
+    const goals = await env.JOURNAL_DB.prepare(`SELECT id, kind, text, created_at, done_at, (SELECT json_group_array(day) FROM (SELECT day FROM goal_days WHERE goal_id = goals.id ORDER BY day)) AS days FROM goals ORDER BY created_at`).all();
+    const documents = await env.JOURNAL_DB.prepare('SELECT id, title, bytes, pages, page, created_at, opened_at FROM documents WHERE complete = 1 ORDER BY created_at').all();
+    const annotations = await env.JOURNAL_DB.prepare('SELECT id, document_id, page, start, length, top, quote, kind, question, body, created_at FROM annotations ORDER BY created_at').all();
     return json({ format: 'christopher-journal-v2', exported_at: new Date().toISOString(), entries: results, draft,
       reading: reading.results,
       photos:photos.results,
       ideas: ideas.results,
+      goals: goals.results.map(goal => ({ ...goal, days: JSON.parse(goal.days) })),
+      documents: documents.results,
+      annotations: annotations.results,
       publications: publications.results.map(row => ({ ...row, draft: JSON.parse(row.draft), published: row.published ? JSON.parse(row.published) : null }))
     }, 200, { 'Content-Disposition': 'attachment; filename="journal.json"' });
   }
@@ -342,11 +354,11 @@ export default {
         }
         if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
-        else if (['GET', 'HEAD'].includes(request.method) && ['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
+        else if (['GET', 'HEAD'].includes(request.method) && (['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/goals.js', '/study.js', '/vendor/pdf.min.mjs', '/vendor/pdf.worker.min.mjs', '/vendor/pdfjs-LICENSE.txt', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname) || /^\/vendor\/standard_fonts\/[A-Za-z-]+\.(?:pfb|ttf)$/.test(url.pathname))) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof TranscriptionError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof GoalError || error instanceof DocumentError || error instanceof TranscriptionError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     if(response.status===101)return response;

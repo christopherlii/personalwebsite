@@ -873,3 +873,121 @@ test('semantic chunks preserve long Unicode inputs and provider failure is expli
   assert.equal(failed.status, 502);
   assert.equal(failed.data.error, 'Related search is unavailable.');
 });
+
+test('goals are private, kept or dropped, listed open first, and exported', async () => {
+  const c = client(); const hex = () => crypto.randomUUID().replaceAll('-', '');
+  assert.equal((await c.call('/api/goals')).status, 401); await c.login();
+  const first = await c.call('/api/goals', 'POST', { id: hex(), text: '  run a half marathon  ' });
+  assert.equal(first.status, 201); assert.equal(first.data.goal.text, 'run a half marathon'); assert.equal(first.data.goal.done_at, null);
+  assert.equal((await c.call('/api/goals', 'POST', { id: first.data.goal.id, text: 'run a half marathon' })).data.goal.id, first.data.goal.id, 'a retried goal is kept once');
+  const second = (await c.call('/api/goals', 'POST', { id: hex(), text: 'write every morning' })).data.goal;
+  const third = (await c.call('/api/goals', 'POST', { id: hex(), text: 'read one paper a week' })).data.goal;
+  assert.ok((await c.call(`/api/goals/${first.data.goal.id}`, 'PATCH', { done: true })).data.goal.done_at);
+  assert.deepEqual((await c.call('/api/goals')).data.goals.map(goal => goal.text), ['write every morning', 'read one paper a week', 'run a half marathon'], 'open goals in the order set, then kept ones');
+  assert.equal((await c.call(`/api/goals/${first.data.goal.id}`, 'PATCH', { done: false })).data.goal.done_at, null, 'a kept goal can be reopened');
+  assert.equal((await c.call(`/api/goals/${third.id}`, 'DELETE')).status, 200);
+  assert.equal((await c.call(`/api/goals/${third.id}`, 'DELETE')).status, 404);
+  assert.deepEqual((await c.call('/api/export')).data.goals.map(goal => goal.id).sort(), [first.data.goal.id, second.id].sort());
+  for (const body of [{ id: 'x', text: 'a' }, { id: hex(), text: ' ' }, { id: hex(), text: 'two\nlines' }, { id: hex(), text: 'a'.repeat(281) }]) assert.equal((await c.call('/api/goals', 'POST', body)).status, 400);
+  assert.equal((await c.call(`/api/goals/${second.id}`, 'PATCH', { done: 'yes' })).status, 400);
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('pdfs are stored in parts, read back whole, remember the page, and carry margin notes and explanations', async () => {
+  const c = client(), id = crypto.randomUUID(), pdfHeaders = { 'Content-Type': 'application/pdf' };
+  // Larger than two stored parts, so reading back has to join them.
+  const bytes = new Uint8Array(3300000); for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31) % 251;
+  bytes.set(new TextEncoder().encode('%PDF-1.7\n'));
+  const upload = `/api/documents/${id}?title=${encodeURIComponent('  a  paper on attention ')}&pages=12`;
+  assert.equal((await c.call(upload, 'PUT', bytes, pdfHeaders)).status, 401); await c.login();
+  assert.equal((await c.call(upload, 'PUT', bytes, { ...pdfHeaders, Origin: 'https://elsewhere.example' })).status, 403);
+  assert.equal((await c.call(upload, 'PUT', bytes, { 'Content-Type': 'image/png' })).status, 415);
+  assert.equal((await c.call(upload, 'PUT', new TextEncoder().encode('not a pdf at all'), pdfHeaders)).status, 415);
+  assert.equal((await c.call(`/api/documents/${id}?pages=12`, 'PUT', bytes, pdfHeaders)).status, 400);
+  assert.equal((await c.call(`/api/documents/${id}?title=a&pages=0`, 'PUT', bytes, pdfHeaders)).status, 400);
+  assert.equal((await c.call(`/api/documents/${crypto.randomUUID()}?title=big&pages=1`, 'PUT', new Uint8Array(20 * 1024 * 1024 + 1).fill(37), pdfHeaders)).status, 413);
+  const created = await c.call(upload, 'PUT', bytes, pdfHeaders);
+  assert.equal(created.status, 201); assert.equal(created.data.document.title, 'a paper on attention'); assert.equal(created.data.document.bytes, bytes.length);
+  assert.equal((await c.call(upload, 'PUT', bytes, pdfHeaders)).status, 200, 'a retried upload is kept once');
+  assert.equal(c.env.JOURNAL_DB.sqlite.prepare('SELECT count(*) AS parts FROM document_parts WHERE document_id = ?').get(id).parts, 3);
+  const file = await worker.fetch(new Request(`https://journal.example/api/documents/${id}/file`, { headers: { Cookie: (await c.login()).headers.get('Set-Cookie').split(';')[0] } }), c.env);
+  assert.equal(file.status, 200); assert.equal(file.headers.get('Content-Type'), 'application/pdf'); assert.equal(file.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(new Uint8Array(await file.arrayBuffer()), bytes);
+  assert.equal((await c.call(`/api/documents/${id}`, 'PATCH', { page: 13 })).status, 400);
+  assert.equal((await c.call(`/api/documents/${id}`, 'PATCH', { page: 7 })).data.document.page, 7);
+
+  const passage = { page: 3, start: 120, length: 42, top: 0.4, quote: 'attention   is all\nyou need' };
+  const note = await c.call(`/api/documents/${id}/annotations`, 'POST', { id: crypto.randomUUID(), kind: 'note', body: ' compare with the 2014 paper ', ...passage });
+  assert.equal(note.status, 201); assert.equal(note.data.annotation.body, 'compare with the 2014 paper'); assert.equal(note.data.annotation.quote, 'attention is all you need');
+  const explainId = crypto.randomUUID();
+  assert.equal((await c.call(`/api/documents/${id}/annotations`, 'POST', { id: explainId, kind: 'ai', ...passage })).status, 503, 'explain needs the AI binding');
+  c.env.AI = { async run() { throw new Error('private provider failure'); } };
+  const failed = await c.call(`/api/documents/${id}/annotations`, 'POST', { id: explainId, kind: 'ai', ...passage });
+  assert.equal(failed.status, 502); assert.equal(failed.data.error, 'Explain is unavailable. Try again.');
+  let asked;
+  c.env.AI = { async run(model, input) { asked = { model, input }; return { response: ' attention weighs every word against every other. ' }; } };
+  const explained = await c.call(`/api/documents/${id}/annotations`, 'POST', { id: explainId, kind: 'ai', question: 'what is attention?', context: 'the surrounding page', ...passage });
+  assert.equal(explained.status, 201); assert.equal(explained.data.annotation.body, 'attention weighs every word against every other.'); assert.equal(explained.data.annotation.question, 'what is attention?');
+  assert.equal(asked.model, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+  const prompt = asked.input.messages.at(-1).content;
+  assert.ok(prompt.includes('a paper on attention') && prompt.includes('the surrounding page') && prompt.includes('attention is all you need') && prompt.includes('what is attention?'));
+  assert.equal((await c.call(`/api/documents/${id}/annotations`, 'POST', { id: explainId, kind: 'ai', ...passage })).data.annotation.id, explainId, 'a retried explanation is not asked again');
+  for (const bad of [{ kind: 'note', body: ' ' }, { kind: 'quote', body: 'a' }, { kind: 'note', body: 'a', page: 13 }, { kind: 'note', body: 'a', top: 1.5 }, { kind: 'note', body: 'a', quote: ' ' }, { kind: 'ai', question: 'a'.repeat(501) }])
+    assert.equal((await c.call(`/api/documents/${id}/annotations`, 'POST', { id: crypto.randomUUID(), ...passage, ...bad })).status, 400);
+  assert.deepEqual((await c.call(`/api/documents/${id}/annotations`)).data.annotations.map(item => item.kind).sort(), ['ai', 'note']);
+  assert.equal((await c.call('/api/documents')).data.documents[0].notes, 2);
+  const exported = (await c.call('/api/export')).data;
+  assert.equal(exported.documents[0].id, id); assert.equal(exported.annotations.length, 2); assert.ok(!('sha256' in exported.documents[0]));
+  assert.equal((await c.call(`/api/annotations/${note.data.annotation.id}`, 'DELETE')).status, 200);
+  assert.equal((await c.call(`/api/documents/${id}/annotations`)).data.annotations.length, 1);
+  assert.equal((await c.call(`/api/documents/${id}`, 'DELETE')).status, 200);
+  assert.equal((await c.call(`/api/documents/${id}`)).status, 404);
+  assert.equal(c.env.JOURNAL_DB.sqlite.prepare('SELECT (SELECT count(*) FROM document_parts) + (SELECT count(*) FROM annotations) AS left').get().left, 0, 'removing a pdf removes its parts and notes');
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('an interrupted upload never lists and is cleared later', async () => {
+  const c = client(); await c.login(); const id = crypto.randomUUID();
+  c.env.JOURNAL_DB.sqlite.prepare('INSERT INTO documents(id, title, bytes, pages, sha256, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, 'half there', 10, 1, 'x', '2026-01-01T00:00:00.000Z');
+  assert.deepEqual((await c.call('/api/documents')).data.documents, []);
+  assert.equal((await c.call(`/api/documents/${id}/file`)).status, 404);
+  assert.equal(c.env.JOURNAL_DB.sqlite.prepare('SELECT count(*) AS n FROM documents').get().n, 0);
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('habits are marked by the day, keep a streak, and cannot be kept like goals', async () => {
+  const c = client(); await c.login(); const hex = () => crypto.randomUUID().replaceAll('-', '');
+  const habit = (await c.call('/api/goals', 'POST', { id: hex(), kind: 'habit', text: 'write every morning' })).data.goal;
+  assert.equal(habit.kind, 'habit'); assert.deepEqual(habit.days, []);
+  const goal = (await c.call('/api/goals', 'POST', { id: hex(), text: 'run a half marathon' })).data.goal;
+  assert.equal(goal.kind, 'goal', 'a goal is the default');
+  const day = offset => new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+  for (const offset of [0, 1, 2, 4]) assert.equal((await c.call(`/api/goals/${habit.id}/days/${day(offset)}`, 'PUT', { done: true })).status, 200);
+  assert.equal((await c.call(`/api/goals/${habit.id}/days/${day(0)}`, 'PUT', { done: true })).status, 200, 'marking a day twice keeps it once');
+  let listed = (await c.call('/api/goals')).data.goals.find(item => item.id === habit.id);
+  assert.deepEqual(listed.days, [day(0), day(1), day(2), day(4)], 'days come newest first');
+  assert.equal((await c.call('/api/goals')).data.goals.find(item => item.id === goal.id).days, undefined);
+  await c.call(`/api/goals/${habit.id}/days/${day(0)}`, 'PUT', { done: false });
+  listed = (await c.call('/api/goals')).data.goals.find(item => item.id === habit.id);
+  assert.deepEqual(listed.days, [day(1), day(2), day(4)], 'a day can be unmarked');
+  for (const bad of ['2026-13-40', '20261021', day(-5)]) assert.equal((await c.call(`/api/goals/${habit.id}/days/${bad}`, 'PUT', { done: true })).status, 400);
+  assert.equal((await c.call(`/api/goals/${habit.id}/days/${day(0)}`, 'PUT', { done: 'yes' })).status, 400);
+  assert.equal((await c.call(`/api/goals/${goal.id}/days/${day(0)}`, 'PUT', { done: true })).status, 400, 'goals are not kept by the day');
+  assert.equal((await c.call(`/api/goals/${habit.id}`, 'PATCH', { done: true })).status, 404, 'habits are never kept like goals');
+  assert.equal((await c.call('/api/goals', 'POST', { id: hex(), kind: 'chore', text: 'x' })).status, 400);
+  assert.deepEqual((await c.call('/api/export')).data.goals.find(item => item.id === habit.id).days, [day(4), day(2), day(1)]);
+  await c.call(`/api/goals/${habit.id}`, 'DELETE');
+  assert.equal(c.env.JOURNAL_DB.sqlite.prepare('SELECT count(*) AS n FROM goal_days').get().n, 0, 'dropping a habit drops its days');
+  c.env.JOURNAL_DB.sqlite.close();
+});
+
+test('a streak counts back from today, or from yesterday while today is open', async () => {
+  const { streak } = await import('../public/goals.js');
+  const now = new Date(2026, 9, 21, 9), on = (...days) => days.map(d => `2026-10-${String(d).padStart(2, '0')}`);
+  assert.equal(streak(on(21, 20, 19), now), 3);
+  assert.equal(streak(on(20, 19), now), 2, 'today still open keeps the streak');
+  assert.equal(streak(on(21, 19, 18), now), 1);
+  assert.equal(streak(on(19, 18), now), 0, 'a whole missed day breaks it');
+  assert.equal(streak([], now), 0);
+  assert.equal(streak(['2026-09-30', ...on(1, 2)], new Date(2026, 9, 2, 9)), 3, 'streaks cross months');
+});

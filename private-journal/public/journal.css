@@ -860,3 +860,69 @@ dialog .public-actions {
 
 .cm-dictation-preview { color:var(--muted); white-space:pre-wrap; pointer-events:none }
 .cm-content:has(.cm-dictation-preview) .cm-placeholder { display:none }
+
+/* Receipts that hold stay up while the work they describe is still going. */
+.command-receipt.is-holding { opacity:1 }
+.float-link { color:inherit; text-decoration:underline; text-underline-offset:3px }
+.float-idea.is-confirming .float-date { color:#a12e22 }
+.drop-hint { position:fixed; inset:0; z-index:20; display:grid; place-items:center; margin:0; background:rgb(250 250 250 / .88); color:var(--muted); font-size:12px; pointer-events:none }
+
+/* Reading a PDF: only the pages, with notes in the margin beside them. */
+.study { max-width:1056px; margin:0 auto 120px; padding:0 40px }
+.study-toolbar { position:sticky; top:0; z-index:3; display:flex; align-items:baseline; gap:20px; padding:22px 0 18px; background:var(--bg); color:var(--muted); font-size:11px; opacity:.5; transition:opacity 200ms ease }
+.study-toolbar:hover,.study-toolbar:focus-within { opacity:1 }
+#study-back { color:inherit; text-decoration:none }
+.study-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.study-position { font-variant-numeric:tabular-nums }
+.study-message { min-height:20px; color:var(--muted); font-size:11px }
+.study-page { display:grid; grid-template-columns:minmax(0,720px) 240px; gap:0 48px; justify-content:center; margin-bottom:24px }
+.study-sheet { position:relative; width:100%; background:var(--bg); box-shadow:0 0 0 1px var(--track); --scale-round-x:1px; --scale-round-y:1px }
+.study-sheet canvas { position:absolute; inset:0; display:block; width:100%; height:100% }
+.study-sheet[data-failed]::after { content:'this page could not be drawn.'; position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); font-size:11px }
+.study-notes { position:relative; font-size:12px; line-height:1.5 }
+.study-note { position:absolute; left:0; right:0; padding-left:10px; border-left:2px solid #f0d78c; color:var(--body); cursor:default; outline:0 }
+.study-note.is-ai { border-left-color:#b9d1ee }
+.study-note.is-pending .study-note-body { color:var(--muted); animation:study-thinking 1.4s ease-in-out infinite }
+.study-note.is-failed { border-left-color:#e7b2aa }
+.study-note.is-failed .study-note-body { color:var(--muted) }
+.study-note-label { margin-bottom:3px; color:var(--muted); font-size:10px }
+.study-note-body.markdown-body { line-height:1.5 }
+.study-note-body.markdown-body p,.study-note-body.markdown-body ul,.study-note-body.markdown-body ol { margin-bottom:.6em }
+.study-note-body.markdown-body>:last-child { margin-bottom:0 }
+.study-note-remove { padding:2px 0 0; background:none; color:var(--muted); font-size:10px; opacity:0 }
+.study-note:hover .study-note-remove,.study-note:focus-within .study-note-remove,.study-note-remove:focus-visible { opacity:1 }
+.study-note-field { display:block; width:100%; min-height:20px; padding:0; border:0; resize:none; overflow:hidden; background:none; font-size:12px; line-height:1.5; outline:0 }
+.study-note-field::placeholder { color:var(--muted) }
+@keyframes study-thinking { 50% { opacity:.45 } }
+/* A small dark bar above the selection, the one bit of ink outside the page. */
+.study-actions { position:fixed; z-index:6; display:flex; gap:14px; padding:3px 12px; border-radius:3px; background:var(--fg); color:#fff; animation:menu-fade 120ms ease-out backwards }
+.study-actions button { padding:4px 0; background:none; color:inherit; font-size:11px }
+@media(hover:hover) { .study-actions button:enabled:hover { opacity:.7 } }
+::highlight(study-note) { background-color:rgb(246 214 120 / .45) }
+::highlight(study-ai) { background-color:rgb(170 200 240 / .45) }
+::highlight(study-active) { background-color:rgb(246 196 80 / .7) }
+@media(max-width:1000px) {
+  .study { padding:0 20px }
+  .study-page { grid-template-columns:minmax(0,1fr) }
+  .study-note { position:static; margin-top:14px }
+}
+@media(pointer:coarse) { .study-actions button { min-height:40px } .study-note-remove { opacity:1 } }
+
+/* PDF.js text layer (from its viewer stylesheet): invisible text over the
+   drawn page, so passages can be selected and found. */
+.textLayer { color-scheme:only light; position:absolute; text-align:initial; inset:0; overflow:clip; opacity:1; line-height:1; letter-spacing:normal; word-spacing:normal; text-size-adjust:none; forced-color-adjust:none; transform-origin:0 0; caret-color:CanvasText; z-index:0; --min-font-size:1; --text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv:calc(1 / var(--min-font-size)) }
+.textLayer :is(span,br) { color:transparent; position:absolute; white-space:pre; cursor:text; transform-origin:0% 0%; user-select:text }
+.textLayer>:not(.markedContent),.textLayer .markedContent span:not(.markedContent) { z-index:1; --font-height:0; font-size:calc(var(--text-scale-factor) * var(--font-height)); --scale-x:1; --rotate:0deg; transform:rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)) }
+.textLayer .markedContent { display:contents }
+.textLayer span[role=img] { user-select:none; cursor:default }
+.textLayer ::selection { background:rgb(120 150 220 / .3); color:transparent }
+.textLayer br::selection { background:transparent }
+.textLayer .endOfContent { display:block; position:absolute; inset:100% 0 0; z-index:0; cursor:default; user-select:none }
+.textLayer.selecting .endOfContent { top:0 }
+.float-date-hint { display:none }
+.float-goal .float-item:hover .float-date-idle,.float-goal .float-item:focus-visible .float-date-idle { display:none }
+.float-goal .float-item:hover .float-date-hint,.float-goal .float-item:focus-visible .float-date-hint { display:inline }
+/* A habit's last week: seven dots, today on the right, filled where kept. */
+.habit-week { display:inline-flex; gap:3px; margin-right:8px; vertical-align:1px }
+.habit-day { width:5px; height:5px; border-radius:50%; background:var(--track) }
+.habit-day.is-kept { background:var(--body) }

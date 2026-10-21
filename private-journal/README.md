@@ -63,7 +63,9 @@ hover the bullet turns into an x that removes it; one from a note leaves the
 list while the note keeps its text. `/timeline` shows or hides the timeline, `/focus` hides everything but the
 name and the page (Esc or `/focus` again restores it), `/random` opens a random thought,
 `/read <link>` saves
-to read later and bare `/read` opens it, `/lock` locks, and `/cl` / `/cr` clear
+to read later and bare `/read` floats what you are reading on the left (see
+Reading PDFs), `/goal <text>` commits to a goal and `/habit <text>` starts a
+habit on the right, and bare `/goal`, `/habit`, or `/goals` shows them, `/lock` locks, and `/cl` / `/cr` clear
 whatever is floating on the left / right. Floats are plain text in the margins
 beside the writing, not panels; below 1124px they sit under the composer. Tapping Shift
 twice within 400ms locks the journal like the lock button; a tap only counts
@@ -206,6 +208,81 @@ Version-guarded inserts prevent stale indexing jobs from restoring removed
 tags. Tags do not call an AI service. `npm run test:tags` checks feed/reader
 links, exact filtering, literal code/URLs, reload, drafts, back navigation,
 edits, clearing, and 320px layout; API tests cover legacy repair and pagination.
+
+## Goals
+
+Some commitments are done once, others are kept up. `/goal <text>` sets a goal:
+it shows a quiet "day N" counted from the day it was set, and pressing it marks
+it kept (struck through, "kept oct 20"); pressing it again reopens it. The five
+most recently kept stay listed under the open ones. `/habit <text>` starts a
+habit: pressing it marks today done (again undoes it), and under it seven dots
+show the last week, today on the right, with "N days in a row" once a streak
+is two days long. A streak still counts while today is open; it breaks only
+when a whole day is missed. Days are the writer's own calendar dates, sent by
+the browser. Hovering either says what a press does.
+
+Habits and goals float on the right of the writing from the moment the journal
+unlocks, as two short lists (habits, then goals). On hover the bullet turns
+into an x that drops one. `/cr` clears them for the rest of the visit;
+`/goal`, `/habit`, or `/goals` brings them back. Migration
+`0016_goals_and_documents.sql` adds `goals` and `goal_days`; both are in the
+owner export.
+
+## Reading PDFs
+
+Drop a PDF anywhere in the journal (including onto the writing, which never
+takes it as a photo or pastes its bytes) to add it to your reading. Bare
+`/read` floats the reading list on the left: PDFs first, with the page you
+were on and how many notes they carry, then up to six unread saved links,
+which open on their own site. Pressing a PDF opens `#read/<id>`, where
+everything but the pages goes away: a faint back link, the title, and the
+page count. Esc or back returns to the journal. It reopens at the page you
+left. Removing a PDF from the float takes a second press of its x, since its
+notes go with it.
+
+Select a passage to get a small bar above it: **note** writes your own note,
+**explain** asks for a plain explanation, and **ask** asks a question about
+it. Notes and answers sit in the margin level with their passage (yellow for
+yours, blue for explanations), pushed down past the one above; under 1000px
+they sit under each page. Hovering a note brightens its passage. Passages are
+drawn with the CSS Custom Highlight API, so the page's text is never changed;
+each is found again by its character offset in the page's text and only drawn
+where the text still matches the quote.
+
+PDFs render with Mozilla's PDF.js (Apache-2.0), pinned in `package.json` and
+copied unchanged into `public/vendor/` by `npm run build:pdf` (run before
+`dev` and `deploy`), with its standard fonts for PDFs that do not embed
+theirs. It loads only when a PDF is first opened or added, runs with eval and
+WebAssembly off, and stays inside the existing CSP: its worker and fonts come
+from the journal's own origin. Without WebAssembly, rare JPEG 2000 and JBIG2
+images inside PDFs do not draw. Pages draw as they come near the view and
+their canvases are released far from it; the text layer stays for finding
+passages.
+
+PDFs are up to 20 MB. The browser opens a PDF before uploading it, to count its
+pages and take a title (its own, unless that looks like a leftover file name).
+The worker checks the PDF header, stores the bytes in 1.5 MB parts under
+D1's 2 MB row limit, and lists a PDF only once every part is stored; an
+interrupted upload is cleared within an hour. Like photos, PDFs share the
+database's storage allowance; a large library should move the bytes to R2
+behind the same API addresses. Notes (`annotations`) and PDF metadata are in
+the owner export; the PDF files themselves are not.
+
+Explain and ask send the selected passage, up to 6,000 characters of the
+page around it, the PDF’s title, and any question to Cloudflare Workers AI
+(`@cf/meta/llama-3.3-70b-instruct-fp8-fast`). Nothing else from the journal is
+sent, and nothing is sent until you press explain or ask. The answer is saved
+as a margin note; a failed request saves nothing and shows the error in the
+margin. Requests are limited to 20 a minute and 200 an hour. Local preview has
+no AI binding, so explain shows "Explain is unavailable here."
+
+`npm run test:study` checks goals (command, day count, keep/reopen, reload,
+`/cr`), a synthetic PDF dropped on the writing, the reading float, the reading
+view, margin notes and highlights, explain and ask against a controlled
+fixture, the local explain failure, notes and page surviving reload, Esc,
+a 390px layout, and removal. API tests cover goals, multi-part storage and
+read-back, page bounds, notes, explanations with a stubbed model, validation,
+export, and cleanup of interrupted uploads.
 
 ## Saved reading
 
