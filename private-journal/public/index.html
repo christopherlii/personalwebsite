@@ -58,7 +58,7 @@
         </div>
       </form>
       <aside id="float-left" class="float float-left" aria-label="your thoughts" hidden></aside>
-      <aside id="float-right" class="float float-right" aria-label="further reading" hidden></aside>
+      <aside id="float-right" class="float float-right" aria-label="goals" hidden></aside>
     </section>
     <p id="notice" class="notice" role="status" hidden></p>
     <p id="copy-status" class="sr-only" role="status"></p>
@@ -114,6 +114,13 @@
     <p id="reading-empty" class="reading-message" role="status"></p>
     <button id="reading-more" type="button" hidden>load more</button>
   </main>
+  <main id="study" class="study" hidden>
+    <header class="study-toolbar"><a id="study-back" href="#">back</a><span id="study-title" class="study-title"></span><span id="study-position" class="study-position"></span></header>
+    <p id="study-message" class="study-message" role="status"></p>
+    <div id="study-pages" class="study-pages"></div>
+    <div id="study-actions" class="study-actions" role="toolbar" aria-label="selected passage" hidden><button type="button" data-study="note">note</button><button type="button" data-study="explain">explain</button><button type="button" data-study="ask">ask</button></div>
+  </main>
+  <p id="drop-hint" class="drop-hint" aria-hidden="true" hidden>drop to read</p>
   <dialog id="delete-dialog" aria-labelledby="delete-title">
     <form id="delete-form">
       <h2 id="delete-title">delete this thought?</h2>

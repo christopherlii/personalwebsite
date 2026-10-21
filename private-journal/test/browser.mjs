@@ -530,7 +530,7 @@ try {
   const draftIs = body => page.waitForFunction(async body => (await (await fetch('./api/draft')).json()).body === body, body);
   await draftIs('');
   await typeCommand('/');
-  assert.equal(await page.locator('#command-menu li').count(), 11, 'a bare slash lists every command but the shortcuts');
+  assert.equal(await page.locator('#command-menu li').count(), 13, 'a bare slash lists every command but the shortcuts');
   await page.keyboard.type('fo');
   const beforeFocus = await page.locator('#composer-editor').boundingBox();
   assert.deepEqual(await page.locator('#command-menu .command-name').allTextContents(), ['/focus']);

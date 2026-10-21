@@ -9,6 +9,8 @@ import { createPhotos } from './photos.js';
 import { plainPhotoLinks } from './photo-links.js';
 import { createCommands, commandMatches } from './commands.js';
 import { IDEA_KINDS, IDEA_WORDS, IDEA_WORD_PATTERN } from './ideas.js';
+import { createGoals } from './goals.js';
+import { createStudy } from './study.js';
 
 const $ = selector => document.querySelector(selector);
 const state = { authenticated: false, view: 'all', query: '', cursor: null, entries: new Map(), generation: 0, controller: null, draft: { version: 0 }, dirty: false, saving: null, conflict: false, posting: false, pendingPost: null, selected: null, publication: null, publicationId: null, publicDirty: false, publicBusy: false, draftTimer: null, searchTimer: null, semanticAvailable: false, semantic: false, timelineHidden: false, renderedQuery: null, renderedView: null, readerGeneration: 0, feedScroll: 0 };
@@ -19,6 +21,8 @@ state.ideaDraft = null;
 let readerEditor = null;
 let composerEditor = null;
 const readingView = createReading({ api, navigateThought });
+const goals = createGoals({ api, notice });
+const study = createStudy({ api, onBack: leaveStudy });
 const photos=createPhotos({api,getEditor:owner=>owner==='composer'?composerEditor:readerEditor,
   onBusy(busy){for(const id of ['composer-editor','live-editor'])document.getElementById(id).setAttribute('aria-busy',String(busy));},
   onMessage(owner,message){if(owner==='composer')notice(message);else $('#reader-error').textContent=message;}
@@ -43,6 +47,14 @@ function navigateThought(id) {
   history.pushState({ journalNavigation: true, previousThought: current || null }, '', `#thought/${id}`);
   showRoute();
 }
+function studyId() { return location.hash.match(/^#read\/([a-f0-9-]{36})$/)?.[1]; }
+function openDocument(id) {
+  if (id === studyId()) return;
+  history.pushState({ journalNavigation: true }, '', `#read/${id}`);
+  showRoute();
+}
+function leaveStudy() { if (history.state?.journalNavigation) history.back(); else location.hash = ''; }
+$('#study-back').addEventListener('click', event => { if (history.state?.journalNavigation) { event.preventDefault(); history.back(); } });
 async function findThoughts(query, signal, exclude = '') {
   const result = await api(`link-suggestions?q=${encodeURIComponent(query)}${exclude ? `&exclude=${exclude}` : ''}`, { signal });
   return result.entries;
@@ -96,6 +108,7 @@ function showLogin(message = '') {
   $('#app').hidden = true;
   $('#reader').hidden = true;
   readingView.hide(); readingView.hideRelated();
+  study.close(); dropHint(false);
   $('#reader-content').replaceChildren();
   $('#login').hidden = false;
   $('#boot-status').hidden = true;
@@ -197,7 +210,7 @@ async function enter() {
   $('#title').value = unsaved?.title ?? draft.title ?? '';
   state.authenticated = true;
   $('#login').hidden = true;
-  $('#app').hidden = Boolean(readerId()) || location.hash === '#reading';
+  $('#app').hidden = Boolean(readerId() || studyId()) || location.hash === '#reading';
   $('#boot-status').hidden = true;
   $('#password').value = '';
   if (!composerEditor) composerEditor = createLiveEditor($('#composer-editor'), {
@@ -210,9 +223,11 @@ async function enter() {
   });
   draftStatus(state.conflict ? 'unsaved text restored. copy your text or post it.' : hasDraft(draft) ? 'draft saved' : '');
   updateComposer();
-  if (readerId() || location.hash === '#reading' || routeTag()) await showRoute();
+  if (readerId() || studyId() || location.hash === '#reading' || routeTag()) await showRoute();
   else await searchFromComposer(true);
   prefetchIdeas();
+  // Goals you have committed to are in sight from the moment you unlock.
+  goals.load().catch(() => {});
   if (state.publicDirty && state.publicationId) { $('#public-dialog').showModal(); $('#public-status').textContent = 'unsaved text restored'; }
 }
 
@@ -319,7 +334,9 @@ async function showRoute() {
   if(!await dictation.stop()){history.replaceState({...state.readerHistory,journalNavigation:false},'',state.readerEntry?`#thought/${state.readerEntry.id}`:state.tag?`#tag/${encodeURIComponent(state.tag)}`:'#');return;}
   if (!state.authenticated) return;
   const generation = ++state.readerGeneration;
-  const id = readerId();
+  const id = readerId(), documentId = studyId();
+  const leavingStudy = !documentId && !$('#study').hidden;
+  if (!documentId) study.close();
   readingView.hide();
   $('#reader-back').href = readerBackTarget();
   if ((state.readerDirty || state.readerSaving) && id !== state.readerEntry?.id) {
@@ -333,6 +350,13 @@ async function showRoute() {
     }
     if (generation !== state.readerGeneration) return;
   }
+  if (documentId) {
+    // Reading a PDF: everything but the pages goes away.
+    if (!$('#app').hidden) state.feedScroll = window.scrollY;
+    $('#app').hidden = true; $('#reader').hidden = true; readingView.hideRelated();
+    state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
+    closeMenus(); await study.open(documentId); return;
+  }
   if (location.hash === '#reading') {
     $('#app').hidden = true; $('#reader').hidden = true; readingView.hideRelated();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
@@ -340,7 +364,7 @@ async function showRoute() {
   }
   if (!id) {
     const tag=routeTag(),tagChanged=tag!==state.tag;state.tag=tag;
-    const wasReading = !$('#reader').hidden;
+    const wasReading = !$('#reader').hidden || leavingStudy;
     $('#reader').hidden = true; $('#reader-content').replaceChildren();
     state.readerEntry = null; state.readerEditing = false; clearReaderEditor();
     state.readerHistory = null;
@@ -692,6 +716,78 @@ function floatBullets(heading, items, emptyText) {
   if (!rows.length) { const empty = document.createElement('p'); empty.className = 'float-empty'; empty.textContent = emptyText; rows.push(empty); }
   float.replaceChildren(title, ...rows); float.hidden = false; delete float.dataset.showing;
 }
+// What you are reading floats up on the left: PDFs first, which open into
+// the reading view, then links saved for later, which open on their own site.
+async function floatReading(animate = true) {
+  const [documents, links] = await Promise.all([study.list(), api('reading?read=0').then(data => data.entries)]);
+  const float = $('#float-left'), element = (tag, className, text) => { const item = document.createElement(tag); item.className = className; if (text) item.textContent = text; return item; };
+  const row = (index, bullet, title, meta, open) => {
+    const item = element('div', 'float-idea'); item.style.animationDelay = `${Math.min(index + 1, 8) * 18}ms`;
+    const button = element('button', 'float-item'); button.type = 'button';
+    button.append(element('span', 'float-text', title), element('span', 'float-date', meta));
+    button.addEventListener('click', open); item.append(bullet, button);
+    return item;
+  };
+  const rows = documents.map((entry, index) => {
+    const meta = `pdf · p. ${entry.page} of ${entry.pages}${entry.notes ? ` · ${entry.notes} ${entry.notes === 1 ? 'note' : 'notes'}` : ''}`;
+    // Notes go with the PDF, so removing one takes a second press.
+    const remove = element('button', 'float-bullet float-remove'); remove.type = 'button'; remove.setAttribute('aria-label', 'remove this pdf');
+    const item = row(index, remove, entry.title, meta, () => openDocument(entry.id));
+    remove.addEventListener('click', async () => {
+      const label = item.querySelector('.float-date');
+      if (!item.classList.contains('is-confirming')) {
+        item.classList.add('is-confirming'); label.textContent = entry.notes ? 'press × again to remove it and its notes' : 'press × again to remove';
+        setTimeout(() => { item.classList.remove('is-confirming'); label.textContent = meta; }, 3000); return;
+      }
+      remove.disabled = true;
+      try { await study.remove(entry.id); await floatReading(false); }
+      catch (error) { remove.disabled = false; notice(error.message); }
+    });
+    return item;
+  });
+  for (const link of links.slice(0, 6)) {
+    const bullet = element('span', 'float-bullet'); bullet.setAttribute('aria-hidden', 'true');
+    const host = new URL(link.url).hostname.replace(/^www\./, '');
+    rows.push(row(rows.length, bullet, link.title || host, host, () => window.open(link.url, '_blank', 'noopener,noreferrer')));
+  }
+  const foot = element('p', 'float-empty', rows.length ? 'drop a pdf anywhere to add it. ' : 'nothing to read yet. drop a pdf anywhere, or /read a link. ');
+  const all = element('a', 'float-link', 'saved links'); all.href = '#reading'; foot.append(all);
+  float.classList.toggle('is-quiet', !animate);
+  float.replaceChildren(element('p', 'float-heading', 'reading'), ...rows, foot); float.hidden = false; float.dataset.showing = 'reading';
+}
+// Drop a PDF anywhere in the journal to add it to your reading.
+function dropHint(on) { $('#drop-hint').hidden = !on; }
+const carriesPdf = event => [...(event.dataTransfer?.items || [])].some(item => item.kind === 'file' && item.type === 'application/pdf');
+window.addEventListener('dragover', event => {
+  if (!state.authenticated || !carriesPdf(event) || document.querySelector('dialog[open]')) return;
+  event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; dropHint(true);
+}, true);
+window.addEventListener('dragleave', event => { if (!event.relatedTarget) dropHint(false); });
+window.addEventListener('dragend', () => dropHint(false));
+// Capturing on the window runs before the writing fields, which would
+// otherwise take the file for a photo or paste its bytes as text.
+window.addEventListener('drop', event => {
+  dropHint(false);
+  const files = [...(event.dataTransfer?.files || [])].filter(study.isPdf);
+  if (!state.authenticated || !files.length || document.querySelector('dialog[open]')) return;
+  event.preventDefault(); event.stopPropagation();
+  addPdfs(files, { left: event.clientX, top: event.clientY });
+}, true);
+async function addPdfs(files, from) {
+  if (files.length > 5) { notice('Drop up to 5 PDFs at a time.'); return; }
+  notice();
+  let added = null;
+  for (const file of files) {
+    receipt(`adding ${file.name}…`, true);
+    try { added = await study.upload(file); }
+    catch (error) { notice(error.message); }
+  }
+  receipt(added ? 'added to reading' : '');
+  if (!added) return;
+  if ($('#app').hidden) { openDocument(added.id); return; }
+  try { await floatReading(); await flyTo('left', added.title, from); }
+  catch (error) { notice(error.message); }
+}
 function setFocus(on) { document.body.classList.toggle('focus-mode', on); }
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && document.body.classList.contains('focus-mode') && !document.querySelector('dialog[open]')) setFocus(false);
@@ -704,7 +800,14 @@ async function runCommand(name, argument, context = {}) {
     if (name === 'focus') setFocus(!document.body.classList.contains('focus-mode'));
     else if (name === 'lock') $('#logout').click();
     else if (name === 'cl') { clearFloat('left'); receipt('cleared the left'); }
-    else if (name === 'cr') { clearFloat('right'); receipt('cleared the right'); }
+    else if (name === 'cr') { goals.hide(); receipt('cleared the right'); }
+    else if (name === 'goal' || name === 'goals' || name === 'habit') {
+      if (!argument || name === 'goals') { await goals.show(); return; }
+      // A goal or habit set on its own flies from where it was typed to the list on the right.
+      await goals.add(argument, name === 'habit' ? 'habit' : 'goal');
+      receipt(name === 'habit' ? 'habit started' : 'committed');
+      await flyTo('right', argument, context.rect);
+    }
     else if (Object.hasOwn(IDEA_WORDS, name)) {
       const kind = IDEA_WORDS[name];
       if (!argument) { await floatIdeas(kind); return; }
@@ -722,20 +825,24 @@ async function runCommand(name, argument, context = {}) {
     }
     else if (name === 'random') { const { entry } = await api('thoughts/random'); navigateThought(entry.id); }
     else if (name === 'read') {
-      if (!argument) { location.hash = '#reading'; return; }
+      if (!argument) { await floatReading(); return; }
       const data = await api('reading', { method: 'POST', body: JSON.stringify({ id: crypto.randomUUID(), url: argument }) });
       receipt(data.existing ? 'already in read later' : 'saved to read later');
     }
   } catch (error) { notice(error.status === 404 && name === 'random' ? 'no thoughts yet.' : error.message); }
 }
 // A faint line under the writing that says what a command did, then fades.
-function receipt(text) {
+// One that holds stays until the next, for work still under way.
+function receipt(text, hold = false) {
   const element = $('#command-receipt');
-  element.textContent = text; element.classList.remove('is-showing'); void element.offsetWidth; element.classList.add('is-showing');
+  element.textContent = text; element.classList.remove('is-showing', 'is-holding'); void element.offsetWidth; element.classList.add(hold ? 'is-holding' : 'is-showing');
 }
 async function flyIdea(kind, text, from) {
   await floatIdeas(kind);
-  const target = [...document.querySelectorAll('#float-left .float-idea:not(.is-done) .float-text')].find(item => item.textContent === text);
+  await flyTo('left', text, from);
+}
+async function flyTo(side, text, from) {
+  const target = [...document.querySelectorAll(`#float-${side} .float-idea:not(.is-done) .float-text`)].find(item => item.textContent === text);
   if (!target || !from || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const to = target.getBoundingClientRect();
   const ghost = document.createElement('span'); ghost.className = 'idea-ghost'; ghost.textContent = text;
@@ -1040,6 +1147,7 @@ $('#logout').addEventListener('click', async () => {
     composerEditor?.setValue('');
     state.tag=null;
     ideaLists.clear(); forgetIdeaDraft();
+    goals.clear(); clearFloat('left');
     readingView.clear();
     for (const input of document.querySelectorAll('.title-input')) input.value = '';
     showLogin();
