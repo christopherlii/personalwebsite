@@ -1425,6 +1425,169 @@ body.no-top-fade .top-fade {
 }
 
 /* ========================================
+   PROJECTS
+   ======================================== */
+
+/* The banner on projects is the photograph itself, cut clean: the same
+   travelling window as the painting, with a plain rectangle for a mask
+   instead of the torn edge. */
+.banner.squared .banner-media {
+  -webkit-mask-image: linear-gradient(#000, #000);
+  mask-image: linear-gradient(#000, #000);
+}
+
+/* Laid exactly over the image layer (same box), so the type samples the
+   pixel beneath it. It paints nothing until the photo has settled into its
+   card, then resolves cell by cell. */
+.banner-ascii {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--banner-height);
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.banner.ascii-on .banner-ascii {
+  opacity: 1;
+  pointer-events: auto;
+  transition: none;
+}
+
+/* Portfolio panels: a hairline and a meta row above each, then the image
+   with the name set large across its foot. The first one runs full width. */
+.projects-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px 16px;
+}
+
+.project-panel {
+  display: block;
+  color: inherit;
+  min-width: 0;
+}
+
+.project-panel.featured {
+  grid-column: 1 / -1;
+}
+
+.project-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.project-arrow {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.project-face {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 1 / 1;
+  background: #111;
+}
+
+.project-panel.featured .project-face {
+  aspect-ratio: 16 / 9;
+}
+
+.project-image,
+.project-mark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.project-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 22%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.project-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.45) 40%, transparent 68%);
+  pointer-events: none;
+}
+
+.project-caption {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #fff;
+}
+
+.project-name {
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.project-panel.featured .project-name {
+  font-size: 40px;
+}
+
+.project-line {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+  max-width: 46ch;
+}
+
+@media (hover: hover) {
+  .project-panel:hover .project-image,
+  .project-panel:hover .project-mark {
+    transform: scale(1.025);
+  }
+
+  a.project-panel:hover .project-arrow {
+    transform: translate(2px, -2px);
+  }
+}
+
+@media (max-width: 640px) {
+  .projects-list {
+    grid-template-columns: 1fr;
+  }
+
+  .project-face,
+  .project-panel.featured .project-face {
+    aspect-ratio: 4 / 3;
+  }
+
+  .project-panel.featured .project-name {
+    font-size: 30px;
+  }
+}
+
+/* ========================================
    READING
    ======================================== */
 

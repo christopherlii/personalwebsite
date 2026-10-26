@@ -6,6 +6,7 @@ class Site {
   constructor() {
     this.posts = [];
     this.reading = [];
+    this.projects = [];
     this.solaces = [];
     this.view = 'home';
     this.slug = null;
@@ -16,6 +17,7 @@ class Site {
     this.setupNavigation();
     this.setupScrollLock();
     this.setupBanner();
+    this.setupProjectAscii();
     this.setupCopyEmail();
   }
 
@@ -69,8 +71,9 @@ class Site {
 
       // Articles: the cover does not condense — the banner rides away at
       // full height with the scroll, like any other content, and long posts
-      // get the full column back.
-      if (this.view === 'thought') {
+      // get the full column back. Projects too: a condensed bar would set the
+      // ink chrome on the photograph.
+      if (this.view === 'thought' || this.view === 'projects') {
         this.banner.style.height = `${target}px`;
         this.banner.classList.remove('condensed');
         if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
@@ -132,7 +135,7 @@ class Site {
     // The panel shadow dies on the click itself — navigation work (view
     // exit fade, image decode) runs 150ms+ later, and a shadow fading
     // around an emptying box reads as an outline.
-    const drawnHashes = new Set(['#thoughts', '#reading']);
+    const drawnHashes = new Set(['#thoughts', '#reading', '#projects']);
     const linkOf = e => e.target.closest && e.target.closest('a[href^="#"]');
     // Trial: the shadow leaves on hover (quick, not a slow fade), before the
     // click even happens; hover away and it returns.
@@ -1048,6 +1051,13 @@ class Site {
     // panel shadow around an empty box, and no hero for the icons to run
     // down the side of.
     this.banner.classList.toggle('bare', this.view === 'stats');
+    // Projects: the photograph itself in the card window, cut clean, then
+    // retyped as ASCII. Keyed to what the banner is showing rather than
+    // the view name — views swap the banner before they claim the view.
+    const squared = this.bannerMode === 'drawn' && this.bannerFrame === 'window' &&
+      !!this.bannerPhoto && this.bannerPhoto.src === this.homePhoto().src;
+    this.banner.classList.toggle('squared', squared);
+    if (this.setProjectAscii) this.setProjectAscii(squared);
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
     if (!this._chromeSwapping) {
@@ -1245,6 +1255,288 @@ class Site {
   }
 
   // ========================================
+  // PROJECTS
+  // ========================================
+
+  async loadProjects() {
+    try {
+      const resp = await fetch('/projects/index.json');
+      if (resp.ok) this.projects = await resp.json();
+    } catch (e) {
+      console.error('Error loading projects:', e);
+    }
+  }
+
+  // Projects show the photograph itself (not the painting), cropped into a
+  // clean card and retyped as ASCII — the same scene, seen the way a
+  // machine would. Each project is a panel: its image with the name set
+  // large over it, like a portfolio page.
+  async showProjectsList() {
+    if (this.data) await this.data.projects;
+    await this.fadeToView('projects-view', 'projects');
+    const photo = this.homePhoto();
+    this.setBannerMode('drawn');
+    this.setBannerPhoto(photo.src, photo.position, 'window');
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
+
+    const list = document.getElementById('projects-list');
+    list.innerHTML = this.projects.map((project, i) => {
+      const tag = project.url ? 'a' : 'div';
+      const href = project.url ? ` href="${project.url}" target="_blank" rel="noopener"` : '';
+      const look = project.image
+        ? `<img class="project-image" src="${project.image}" alt="" loading="lazy" style="object-position:${project.imagePosition || 'center'}">`
+        : `<span class="project-mark" style="background:${project.color || 'var(--accent)'}">${project.mark || ''}</span>`;
+      return `
+        <${tag} class="project-panel${i === 0 ? ' featured' : ''}"${href}>
+          <div class="project-meta">
+            <span>${project.when}</span>
+            <span>${project.role || ''}${project.url ? ' <span class="project-arrow">↗</span>' : ''}</span>
+          </div>
+          <div class="project-face">
+            ${look}
+            <div class="project-caption">
+              <span class="project-name">${project.name}</span>
+              <span class="project-line">${project.description}</span>
+            </div>
+          </div>
+        </${tag}>`;
+    }).join('') || '<p class="empty-note">nothing here yet.</p>';
+
+    this.syncUrl('#projects');
+  }
+
+  // ========================================
+  // PROJECT ASCII
+  // ========================================
+  //
+  // After Cognition's ASCII flag: a canvas laid exactly over the banner's
+  // image layer (same box, same cover math) retypes the photograph in the
+  // card as monochrome characters. Tone rides two channels — denser glyphs
+  // and darker ink where the photo is darker — so the figure reads clearly.
+  // It holds perfectly still; only the pointer moves it, scattering the few
+  // characters right beneath it, which heal back into the picture at once.
+
+  setupProjectAscii() {
+    const canvas = document.getElementById('banner-ascii');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const CW = 4, CH = 5, SUB = 3;
+    const RAMP = ' .,-~=+*x#%&@';
+    const INK = '#141414', BG = '#fafafa';
+    // the pointer's reach (px), how fast its wake heals, how hard it stirs
+    const REACH = 14, HEAL = 4, STIR = 0.6;
+    const st = {
+      on: false, raf: 0, t: 0, last: 0, shown: 0, w: 0, h: 0, dpr: 1,
+      img: null, lum: null, gw: 0, gh: 0, cols: 0, rows: 0,
+      seeds: null, atlas: null, wake: null, prev: null
+    };
+    // cheap repeatable noise in [0, 1)
+    const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    const mono = () => getComputedStyle(document.documentElement).getPropertyValue('--font-mono');
+
+    const img = new Image();
+    img.src = this.homePhoto().src;
+    img.onload = () => { st.img = img; if (st.on) layout(); };
+
+    // The card window the photo shows through, in canvas CSS px — the same
+    // calc() the .cropped mask uses.
+    const card = () => {
+      const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-pad')) || 28;
+      return { x: pad, y: this.bannerBar, w: st.w - pad * 2, h: st.h - this.bannerBar - 18 };
+    };
+
+    // One row of glyphs in full-strength ink, drawn once, stamped per cell
+    // at whatever opacity the cell's tone asks for.
+    const buildAtlas = () => {
+      const a = document.createElement('canvas');
+      a.width = RAMP.length * CW * st.dpr; a.height = CH * st.dpr;
+      const actx = a.getContext('2d');
+      actx.scale(st.dpr, st.dpr);
+      actx.fillStyle = INK;
+      // a touch larger than the cell, so the type crowds into one texture
+      actx.font = `500 ${CH + 1.5}px ${mono()}`;
+      actx.textAlign = 'center'; actx.textBaseline = 'middle';
+      [...RAMP].forEach((c, i) => actx.fillText(c, i * CW + CW / 2, CH / 2 + 0.5));
+      st.atlas = a;
+    };
+
+    // Separable box blur over a w x h grid.
+    const boxBlur = (src, w, h, r) => {
+      const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+      for (let y = 0; y < h; y++) {
+        let acc = 0;
+        for (let x = -r; x <= r; x++) acc += src[y * w + Math.max(0, Math.min(w - 1, x))];
+        for (let x = 0; x < w; x++) {
+          tmp[y * w + x] = acc / (2 * r + 1);
+          acc += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)];
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let acc = 0;
+        for (let y = -r; y <= r; y++) acc += tmp[Math.max(0, Math.min(h - 1, y)) * w + x];
+        for (let y = 0; y < h; y++) {
+          out[y * w + x] = acc / (2 * r + 1);
+          acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+        }
+      }
+      return out;
+    };
+
+    // Re-draw the photo the way CSS paints the layer (cover + position),
+    // then shrink the card to a brightness grid SUB times finer than the
+    // type, so each character samples the middle of its own cell.
+    const layout = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !st.img) return;
+      st.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      st.w = rect.width; st.h = rect.height;
+      canvas.width = Math.round(st.w * st.dpr);
+      canvas.height = Math.round(st.h * st.dpr);
+      const scale = Math.max(st.w / st.img.width, st.h / st.img.height);
+      const dw = st.img.width * scale, dh = st.img.height * scale;
+      const [px, py] = (this.homePhoto().position || 'center').split(' ');
+      const frac = v => v === 'center' || !v ? 0.5 : parseFloat(v) / 100;
+      const off = document.createElement('canvas');
+      off.width = Math.round(st.w * st.dpr); off.height = Math.round(st.h * st.dpr);
+      const octx = off.getContext('2d');
+      octx.scale(st.dpr, st.dpr);
+      octx.drawImage(st.img, (st.w - dw) * frac(px), (st.h - dh) * frac(py), dw, dh);
+      const c = card();
+      st.cols = Math.floor(c.w / CW); st.rows = Math.floor(c.h / CH);
+      st.gw = st.cols * SUB; st.gh = st.rows * SUB;
+      const tiny = document.createElement('canvas');
+      tiny.width = st.gw; tiny.height = st.gh;
+      const tctx = tiny.getContext('2d');
+      tctx.imageSmoothingQuality = 'high';
+      tctx.drawImage(off, c.x * st.dpr, c.y * st.dpr, st.cols * CW * st.dpr, st.rows * CH * st.dpr, 0, 0, st.gw, st.gh);
+      const d = tctx.getImageData(0, 0, st.gw, st.gh).data;
+      const raw = new Float32Array(st.gw * st.gh);
+      for (let i = 0; i < raw.length; i++) {
+        raw[i] = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255;
+      }
+      // Gentle local contrast — enough to lift the figure off the hillside
+      // without a halo — then stretch over the whole ramp.
+      const blur = boxBlur(raw, st.gw, st.gh, 12);
+      const lc = raw.map((v, i) => blur[i] + (v - blur[i]) * 1.7);
+      const sorted = Float32Array.from(lc).sort();
+      const lo = sorted[Math.floor(sorted.length * 0.01)], hi = sorted[Math.floor(sorted.length * 0.99)];
+      st.lum = lc.map(v => Math.min(1, Math.max(0, (v - lo) / (hi - lo))));
+      st.seeds = Float32Array.from({ length: st.cols * st.rows }, () => Math.random());
+      st.wake = new Float32Array(st.cols * st.rows);
+      buildAtlas();
+      draw();
+    };
+
+    // Brightness at a point in card px.
+    const lumAt = (x, y) => {
+      const gx = Math.max(0, Math.min(st.gw - 1, Math.round(x / CW * SUB)));
+      const gy = Math.max(0, Math.min(st.gh - 1, Math.round(y / CH * SUB)));
+      return st.lum[gy * st.gw + gx];
+    };
+
+    const draw = () => {
+      if (!st.lum) return;
+      const { dpr, cols, rows, t } = st;
+      const c = card();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, st.w, st.h);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(c.x, c.y, c.w, c.h); ctx.clip();
+
+      // Arrival: cells turn from photograph to type in a scattered wave
+      // running left to right, so the photo dissolves into characters.
+      const reveal = reduced ? 2 : Math.min(2, st.shown / 0.9);
+      const full = reveal >= 2;
+      if (full) { ctx.fillStyle = BG; ctx.fillRect(c.x, c.y, c.w, c.h); }
+      const atlas = st.atlas, aw = CW * dpr, ah = CH * dpr;
+      const roll = Math.floor(t * 14);
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = j * cols + i;
+          if (!full && st.seeds[k] * 0.6 + (i / cols) * 0.8 > reveal) continue;
+          const x = c.x + i * CW, y = c.y + j * CH;
+          const dark = 1 - lumAt(i * CW + CW / 2, j * CH + CH / 2);
+          if (!full) { ctx.globalAlpha = 1; ctx.fillStyle = BG; ctx.fillRect(x, y, CW, CH); }
+          const g = Math.round(dark * (RAMP.length - 1));
+          if (g === 0) continue;
+          // second tone channel: darker ink where the photo is darker
+          let alpha = 0.28 + 0.72 * Math.pow(dark, 1.15), dx = 0, dy = 0;
+          // the pointer's wake: stirred cells drop out or jitter loose,
+          // re-rolling a few times a second until they settle
+          const e = st.wake[k];
+          if (e > 0.02) {
+            if (hash(k * 1.7 + roll) < e * 0.9) continue;
+            dx = (hash(k * 3.1 + roll) - 0.5) * e * CW * 6;
+            dy = (hash(k * 5.3 + roll) - 0.5) * e * CH * 4;
+            alpha *= 1 - e * 0.35;
+          }
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(atlas, g * aw, 0, aw, ah, x + dx, y + dy, CW, CH);
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    };
+
+    const frame = now => {
+      if (!st.on) { st.raf = 0; return; }
+      st.raf = requestAnimationFrame(frame);
+      // ~30fps is plenty for a settling wake
+      if (st.last && now - st.last < 30) return;
+      const dt = Math.min(0.1, (now - (st.last || now)) / 1000);
+      st.last = now; st.t += dt; st.shown += dt;
+      if (!st.wake) return;   // the photo is still loading
+      let stirred = false;
+      const keep = Math.exp(-dt * HEAL);
+      for (let i = 0; i < st.wake.length; i++) { st.wake[i] *= keep; if (st.wake[i] > 0.01) stirred = true; }
+      // Still: nothing is drawn once the type has arrived and the pointer's
+      // wake has healed, or while the banner is scrolled out of sight.
+      if (!stirred && st.shown > 2.2) return;
+      if (canvas.getBoundingClientRect().bottom > 0) draw();
+    };
+
+    this.setProjectAscii = on => {
+      if (on === st.on) return;
+      st.on = on;
+      this.banner.classList.toggle('ascii-on', on);
+      if (!on) { st.prev = null; return; }
+      // the type starts resolving once the photo has settled into its card
+      st.shown = reduced ? 2 : -0.45;
+      layout();
+      if (!reduced && !st.raf) { st.last = 0; st.raf = requestAnimationFrame(frame); }
+    };
+
+    // Stir the cells along the pointer's path since the last event, so a
+    // fast sweep leaves an unbroken wake rather than a row of dots.
+    const stir = (x, y) => {
+      const c = card();
+      const ci = Math.round((x - c.x) / CW), cj = Math.round((y - c.y) / CH);
+      const ri = Math.ceil(REACH / CW), rj = Math.ceil(REACH / CH);
+      for (let j = Math.max(0, cj - rj); j <= Math.min(st.rows - 1, cj + rj); j++) {
+        for (let i = Math.max(0, ci - ri); i <= Math.min(st.cols - 1, ci + ri); i++) {
+          const d = Math.hypot((i - ci) * CW, (j - cj) * CH) / REACH;
+          if (d >= 1) continue;
+          const k = j * st.cols + i;
+          st.wake[k] = Math.min(1, st.wake[k] + (1 - d * d) * (0.55 + 0.45 * st.seeds[k]) * STIR);
+        }
+      }
+    };
+    canvas.addEventListener('pointermove', e => {
+      if (reduced || !st.wake) return;
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const from = st.prev || { x, y };
+      const steps = Math.max(1, Math.ceil(Math.hypot(x - from.x, y - from.y) / 6));
+      for (let n = 1; n <= steps; n++) stir(from.x + (x - from.x) * n / steps, from.y + (y - from.y) * n / steps);
+      st.prev = { x, y };
+      if (!st.raf && st.on) { st.last = 0; st.raf = requestAnimationFrame(frame); }
+    });
+    canvas.addEventListener('pointerleave', () => { st.prev = null; });
+    new ResizeObserver(() => { if (st.on) layout(); }).observe(canvas);
+  }
+
+  // ========================================
   // READING
   // ========================================
 
@@ -1417,6 +1709,8 @@ class Site {
       await this.showHome();
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
       await this.showThoughtsList();
+    } else if (hash === 'projects') {
+      await this.showProjectsList();
     } else if (hash === 'reading') {
       await this.showReadingList();
     } else if (hash === 'favorites' || hash === 'solaces') {
@@ -1451,6 +1745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   site.data = {
     posts: site.loadPosts(),
     reading: site.loadReading(),
+    projects: site.loadProjects(),
     solaces: site.loadSolaces()
   };
 
