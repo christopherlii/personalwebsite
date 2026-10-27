@@ -8,7 +8,6 @@ class Site {
     this.reading = [];
     this.solaces = [];
     this.view = 'home';
-    this.slug = null;
     this.init();
   }
 
@@ -479,13 +478,6 @@ class Site {
   }
 
   setupNavigation() {
-    document.querySelectorAll('a[href="/"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showHome();
-      });
-    });
-
     // Back/forward fires popstate and then hashchange for the same move —
     // route once, not twice. Plain anchor clicks only fire hashchange.
     window.addEventListener('popstate', async () => {
@@ -904,16 +896,6 @@ class Site {
     return a;
   }
 
-  // Deal up to six tiles: shuffle the THINGS, take six, one randomly chosen
-  // photo from each — so no two photos of the same thing ever share a set,
-  // and a thing with several photos shows a different face across deals.
-  dealSix(things) {
-    return this.shuffled(things).slice(0, 6).map(th => ({
-      src: th.photos[Math.floor(Math.random() * th.photos.length)],
-      label: th.label
-    }));
-  }
-
   // A fresh deal never repeats what is currently on screen when it can
   // help it: unseen things first, then on-screen things wearing an unseen
   // photo, then (only to fill out six) anything left. Re-dealing a category
@@ -1211,7 +1193,6 @@ class Site {
       this.fadeToView('thought-view', 'thought'),
       this.loadPostBody(post)
     ]);
-    this.slug = postId;
 
     if (post.cover) {
       // Covers use the same card frame as the writing page.
@@ -1303,9 +1284,6 @@ class Site {
     const container = document.getElementById('solaces-list');
     if (!container) return;
 
-    // Categories whose items carry images render as shelves of torn-edge
-    // photo cards (the banner's deckle language, miniature); the rest stay
-    // quiet text lists.
     // The page is just the hero and this strip: each word is a button that
     // fills the hero grid with that category's photos. Categories without
     // photos yet sit disabled until they're uploaded.
