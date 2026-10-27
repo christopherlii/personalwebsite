@@ -351,6 +351,24 @@ try {
   await page.waitForFunction(() => document.querySelector('#edit-body').value.includes('- [x] come back to it'));
   await page.locator('#live-editor .cm-content').press('ControlOrMeta+z');
   await page.waitForFunction(value => document.querySelector('#edit-body').value === value, unsafeMarkdown);
+  // Starting a list under a paragraph: `hello\n-` is a setext underline to
+  // CommonMark, but the editor must not flash "hello" into a heading.
+  const helloLine = page.locator('#live-editor .cm-line', { hasText: /^hello$/ });
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+End');
+  await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  await page.keyboard.type('hello'); await page.keyboard.press('Enter'); await page.keyboard.type('-');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value + '\n\nhello\n-', unsafeMarkdown);
+  assert.doesNotMatch(await helloLine.getAttribute('class'), /cm-md-heading/, 'a lone dash does not turn the line above into a heading');
+  await page.keyboard.type(' ');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value + '\n\nhello\n- ', unsafeMarkdown);
+  assert.doesNotMatch(await helloLine.getAttribute('class'), /cm-md-heading/, 'starting a list does not turn the line above into a heading');
+  assert.equal(await page.locator('#live-editor .cm-line').last().locator('.cm-md-bullet').count(), 1, 'the new item already shows its bullet');
+  await page.keyboard.type('item');
+  await page.waitForFunction(value => document.querySelector('#edit-body').value === value + '\n\nhello\n- item', unsafeMarkdown);
+  assert.doesNotMatch(await helloLine.getAttribute('class'), /cm-md-heading/, 'the paragraph stays a paragraph once the item has text');
+  assert.match(await page.locator('#live-editor .cm-line').last().getAttribute('class'), /cm-md-list/, 'the typed line is a list item');
+  assert.equal(await page.locator('#live-editor .cm-line').last().textContent(), 'item');
+  await fillThought(unsafeMarkdown);
   await page.locator('#live-editor .cm-content').press('ControlOrMeta+a');
   await page.locator('#live-editor .cm-content').press('ControlOrMeta+c');
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), unsafeMarkdown, 'copying the editable document preserves all Markdown syntax');

@@ -220,6 +220,22 @@ function decorate(view) {
     const { name, from, to } = ref, node = ref.node;
     if (name === 'Image' && isPhoto(text(from, to))) { hide(from, to, new Photo(text(from, to))); return false; }
     if (name === 'Table') return linesTouch(state, from, to) ? undefined : false;
+    if (name === 'SetextHeading2') {
+      // A lone `-` under a paragraph is, to CommonMark, a heading underline,
+      // because an empty list item cannot interrupt a paragraph. While typing
+      // `- ` to start a list that would flash the line above into a heading,
+      // so a single dash is treated as the list item it is about to become.
+      // Two or more dashes (`--`, `---`) still underline a heading.
+      const underline = node.lastChild, line = doc.lineAt(to);
+      if (underline?.name === 'HeaderMark' && /^ {0,3}-[ \t]*$/.test(line.text)) {
+        const end = underline.to + 1;
+        if (/[ \t]/.test(text(underline.to, end)) && !overlaps(state, underline.from, end)) {
+          hide(underline.from, end, new Bullet(0));
+          if (line.from === underline.from) lineClass(line.from, line.from, 'cm-md-list cm-md-list-0');
+        }
+        return;
+      }
+    }
     if (/^(ATX|Setext)Heading[1-6]$/.test(name)) {
       lineClass(from, to, `cm-md-heading cm-md-h${name.at(-1)}`);
       const shown = linesTouch(state, from, to);
