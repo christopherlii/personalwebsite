@@ -9,7 +9,7 @@ const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a
 export const MAXIMUM_BYTES = 20 * 1024 * 1024;
 // Each stored part stays well under D1's 2 MB row limit.
 const PART_BYTES = 1500000;
-export const EXPLAIN_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const EXPLAIN_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const fields = 'id, title, bytes, pages, page, created_at, opened_at';
 const noteFields = 'id, document_id, page, start, length, top, quote, kind, question, body, created_at';
 
