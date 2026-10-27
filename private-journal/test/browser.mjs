@@ -369,6 +369,28 @@ try {
   assert.match(await page.locator('#live-editor .cm-line').last().getAttribute('class'), /cm-md-list/, 'the typed line is a list item');
   assert.equal(await page.locator('#live-editor .cm-line').last().textContent(), 'item');
   await fillThought(unsafeMarkdown);
+  // Tab nests a list item under the one above, Shift-Tab returns it, and
+  // Enter on an empty nested item steps back out a level.
+  const sourceIs = suffix => page.waitForFunction(({ value, suffix }) => document.querySelector('#edit-body').value === value + suffix, { value: unsafeMarkdown, suffix });
+  const lastLine = () => page.locator('#live-editor .cm-line').last();
+  await page.locator('#live-editor .cm-content').press('ControlOrMeta+End');
+  await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  await page.keyboard.type('- a'); await page.keyboard.press('Enter'); await page.keyboard.press('Tab'); await page.keyboard.type('b');
+  await sourceIs('\n\n- a\n  - b');
+  assert.equal(await page.evaluate(() => Boolean(document.activeElement.closest('#live-editor'))), true, 'Tab in a list keeps focus in the editor');
+  assert.match(await lastLine().getAttribute('class'), /cm-md-list-1/, 'the nested item hangs at the second level');
+  assert.equal(await lastLine().locator('.cm-md-bullet-1').count(), 1, 'the nested item draws a second-level bullet');
+  assert.equal(await lastLine().textContent(), 'b');
+  await page.keyboard.press('Shift+Tab');
+  await sourceIs('\n\n- a\n- b');
+  assert.match(await lastLine().getAttribute('class'), /cm-md-list-0/, 'Shift-Tab returns the item to the top level');
+  await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+  await sourceIs('\n\n- a\n  - b\n  - ');
+  await page.keyboard.press('Enter');
+  await sourceIs('\n\n- a\n  - b\n- ');
+  await page.keyboard.press('Enter');
+  await sourceIs('\n\n- a\n  - b\n');
+  await fillThought(unsafeMarkdown);
   await page.locator('#live-editor .cm-content').press('ControlOrMeta+a');
   await page.locator('#live-editor .cm-content').press('ControlOrMeta+c');
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), unsafeMarkdown, 'copying the editable document preserves all Markdown syntax');

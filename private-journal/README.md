@@ -117,7 +117,13 @@ render as tables; clicking one reveals that table's Markdown for editing.
 Bullets, nested indentation, and task checkboxes stay drawn on the active line
 (wrapped list text hangs under the first word) unless the selection reaches
 into the marker. Checkboxes update the source through normal undoable editor
-transactions. Cmd/Ctrl-click opens a web link in a new tab. Apart from tables,
+transactions. Tab nests the selected list items under the item above, using
+the parent's own content indent (two spaces under `- `, three under `1. `), and
+Shift-Tab returns them a level; children move with their item. Enter on an
+empty nested item steps out a level and on an empty top-level item ends the
+list; Backspace on an empty nested item also steps out. Outside lists Tab is
+unchanged. A lone `-` typed under a paragraph is drawn as the bullet it is
+becoming rather than as a setext heading underline. Cmd/Ctrl-click opens a web link in a new tab. Apart from tables,
 decorations are drawn only for the visible part of the document.
 Obsidian-specific plugin syntax and embedded files are not implemented.
 

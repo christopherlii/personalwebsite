@@ -226,12 +226,14 @@ function decorate(view) {
       // `- ` to start a list that would flash the line above into a heading,
       // so a single dash is treated as the list item it is about to become.
       // Two or more dashes (`--`, `---`) still underline a heading.
+      // Inside a list item the dash is a child item being started.
       const underline = node.lastChild, line = doc.lineAt(to);
-      if (underline?.name === 'HeaderMark' && /^ {0,3}-[ \t]*$/.test(line.text)) {
-        const end = underline.to + 1;
-        if (/[ \t]/.test(text(underline.to, end)) && !overlaps(state, underline.from, end)) {
-          hide(underline.from, end, new Bullet(0));
-          if (line.from === underline.from) lineClass(line.from, line.from, 'cm-md-list cm-md-list-0');
+      if (underline?.name === 'HeaderMark' && /^[ \t]*-[ \t]*$/.test(line.text)) {
+        const end = underline.to + 1, depth = Math.min(node.parent?.name === 'ListItem' ? listDepth(node) + 1 : 0, 5);
+        if (/[ \t]/.test(text(underline.to, end)) && !overlaps(state, line.from, end)) {
+          hide(line.from, underline.from, depth ? new Indent(depth) : undefined);
+          hide(underline.from, end, new Bullet(depth));
+          lineClass(line.from, line.from, `cm-md-list cm-md-list-${depth}`);
         }
         return;
       }
@@ -310,6 +312,114 @@ const livePreview = ViewPlugin.fromClass(class {
   }
 }, { decorations: plugin => plugin.decorations });
 
+// List nesting, as in Obsidian. Lists are read from their text rather than
+// the syntax tree: an item being started (`  - ` with nothing after it) is
+// not yet a list item to CommonMark, but it is to the person typing it.
+const listLine = /^([ \t]*)([-+*]|\d{1,9}[.)])(?:([ \t]+)(.*))?$/;
+const emptyItemRest = /^(?:\[[ xX]\])?[ \t]*$/;
+function listInfo(state, line) {
+  const match = listLine.exec(line.text);
+  if (!match) return null;
+  for (let node = syntaxTree(state).resolveInner(line.from + match[1].length, 1); node; node = node.parent) {
+    if (['FencedCode', 'CodeBlock', 'HTMLBlock', 'HorizontalRule'].includes(node.name)) return null;
+  }
+  const marker = match[1].length, rest = match[4] ?? '', spaces = (match[3] ?? '').length;
+  // Where an item's text starts, which is where its children's markers go.
+  const content = marker + match[2].length + (spaces >= 1 && spaces <= 4 && rest ? spaces : 1);
+  return { line, marker, content, empty: match[3] !== undefined && emptyItemRest.test(rest) };
+}
+const indentOf = text => /^[ \t]*/.exec(text)[0].length;
+// The nearest item above at a shallower or equal column, skipping deeper
+// items and the indented text that belongs to them.
+function itemAbove(state, item, shallower) {
+  for (let number = item.line.number - 1; number >= 1; number--) {
+    const line = state.doc.line(number);
+    if (!line.text.trim()) continue;
+    const above = listInfo(state, line);
+    if (!above) { if (indentOf(line.text) > 0) continue; return null; }
+    if (above.marker < item.marker) return shallower ? above : null;
+    if (above.marker === item.marker && !shallower) return above;
+  }
+  return null;
+}
+// An item moves with the lines under it: its wrapped text and its children.
+function itemLines(state, item) {
+  const lines = [item.line];
+  for (let number = item.line.number + 1; number <= state.doc.lines; number++) {
+    const line = state.doc.line(number);
+    if (!line.text.trim() || indentOf(line.text) <= item.marker) break;
+    lines.push(line);
+  }
+  return lines;
+}
+function shiftItems(state, items, direction) {
+  const changes = [], moved = new Set();
+  for (const item of items) {
+    if (moved.has(item.line.number)) continue;
+    const lines = itemLines(state, item);
+    for (const line of lines) moved.add(line.number);
+    const target = direction > 0 ? itemAbove(state, item, false)?.content : itemAbove(state, item, true)?.marker;
+    if (target === undefined || target === item.marker) continue;
+    const delta = target - item.marker;
+    for (const line of lines) {
+      if (delta > 0) changes.push({ from: line.from, insert: ' '.repeat(delta) });
+      else changes.push({ from: line.from, to: line.from + Math.min(-delta, indentOf(line.text)) });
+    }
+  }
+  return changes;
+}
+const selectedItems = state => {
+  const items = [];
+  for (const range of state.selection.ranges) {
+    for (let number = state.doc.lineAt(range.from).number, last = state.doc.lineAt(range.to).number; number <= last; number++) {
+      const item = listInfo(state, state.doc.line(number));
+      if (item && !items.some(other => other.line.number === number)) items.push(item);
+    }
+  }
+  return items.sort((a, b) => a.line.number - b.line.number);
+};
+// Tab nests the selected items under the item above; Shift-Tab returns them
+// to their parent's level. Inside a list Tab never leaves the editor, even
+// when an item cannot move (the first item has nothing to nest under).
+const shiftList = direction => ({ state, dispatch }) => {
+  if (state.readOnly) return false;
+  const items = selectedItems(state);
+  if (!items.length) return false;
+  const changes = shiftItems(state, items, direction);
+  if (changes.length) dispatch(state.update({ changes, scrollIntoView: true, userEvent: direction > 0 ? 'input.indent' : 'delete.dedent' }));
+  return true;
+};
+// The empty item under the cursor, if the cursor sits at its end.
+function emptyItem(state) {
+  const { main } = state.selection;
+  if (state.readOnly || !main.empty || state.selection.ranges.length > 1) return null;
+  const line = state.doc.lineAt(main.head), item = listInfo(state, line);
+  return item?.empty && main.head === line.to ? item : null;
+}
+// Enter on an empty nested item steps it out a level; on an empty top-level
+// item it ends the list, leaving a plain empty line.
+const leaveEmptyItem = ({ state, dispatch }) => {
+  const item = emptyItem(state);
+  if (!item) return false;
+  const changes = shiftItems(state, [item], -1);
+  if (changes.length) dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'delete.dedent' }));
+  else dispatch(state.update({ changes: { from: item.line.from, to: item.line.to }, selection: { anchor: item.line.from }, scrollIntoView: true, userEvent: 'delete' }));
+  return true;
+};
+// Backspace on an empty nested item also steps out; elsewhere the Markdown
+// keymap's own Backspace handling applies.
+const outdentEmptyItem = ({ state, dispatch }) => {
+  const item = emptyItem(state), changes = item ? shiftItems(state, [item], -1) : [];
+  if (!changes.length) return false;
+  dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'delete.dedent' }));
+  return true;
+};
+const listKeymap = [
+  { key: 'Tab', run: shiftList(1), shift: shiftList(-1) },
+  { key: 'Enter', run: leaveEmptyItem },
+  { key: 'Backspace', run: outdentEmptyItem }
+];
+
 const speechPreview = StateEffect.define();
 class SpeechPreview extends WidgetType {
   constructor(text) { super(); this.text = text; }
@@ -339,7 +449,7 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
       EditorView.atomicRanges.of(view => view.state.field(hiddenTargets)),
       placeholder(emptyText),
       autocompletion({ override: [completions(findThoughts)], icons: false, maxRenderedOptions: 8, activateOnTypingDelay: 180 }),
-      Prec.highest(keymap.of(completionKeymap)),
+      Prec.highest(keymap.of(completionKeymap)), Prec.highest(keymap.of(listKeymap)),
       ...(onSubmit ? [Prec.highest(keymap.of([{ key: 'Mod-Enter', run() { onSubmit(); return true; } }]))] : []),
       history(), keymap.of([...defaultKeymap, ...historyKeymap]), EditorView.lineWrapping,
       EditorView.contentAttributes.of({ 'aria-label': 'thought', 'aria-multiline': 'true', spellcheck: 'true', autocapitalize: 'sentences' }),
