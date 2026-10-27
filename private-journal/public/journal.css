@@ -40,6 +40,7 @@
   color-scheme:light;
   --font-display:'Fraunces',Georgia,serif;
   --font-body:'Instrument Sans','Helvetica Neue',Helvetica,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --bg:#fafafa;
   --fg:#1a1a1a;
   --body:#333;
@@ -452,13 +453,34 @@ textarea::placeholder {
 :is(#live-editor,#composer-editor) .cm-md-strong { font-weight:600 }
 :is(#live-editor,#composer-editor) .cm-md-emphasis { font-style:italic }
 :is(#live-editor,#composer-editor) .cm-md-strike { text-decoration:line-through }
-:is(#live-editor,#composer-editor) .cm-md-marker { color:var(--muted); font-weight:400 }
+:is(#live-editor,#composer-editor) .cm-md-marker { color:var(--muted); font-weight:400; font-style:normal }
 :is(#live-editor,#composer-editor) .cm-md-link { color:#0b243e; text-decoration:underline; text-underline-offset:3px }
+:is(#live-editor,#composer-editor) .cm-md-link .cm-md-marker { text-decoration:none }
 :is(#live-editor,#composer-editor) .cm-md-quote { border-left:1px solid var(--track); padding-left:18px; color:var(--muted) }
-:is(#live-editor,#composer-editor) .cm-md-code-line { background:#eee; padding:0 12px }
-:is(#live-editor,#composer-editor) .cm-md-inline-code { background:#eee }
-:is(#live-editor,#composer-editor) .cm-md-task { margin:0 2px 0 0; vertical-align:middle; accent-color:var(--fg) }
-:is(#live-editor,#composer-editor) .cm-md-bullet { display:inline-block; min-width:12px }
+:is(#live-editor,#composer-editor) .cm-md-code-line { background:#eee; padding:0 12px; font-family:var(--font-mono); font-size:12.5px }
+:is(#live-editor,#composer-editor) .cm-md-inline-code { background:#eee; padding:1px 2px; font-family:var(--font-mono); font-size:.9em }
+/* A hidden fence or setext underline keeps a short line rather than a full blank one. */
+:is(#live-editor,#composer-editor) .cm-line.cm-md-collapsed { font-size:7px }
+:is(#live-editor,#composer-editor) .cm-md-rule { display:inline-block; width:100%; height:1px; vertical-align:middle; background:var(--track) }
+/* Rendered list lines hang: wrapped text lines up under the first word, not the bullet. */
+:is(#live-editor,#composer-editor) .cm-md-bullet,:is(#live-editor,#composer-editor) .cm-md-task-box,:is(#live-editor,#composer-editor) .cm-md-indent { display:inline-block; text-indent:0 }
+:is(#live-editor,#composer-editor) .cm-md-bullet { width:24px; padding-left:8px }
+:is(#live-editor,#composer-editor) .cm-md-bullet::after { content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:currentColor; vertical-align:middle }
+:is(#live-editor,#composer-editor) .cm-md-bullet-1::after { background:none; border:1px solid currentColor }
+:is(#live-editor,#composer-editor) .cm-md-bullet-2::after { border-radius:0 }
+:is(#live-editor,#composer-editor) .cm-md-task-box { width:24px; padding-left:4px }
+:is(#live-editor,#composer-editor) .cm-md-task { margin:0; vertical-align:-2px; accent-color:var(--fg) }
+:is(#live-editor,#composer-editor) .cm-md-indent-1 { width:24px }
+:is(#live-editor,#composer-editor) .cm-md-indent-2 { width:48px }
+:is(#live-editor,#composer-editor) .cm-md-indent-3 { width:72px }
+:is(#live-editor,#composer-editor) .cm-md-indent-4 { width:96px }
+:is(#live-editor,#composer-editor) .cm-md-indent-5 { width:120px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-0 { padding-left:24px; text-indent:-24px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-1 { padding-left:48px; text-indent:-48px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-2 { padding-left:72px; text-indent:-72px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-3 { padding-left:96px; text-indent:-96px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-4 { padding-left:120px; text-indent:-120px }
+:is(#live-editor,#composer-editor) .cm-line.cm-md-list-5 { padding-left:144px; text-indent:-144px }
 :is(#live-editor,#composer-editor) .cm-md-table { padding:8px 0 }
 :is(#live-editor,#composer-editor) .cm-md-table .table-scroll { margin-bottom:0 }
 #edit-form .title-input {
@@ -503,16 +525,20 @@ textarea::placeholder {
 .markdown-body blockquote>:last-child { margin-bottom:0 }
 .markdown-body code {
   font:inherit;
+  font-family:var(--font-mono);
+  font-size:.9em;
   background:#eee;
   padding:1px 4px
 }
 .markdown-body pre {
   font:inherit;
+  font-family:var(--font-mono);
+  font-size:12.5px;
   padding:12px;
   background:#eee;
   overflow-x:auto
 }
-.markdown-body pre code { padding:0; white-space:pre }
+.markdown-body pre code { padding:0; white-space:pre; font-size:inherit }
 .markdown-body hr {
   border:0;
   border-top:1px solid var(--track);

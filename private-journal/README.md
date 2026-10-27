@@ -27,9 +27,11 @@ indexing; there is no intermediate word-match pass or loading label. Clearing
 restores the timeline. The feed offers copy and open; other actions live on
 the full-page writing view. Open renders Markdown with headings, emphasis,
 lists, quotes, code, tasks, tables, and links. Edit opens a borderless CodeMirror
-editor that formats Markdown in place as it is typed. The active line shows
-its syntax in muted text; markers elsewhere recede. There is no source/preview
-toggle. Save, cancel, and back retain their existing behavior. Back saves changes
+editor that formats Markdown in place as it is typed, like Obsidian's Live
+Preview. Syntax is hidden except where the cursor or selection touches it:
+heading, quote, and rule markers return in muted text on the line being edited,
+code fences for the block being edited, and emphasis, code, and link syntax
+only for the span the cursor is in. There is no source/preview toggle. Save, cancel, and back retain their existing behavior. Back saves changes
 before returning; save errors or version conflicts keep the editor visible.
 Unsaved source and editor history also survive reauthentication in the same tab.
 Reload/close warns while edits are unsaved. Publishing stays an explicit,
@@ -109,9 +111,14 @@ text, links allow only HTTP(S)/mailto, and external Markdown images become links
 rather than automatic external requests. Uploaded journal photos render inline.
 The live editor uses the Lezer Markdown tree
 to decorate the exact source, not a conversion through editable HTML. Headings,
-emphasis, lists, quotes, code, links, and tasks format in place. Inactive tables
+emphasis, lists, quotes, rules, code, links, and tasks format in place, matching
+the reading view's sizes and monospace code. Inactive tables
 render as tables; clicking one reveals that table's Markdown for editing.
-Task checkboxes update the source through normal undoable editor transactions.
+Bullets, nested indentation, and task checkboxes stay drawn on the active line
+(wrapped list text hangs under the first word) unless the selection reaches
+into the marker. Checkboxes update the source through normal undoable editor
+transactions. Cmd/Ctrl-click opens a web link in a new tab. Apart from tables,
+decorations are drawn only for the visible part of the document.
 Obsidian-specific plugin syntax and embedded files are not implemented.
 
 Both the quick-writing field and full-page editor support internal links.
