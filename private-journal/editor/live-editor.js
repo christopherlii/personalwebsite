@@ -1,14 +1,18 @@
 import { EditorState, StateField, StateEffect, Compartment, Prec, RangeSet } from '@codemirror/state';
-import { EditorView, Decoration, WidgetType, keymap, placeholder } from '@codemirror/view';
+import { EditorView, ViewPlugin, Decoration, WidgetType, keymap, placeholder } from '@codemirror/view';
 import { autocompletion, completionKeymap, pickedCompletion } from '@codemirror/autocomplete';
 import { markdown } from '@codemirror/lang-markdown';
 import { GFM } from '@lezer/markdown';
-import { syntaxTree, syntaxHighlighting, HighlightStyle } from '@codemirror/language';
-import { tags } from '@lezer/highlight';
+import { syntaxTree } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { markdown as renderMarkdown } from './markdown.js';
 import { thoughtLinks, thoughtLink, thoughtLabel } from './thought-links.js';
 import { photoReference } from './photo-links.js';
+// Cmd/Ctrl-click follows web and mail links, never other schemes.
+const externalLink = source => {
+  try { const url = new URL(/^www\./i.test(source) ? `https://${source}` : source); return ['https:', 'http:', 'mailto:'].includes(url.protocol) ? url.href : null; }
+  catch { return null; }
+};
 const isPhoto=source=>photoReference(source.match(/^!\[(?:\\.|[^\]])*\]\(([^)]+)\)$/u)?.[1]);
 
 const wikiLinks = {
@@ -67,22 +71,47 @@ function completions(findThoughts) {
   };
 }
 
+// Live preview, as in Obsidian: Markdown syntax is hidden and the text shown
+// formatted, except where the selection touches it. Block syntax (headings,
+// quotes, rules, code fences) reappears for the line or block being edited;
+// inline syntax (emphasis, code, links) only for the span the cursor is in.
+// List bullets, indentation, and checkboxes stay rendered unless the
+// selection reaches into the marker itself, so a line does not jump sideways.
+
+// Disc, circle, then square by depth, as the reading view's nested lists draw them.
 class Bullet extends WidgetType {
-  toDOM() { const span = document.createElement('span'); span.className = 'cm-md-bullet'; span.textContent = '•'; return span; }
+  constructor(depth) { super(); this.depth = depth; }
+  eq(other) { return this.depth === other.depth; }
+  toDOM() {
+    const span = document.createElement('span'); span.className = `cm-md-bullet cm-md-bullet-${Math.min(this.depth, 2)}`;
+    span.setAttribute('aria-hidden', 'true'); return span;
+  }
+  ignoreEvent() { return false; }
+}
+class Indent extends WidgetType {
+  constructor(depth) { super(); this.depth = depth; }
+  eq(other) { return this.depth === other.depth; }
+  toDOM() { const span = document.createElement('span'); span.className = `cm-md-indent cm-md-indent-${this.depth}`; return span; }
+  ignoreEvent() { return false; }
+}
+class Rule extends WidgetType {
+  toDOM() { const span = document.createElement('span'); span.className = 'cm-md-rule'; span.setAttribute('aria-hidden', 'true'); return span; }
+  ignoreEvent() { return false; }
 }
 class Task extends WidgetType {
   constructor(from, checked) { super(); this.from = from; this.checked = checked; }
   eq(other) { return this.from === other.from && this.checked === other.checked; }
   toDOM(view) {
+    const box = document.createElement('span'); box.className = 'cm-md-task-box';
     const input = document.createElement('input'); input.type = 'checkbox'; input.checked = this.checked;
     input.className = 'cm-md-task'; input.setAttribute('aria-label', this.checked ? 'mark incomplete' : 'mark complete');
     input.addEventListener('mousedown', event => event.preventDefault());
     input.addEventListener('click', event => {
       event.stopPropagation();
-      if (view.state.readOnly) return;
+      if (view.state.readOnly) { event.preventDefault(); return; }
       view.dispatch({ changes: { from: this.from, to: this.from + 3, insert: this.checked ? '[ ]' : '[x]' } });
     });
-    return input;
+    box.append(input); return box;
   }
   ignoreEvent() { return true; }
 }
@@ -106,71 +135,290 @@ class Photo extends WidgetType{
   toDOM(){const span=document.createElement('span');span.className='cm-photo';const parsed=document.createElement('div');parsed.append(renderMarkdown(this.source));const img=parsed.querySelector('img');if(img)span.append(img);return span;}
   ignoreEvent(){return true;}
 }
-function decorate(state) {
-  const ranges = [], lines = new Map();
-  const active = state.selection.ranges.map(range => ({ from: state.doc.lineAt(range.from).from, to: state.doc.lineAt(range.to).to }));
-  const editing = (from, to) => active.some(range => from <= range.to && to >= range.from);
-  const hide = (from, to, widget) => { if (to > from) ranges.push(Decoration.replace({ widget }).range(from, to)); };
+// Selection tests. `touches` includes a cursor resting at either edge of a
+// span (so `**word**|` still shows its stars); `overlaps` needs the selection
+// to reach inside, which keeps rendered bullets and checkboxes steady.
+const touches = (state, from, to) => state.selection.ranges.some(range => range.from <= to && range.to >= from);
+const overlaps = (state, from, to) => state.selection.ranges.some(range => range.from < to && range.to > from);
+const linesTouch = (state, from, to) => touches(state, state.doc.lineAt(from).from, state.doc.lineAt(to).to);
+const children = node => { const list = []; for (let child = node.firstChild; child; child = child.nextSibling) list.push(child); return list; };
+const listDepth = node => { let depth = -1; for (let parent = node; parent; parent = parent.parent) if (parent.name === 'BulletList' || parent.name === 'OrderedList') depth++; return Math.max(0, depth); };
+const blank = /^[ \t]*$/;
+
+// Inactive tables become rendered block widgets. Block decorations must come
+// from state, so tables live in a field; everything else is drawn per viewport.
+function tableRanges(state) {
+  const ranges = [];
+  syntaxTree(state).iterate({ enter(node) {
+    if (node.name !== 'Table') return;
+    if (!linesTouch(state, node.from, node.to)) ranges.push(Decoration.replace({ block: true, widget: new Table(node.from, state.doc.sliceString(node.from, node.to)) }).range(node.from, node.to));
+    return false;
+  } });
+  return Decoration.set(ranges, true);
+}
+const tables = StateField.define({
+  create: tableRanges,
+  update(value, transaction) {
+    return transaction.docChanged || transaction.selection || syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? tableRanges(transaction.state) : value;
+  },
+  provide: field => EditorView.decorations.from(field)
+});
+
+function decorate(view) {
+  const { state } = view, { doc } = state, ranges = [], lines = new Map();
+  const text = (from, to) => doc.sliceString(from, to);
+  // Replacements never cross a line break: inline syntax that spans lines
+  // stays visible rather than collapsing the lines together.
+  const hide = (from, to, widget) => { if (to > from && doc.lineAt(from).to >= to) ranges.push(Decoration.replace(widget ? { widget } : {}).range(from, to)); };
   const mark = (from, to, className) => { if (to > from) ranges.push(Decoration.mark({ class: className }).range(from, to)); };
+  const marker = (from, to) => mark(from, to, 'cm-md-marker');
   const lineClass = (from, to, className) => {
-    for (let line = state.doc.lineAt(from); line.from <= to;) {
+    for (let line = doc.lineAt(from); ;) {
       const classes = lines.get(line.from) || new Set(); classes.add(className); lines.set(line.from, classes);
-      if (line.to >= to || line.number === state.doc.lines) break;
-      line = state.doc.line(line.number + 1);
+      if (line.to >= to || line.number === doc.lines) break;
+      line = doc.line(line.number + 1);
     }
   };
-  syntaxTree(state).iterate({ enter(node) {
-    const { name, from, to } = node;
-    const selected = editing(from, to);
-    if(name==='Image'&&isPhoto(state.doc.sliceString(from,to))){hide(from,to,new Photo(state.doc.sliceString(from,to)));return false;}
-    if (name === 'ThoughtLinkTarget') { hide(from, to); return false; }
-    if (name === 'ThoughtLinkLabel') mark(from, to, 'cm-md-link');
-    if (name === 'ThoughtLink') mark(from, to, 'cm-thought-link');
-    if (/^(ATX|Setext)Heading[1-6]$/.test(name)) lineClass(from, to, `cm-md-heading cm-md-h${name.at(-1)}`);
-    if (name === 'Blockquote') lineClass(from, to, 'cm-md-quote');
-    if (name === 'FencedCode' || name === 'CodeBlock') lineClass(from, to, 'cm-md-code-line');
-    if (name === 'InlineCode') mark(from, to, 'cm-md-inline-code');
-    if (name === 'Table' && !selected) {
-      ranges.push(Decoration.replace({ block: true, widget: new Table(from, state.doc.sliceString(from, to)) }).range(from, to));
-      return false;
+  const spaceAfter = at => { let end = at; while (end < doc.length && /[ \t]/.test(text(end, end + 1))) end++; return end; };
+  // A delimited inline span: format its content, then show or hide its marks.
+  const span = (node, markName, className) => {
+    const marks = children(node).filter(child => child.name === markName);
+    if (marks.length < 2) return;
+    const open = marks[0], close = marks.at(-1), shown = touches(state, node.from, node.to);
+    mark(open.to, close.from, className);
+    for (const child of [open, close]) shown ? marker(child.from, child.to) : hide(child.from, child.to);
+  };
+  const link = node => {
+    const parts = children(node), marks = parts.filter(child => child.name === 'LinkMark');
+    const open = marks[0], close = marks.find(child => text(child.from, child.to) === ']');
+    // A bare `[words]` with no destination is just text in brackets.
+    if (!open || !close || !parts.some(child => child.name === 'URL' || child.name === 'LinkLabel' || (child.name === 'LinkMark' && text(child.from, child.to) === '('))) return;
+    mark(open.to, close.from, 'cm-md-link');
+    if (touches(state, node.from, node.to)) { marker(node.from, open.to); marker(close.from, node.to); }
+    else { hide(node.from, open.to); hide(close.from, node.to); }
+  };
+  const list = node => {
+    const from = node.from, to = node.to, line = doc.lineAt(from), depth = listDepth(node);
+    const indented = line.from < from && blank.test(text(line.from, from));
+    if (!/^[-+*]$/.test(text(from, to))) {
+      // Numbers stay as written; nested ones keep a steady indent.
+      if (indented && depth && !overlaps(state, line.from, from)) hide(line.from, from, new Indent(Math.min(depth, 5)));
+      return;
     }
-    if (name === 'Link' || name === 'Image') {
-      if (!selected) {
-        const children = []; for (let child = node.node.firstChild; child; child = child.nextSibling) children.push(child);
-        const open = children.find(child => child.name === 'LinkMark');
-        const close = children.find(child => child.name === 'LinkMark' && state.doc.sliceString(child.from, child.to) === ']');
-        if (open && close) { hide(from, open.to); hide(close.from, to); mark(open.to, close.from, 'cm-md-link'); return false; }
+    if (!/[ \t]/.test(text(to, to + 1))) return; // `-` alone may yet become a rule.
+    const task = node.parent?.getChild('Task')?.getChild('TaskMarker');
+    const taskHere = task && blank.test(text(to, task.from));
+    const end = taskHere ? Math.min(spaceAfter(task.to), task.to + 1) : to + 1;
+    if (overlaps(state, indented ? line.from : from, end)) { if (taskHere) marker(task.from, task.to); return; }
+    if (indented) hide(line.from, from, new Indent(Math.min(depth, 5)));
+    hide(from, end, taskHere ? new Task(task.from, /x/i.test(text(task.from, task.to))) : new Bullet(depth));
+    if (indented || line.from === from) lineClass(from, from, `cm-md-list cm-md-list-${Math.min(depth, 5)}`);
+  };
+  const { visibleRanges } = view;
+  if (!visibleRanges.length) return Decoration.none;
+  syntaxTree(state).iterate({ from: visibleRanges[0].from, to: visibleRanges.at(-1).to, enter(ref) {
+    const { name, from, to } = ref, node = ref.node;
+    if (name === 'Image' && isPhoto(text(from, to))) { hide(from, to, new Photo(text(from, to))); return false; }
+    if (name === 'Table') return linesTouch(state, from, to) ? undefined : false;
+    if (name === 'SetextHeading2') {
+      // A lone `-` under a paragraph is, to CommonMark, a heading underline,
+      // because an empty list item cannot interrupt a paragraph. While typing
+      // `- ` to start a list that would flash the line above into a heading,
+      // so a single dash is treated as the list item it is about to become.
+      // Two or more dashes (`--`, `---`) still underline a heading.
+      // Inside a list item the dash is a child item being started.
+      const underline = node.lastChild, line = doc.lineAt(to);
+      if (underline?.name === 'HeaderMark' && /^[ \t]*-[ \t]*$/.test(line.text)) {
+        const end = underline.to + 1, depth = Math.min(node.parent?.name === 'ListItem' ? listDepth(node) + 1 : 0, 5);
+        if (/[ \t]/.test(text(underline.to, end)) && !overlaps(state, line.from, end)) {
+          hide(line.from, underline.from, depth ? new Indent(depth) : undefined);
+          hide(underline.from, end, new Bullet(depth));
+          lineClass(line.from, line.from, `cm-md-list cm-md-list-${depth}`);
+        }
+        return;
       }
     }
-    if (name === 'TaskMarker' && !selected) { hide(from, to, new Task(from, /x/i.test(state.doc.sliceString(from, to)))); return false; }
-    if (name === 'ListMark' && !selected && /^[-+*]$/.test(state.doc.sliceString(from, to))) {
-      if (node.node.parent?.getChild('Task')) hide(from, to + (state.doc.sliceString(to, to + 1) === ' ' ? 1 : 0));
-      else hide(from, to, new Bullet());
-      return false;
+    if (/^(ATX|Setext)Heading[1-6]$/.test(name)) {
+      lineClass(from, to, `cm-md-heading cm-md-h${name.at(-1)}`);
+      const shown = linesTouch(state, from, to);
+      for (const child of children(node)) if (child.name === 'HeaderMark') {
+        if (shown) { marker(child.from, child.to); continue; }
+        hide(child.from, spaceAfter(child.to));
+        if (name.startsWith('Setext')) lineClass(child.from, child.to, 'cm-md-collapsed');
+      }
+      return;
     }
-    if (['HeaderMark', 'QuoteMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'CodeInfo', 'ThoughtLinkMark'].includes(name)) {
-      if (!selected) {
-        let end = to;
-        if (name === 'HeaderMark' || name === 'QuoteMark') while (state.doc.sliceString(end, end + 1) === ' ') end++;
-        hide(from, end);
-      } else mark(from, to, 'cm-md-marker');
+    switch (name) {
+      case 'Blockquote': lineClass(from, to, 'cm-md-quote'); return;
+      case 'QuoteMark':
+        if (linesTouch(state, from, from)) marker(from, to);
+        else hide(from, Math.min(spaceAfter(to), to + 1));
+        return;
+      case 'HorizontalRule':
+        if (linesTouch(state, from, to)) marker(from, to);
+        else hide(from, to, new Rule());
+        return false;
+      case 'FencedCode': case 'CodeBlock': {
+        lineClass(from, to, 'cm-md-code-line'); lineClass(from, from, 'cm-md-code-first'); lineClass(to, to, 'cm-md-code-last');
+        const shown = linesTouch(state, from, to);
+        for (const child of children(node)) if (child.name === 'CodeMark' || child.name === 'CodeInfo') {
+          if (shown) marker(child.from, child.to);
+          else { hide(child.from, child.to); lineClass(child.from, child.from, 'cm-md-collapsed'); }
+        }
+        return false;
+      }
+      case 'InlineCode': {
+        mark(from, to, 'cm-md-inline-code');
+        const shown = touches(state, from, to);
+        for (const child of children(node)) if (child.name === 'CodeMark') shown ? marker(child.from, child.to) : hide(child.from, child.to);
+        return false;
+      }
+      case 'StrongEmphasis': span(node, 'EmphasisMark', 'cm-md-strong'); return;
+      case 'Emphasis': span(node, 'EmphasisMark', 'cm-md-emphasis'); return;
+      case 'Strikethrough': span(node, 'StrikethroughMark', 'cm-md-strike'); return;
+      case 'Link': case 'Image': link(node); return;
+      case 'Autolink': {
+        const shown = touches(state, from, to);
+        for (const child of children(node)) {
+          if (child.name === 'URL') mark(child.from, child.to, 'cm-md-link');
+          else if (child.name === 'LinkMark') shown ? marker(child.from, child.to) : hide(child.from, child.to);
+        }
+        return false;
+      }
+      case 'URL': if (!['Link', 'Image'].includes(node.parent?.name)) mark(from, to, 'cm-md-link'); return;
+      case 'Escape': if (!touches(state, from, to)) hide(from, from + 1); return;
+      case 'ListMark': list(node); return;
+      case 'TaskMarker': {
+        const bullet = node.parent?.parent?.getChild('ListMark');
+        // Tasks under a bullet were drawn with it; others keep their number.
+        if (bullet && /^[-+*]$/.test(text(bullet.from, bullet.to)) && /[ \t]/.test(text(bullet.to, bullet.to + 1)) && blank.test(text(bullet.to, from))) return;
+        if (overlaps(state, from, to)) marker(from, to);
+        else hide(from, to, new Task(from, /x/i.test(text(from, to))));
+        return;
+      }
+      case 'ThoughtLinkTarget': hide(from, to); return false;
+      case 'ThoughtLinkLabel': mark(from, to, 'cm-md-link'); return;
+      case 'ThoughtLink': mark(from, to, 'cm-thought-link'); return;
+      case 'ThoughtLinkMark': touches(state, node.parent.from, node.parent.to) ? marker(from, to) : hide(from, to); return;
     }
   } });
   for (const [from, classes] of lines) ranges.push(Decoration.line({ class: [...classes].join(' ') }).range(from));
   return Decoration.set(ranges, true);
 }
-const liveFormatting = StateField.define({
-  create: decorate,
-  update(value, transaction) {
-    return transaction.docChanged || transaction.selection || syntaxTree(transaction.state) !== syntaxTree(transaction.startState) ? decorate(transaction.state) : value;
-  },
-  provide: field => EditorView.decorations.from(field)
-});
-const formatting = HighlightStyle.define([
-  { tag: tags.strong, class: 'cm-md-strong' },
-  { tag: tags.emphasis, class: 'cm-md-emphasis' },
-  { tag: tags.strikethrough, class: 'cm-md-strike' }
-]);
+const livePreview = ViewPlugin.fromClass(class {
+  constructor(view) { this.decorations = decorate(view); }
+  update(update) {
+    if (update.docChanged || update.selectionSet || update.viewportChanged || syntaxTree(update.state) !== syntaxTree(update.startState)) this.decorations = decorate(update.view);
+  }
+}, { decorations: plugin => plugin.decorations });
+
+// List nesting, as in Obsidian. Lists are read from their text rather than
+// the syntax tree: an item being started (`  - ` with nothing after it) is
+// not yet a list item to CommonMark, but it is to the person typing it.
+const listLine = /^([ \t]*)([-+*]|\d{1,9}[.)])(?:([ \t]+)(.*))?$/;
+const emptyItemRest = /^(?:\[[ xX]\])?[ \t]*$/;
+function listInfo(state, line) {
+  const match = listLine.exec(line.text);
+  if (!match) return null;
+  for (let node = syntaxTree(state).resolveInner(line.from + match[1].length, 1); node; node = node.parent) {
+    if (['FencedCode', 'CodeBlock', 'HTMLBlock', 'HorizontalRule'].includes(node.name)) return null;
+  }
+  const marker = match[1].length, rest = match[4] ?? '', spaces = (match[3] ?? '').length;
+  // Where an item's text starts, which is where its children's markers go.
+  const content = marker + match[2].length + (spaces >= 1 && spaces <= 4 && rest ? spaces : 1);
+  return { line, marker, content, empty: match[3] !== undefined && emptyItemRest.test(rest) };
+}
+const indentOf = text => /^[ \t]*/.exec(text)[0].length;
+// The nearest item above at a shallower or equal column, skipping deeper
+// items and the indented text that belongs to them.
+function itemAbove(state, item, shallower) {
+  for (let number = item.line.number - 1; number >= 1; number--) {
+    const line = state.doc.line(number);
+    if (!line.text.trim()) continue;
+    const above = listInfo(state, line);
+    if (!above) { if (indentOf(line.text) > 0) continue; return null; }
+    if (above.marker < item.marker) return shallower ? above : null;
+    if (above.marker === item.marker && !shallower) return above;
+  }
+  return null;
+}
+// An item moves with the lines under it: its wrapped text and its children.
+function itemLines(state, item) {
+  const lines = [item.line];
+  for (let number = item.line.number + 1; number <= state.doc.lines; number++) {
+    const line = state.doc.line(number);
+    if (!line.text.trim() || indentOf(line.text) <= item.marker) break;
+    lines.push(line);
+  }
+  return lines;
+}
+function shiftItems(state, items, direction) {
+  const changes = [], moved = new Set();
+  for (const item of items) {
+    if (moved.has(item.line.number)) continue;
+    const lines = itemLines(state, item);
+    for (const line of lines) moved.add(line.number);
+    const target = direction > 0 ? itemAbove(state, item, false)?.content : itemAbove(state, item, true)?.marker;
+    if (target === undefined || target === item.marker) continue;
+    const delta = target - item.marker;
+    for (const line of lines) {
+      if (delta > 0) changes.push({ from: line.from, insert: ' '.repeat(delta) });
+      else changes.push({ from: line.from, to: line.from + Math.min(-delta, indentOf(line.text)) });
+    }
+  }
+  return changes;
+}
+const selectedItems = state => {
+  const items = [];
+  for (const range of state.selection.ranges) {
+    for (let number = state.doc.lineAt(range.from).number, last = state.doc.lineAt(range.to).number; number <= last; number++) {
+      const item = listInfo(state, state.doc.line(number));
+      if (item && !items.some(other => other.line.number === number)) items.push(item);
+    }
+  }
+  return items.sort((a, b) => a.line.number - b.line.number);
+};
+// Tab nests the selected items under the item above; Shift-Tab returns them
+// to their parent's level. Inside a list Tab never leaves the editor, even
+// when an item cannot move (the first item has nothing to nest under).
+const shiftList = direction => ({ state, dispatch }) => {
+  if (state.readOnly) return false;
+  const items = selectedItems(state);
+  if (!items.length) return false;
+  const changes = shiftItems(state, items, direction);
+  if (changes.length) dispatch(state.update({ changes, scrollIntoView: true, userEvent: direction > 0 ? 'input.indent' : 'delete.dedent' }));
+  return true;
+};
+// The empty item under the cursor, if the cursor sits at its end.
+function emptyItem(state) {
+  const { main } = state.selection;
+  if (state.readOnly || !main.empty || state.selection.ranges.length > 1) return null;
+  const line = state.doc.lineAt(main.head), item = listInfo(state, line);
+  return item?.empty && main.head === line.to ? item : null;
+}
+// Enter on an empty nested item steps it out a level; on an empty top-level
+// item it ends the list, leaving a plain empty line.
+const leaveEmptyItem = ({ state, dispatch }) => {
+  const item = emptyItem(state);
+  if (!item) return false;
+  const changes = shiftItems(state, [item], -1);
+  if (changes.length) dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'delete.dedent' }));
+  else dispatch(state.update({ changes: { from: item.line.from, to: item.line.to }, selection: { anchor: item.line.from }, scrollIntoView: true, userEvent: 'delete' }));
+  return true;
+};
+// Backspace on an empty nested item also steps out; elsewhere the Markdown
+// keymap's own Backspace handling applies.
+const outdentEmptyItem = ({ state, dispatch }) => {
+  const item = emptyItem(state), changes = item ? shiftItems(state, [item], -1) : [];
+  if (!changes.length) return false;
+  dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'delete.dedent' }));
+  return true;
+};
+const listKeymap = [
+  { key: 'Tab', run: shiftList(1), shift: shiftList(-1) },
+  { key: 'Enter', run: leaveEmptyItem },
+  { key: 'Backspace', run: outdentEmptyItem }
+];
 
 const speechPreview = StateEffect.define();
 class SpeechPreview extends WidgetType {
@@ -197,11 +445,11 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
     doc: value, selection: { anchor: value.length },
     extensions: [
       EditorView.cspNonce.of(nonce),
-      markdown({ extensions: [GFM, wikiLinks] }), syntaxHighlighting(formatting), liveFormatting, hiddenTargets, ideaMarkers, liveSpeech,
+      markdown({ extensions: [GFM, wikiLinks] }), tables, livePreview, hiddenTargets, ideaMarkers, liveSpeech,
       EditorView.atomicRanges.of(view => view.state.field(hiddenTargets)),
       placeholder(emptyText),
       autocompletion({ override: [completions(findThoughts)], icons: false, maxRenderedOptions: 8, activateOnTypingDelay: 180 }),
-      Prec.highest(keymap.of(completionKeymap)),
+      Prec.highest(keymap.of(completionKeymap)), Prec.highest(keymap.of(listKeymap)),
       ...(onSubmit ? [Prec.highest(keymap.of([{ key: 'Mod-Enter', run() { onSubmit(); return true; } }]))] : []),
       history(), keymap.of([...defaultKeymap, ...historyKeymap]), EditorView.lineWrapping,
       EditorView.contentAttributes.of({ 'aria-label': 'thought', 'aria-multiline': 'true', spellcheck: 'true', autocapitalize: 'sentences' }),
@@ -213,6 +461,11 @@ export function createLiveEditor(parent, { value, nonce, onChange, onLimit, find
           if (node.name === 'ThoughtLink') {
             const link = thoughtLinks(view.state.doc.sliceString(node.from, node.to))[0];
             if (link) { event.preventDefault(); onOpenThought(link.id); return true; }
+          }
+          if (['Link', 'Autolink', 'URL'].includes(node.name)) {
+            const target = node.name === 'URL' ? node : node.getChild('URL');
+            const url = target && externalLink(view.state.doc.sliceString(target.from, target.to));
+            if (url) { event.preventDefault(); window.open(url, '_blank', 'noopener,noreferrer'); return true; }
           }
         }
         return false;
