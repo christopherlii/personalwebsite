@@ -45,12 +45,6 @@
   --chrome-ms: 300ms;
 
   --code-bg: rgba(0, 0, 0, 0.06);
-  --card-bg: var(--bg);
-  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  --card-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.12);
-  --pill-blue: #1d4ed8;
-  --pill-green: #15803d;
-  --pill-yellow: #a16207;
 
   color-scheme: light;
 }
@@ -1192,21 +1186,6 @@ body.no-top-fade .top-fade {
   opacity: 1;
 }
 
-/* Side-by-side pair */
-
-.article-body .photo-pair {
-  display: flex;
-  gap: 16px;
-  margin: 32px 0;
-}
-
-.article-body .photo-pair img,
-.article-body .photo-pair figure {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-}
-
 .article-footer {
   display: flex;
   justify-content: space-between;
@@ -1236,42 +1215,6 @@ body.no-top-fade .top-fade {
 .solaces-masonry {
   column-count: 2;
   column-gap: 40px;
-}
-
-.solaces-category {
-  break-inside: avoid;
-  margin-bottom: 28px;
-}
-
-.solaces-category-title {
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  color: var(--fg-muted);
-  margin-bottom: 8px;
-}
-
-.solaces-category-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.solaces-item {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--fg);
-}
-
-.solaces-item a {
-  color: var(--fg);
-  border-bottom: 1px solid var(--border);
-}
-
-@media (hover: hover) {
-  .solaces-item a:hover {
-    color: var(--fg);
-    opacity: 0.6;
-  }
 }
 
 /* Category words as a quiet button row under the collage hero — each fills
@@ -1608,10 +1551,6 @@ body.no-top-fade .top-fade {
   .solaces-masonry {
     column-count: 2;
     column-gap: 24px;
-  }
-
-  .solaces-category {
-    margin-bottom: 24px;
   }
 }
 

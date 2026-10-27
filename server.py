@@ -22,39 +22,7 @@ class MarkdownHandler(http.server.SimpleHTTPRequestHandler):
         # Parse the URL
         parsed_url = urlparse(self.path)
         path = parsed_url.path
-        
-        # If requesting the posts directory, serve a directory listing
-        if path == '/posts/' or path == '/posts':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            
-            # Generate directory listing
-            posts_dir = 'content/posts'
-            files = os.listdir(posts_dir)
-            md_files = [f for f in files if f.endswith('.md')]
-            
-            html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head><title>Posts Directory</title></head>
-            <body>
-            <h1>Posts Directory</h1>
-            <ul>
-            """
-            
-            for file in md_files:
-                html += f'<li><a href="{file}">{file}</a></li>'
-            
-            html += """
-            </ul>
-            </body>
-            </html>
-            """
-            
-            self.wfile.write(html.encode())
-            return
-        
+
         # For .md files, serve them with proper content type
         if path.endswith('.md'):
             file_path = self.translate_path(path)
