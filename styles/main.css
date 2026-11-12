@@ -1425,6 +1425,130 @@ body.no-top-fade .top-fade {
 }
 
 /* ========================================
+   PROJECTS
+   ======================================== */
+
+/* Laid exactly over the image layer (same box), so the type samples the
+   pixel beneath it. It paints nothing until the photo has settled into its
+   card, then resolves cell by cell. */
+.banner-ascii {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--banner-height);
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+/* Type on the page colour wants no panel shadow round it. */
+.banner.ascii-on {
+  box-shadow: none;
+}
+
+/* Leaving, the type stays up while it dissolves back into the photo, but
+   no longer takes the pointer. */
+.banner.ascii-leaving .banner-ascii {
+  pointer-events: none !important;
+}
+
+.banner.ascii-on .banner-ascii {
+  opacity: 1;
+  pointer-events: auto;
+  transition: none;
+}
+
+/* A project writeup runs as wide as the banner above it (the full column,
+   past the page padding), with its chapters in the margin to the left. */
+.article.project-writeup {
+  position: relative;
+  margin: 0 calc(var(--page-pad) * -1);
+}
+
+.chapters {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(100% + 48px);
+  width: 150px;
+}
+
+.chapters ol {
+  position: sticky;
+  top: 48px;
+  margin: 0;
+  /* the first chapter sits level with the title's first line */
+  padding: 23px 0 0;
+  list-style: none;
+}
+
+.chapters li + li {
+  margin-top: 8px;
+}
+
+.chapters button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--fg-faint);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.chapters button.on {
+  color: var(--fg);
+}
+
+@media (hover: hover) {
+  .chapters button:hover {
+    color: var(--fg-muted);
+  }
+
+  .chapters button.on:hover {
+    color: var(--fg);
+  }
+}
+
+/* label and year on the left, the project's own link out at the far end */
+.article-date.project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.project-link svg {
+  flex-shrink: 0;
+}
+
+@media (hover: hover) {
+  .project-link:hover {
+    color: var(--fg);
+  }
+}
+
+/* no margin to sit in: the chapters go */
+@media (max-width: 1080px) {
+  .chapters {
+    display: none;
+  }
+}
+
+/* ========================================
    READING
    ======================================== */
 

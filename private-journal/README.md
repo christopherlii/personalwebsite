@@ -677,3 +677,46 @@ printf '%s' "$key" | shasum -a 256 | cut -d' ' -f1 | npx wrangler secret put JOU
 For host setup, use the official [Workers static asset docs](https://developers.cloudflare.com/workers/static-assets/)
 and [D1 docs](https://developers.cloudflare.com/d1/). The public GitHub Pages
 deployment and the private journal are separate deployments.
+
+## Spotify on the public info page
+
+`spotify.mjs` serves `/public/listening`: the top track and artist, Spotify links,
+approximate four-week time range, and update time. The site reads the endpoint in
+`writing-source.json`. Until a connection has rankings, or if the endpoint is
+unavailable, the info page retains its hand-written favorites. Connected rows use the requested labels
+“top song this week” and “top artist this week”; the underlying Spotify rankings
+still cover approximately four weeks, as explained in their tooltips.
+
+Apply `0017_spotify.sql` to the selected database before deploying. Production
+refreshes daily at 09:17 UTC; public requests can also refresh a stale snapshot
+in the background. A database lease prevents concurrent refreshes. Rate limits
+retain the last good result and honor `Retry-After`. Invalid refresh grants clear
+published data and require reconnection. Disconnect removes tokens and rankings.
+
+The private journal menu links to `spotify.html` (production:
+`https://christopherli.dev/journal/spotify.html`). Unlock the journal, then:
+
+1. Create or open an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard).
+2. Enable Web API and register the exact redirect address shown on the setup page.
+3. Enter its **Client ID** and press **connect Spotify**.
+4. Authorize read-only access to your top items.
+
+The [PKCE flow](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow)
+needs no Client Secret. The verifier and refresh token stay in D1. Setup requires
+the existing owner session and same-origin write headers. One-use state and a
+separate HttpOnly `SameSite=Lax` cookie bind the callback to its browser and owner
+session, preserving the journal's `SameSite=Strict` cookie. The public endpoint
+never serializes credentials or account identity. Spotify currently requires a
+Premium app owner; developer-app refresh grants expire after six months.
+
+For local authorization, open `http://127.0.0.1:8787/spotify.html` and register
+`http://127.0.0.1:8787/api/spotify/callback`. The setup page redirects `localhost`
+to the explicit loopback IP Spotify requires. Use the journal's existing local
+migrations and password configuration. Point a local `writing-source.json`
+override at the local Worker's `/public/listening` when previewing local data.
+
+`node --test test/spotify.test.mjs` checks authorization, callback replay,
+public-data boundaries, concurrent refresh, rate limits, token rotation,
+revocation, disconnect races, and absent listening data.
+`test/spotify-runtime.test.mjs` also runs the outbound requests in real workerd
+with isolated D1 storage and mock Spotify responses, including refused redirects.

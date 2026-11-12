@@ -11,6 +11,7 @@ import { liveDictation } from './live-dictation.mjs';
 import { IdeaError, ideaApi, indexIdeas } from './ideas.mjs';
 import { GoalError, goalApi } from './goals.mjs';
 import { DocumentError, documentApi } from './documents.mjs';
+import { SpotifyError, spotifyApi, spotifyCallback, publicListening, refreshListening } from './spotify.mjs';
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -147,6 +148,7 @@ async function api(request, env, url, context) {
     return json({ authenticated: true, semanticSearch: Boolean(env.AI) }, 200, { 'Set-Cookie': sessionCookie(token) });
   }
   if (!session) fail(401, 'Sign in to continue.');
+  if (path === '/api/spotify' || path.startsWith('/api/spotify/')) return spotifyApi(request, env, url, session, readBody);
   if(path==='/api/dictation'){
     if(request.method!=='GET')fail(405,'Method not allowed.');
     if(request.headers.get('Origin')!==url.origin)fail(403,'Request not allowed.');
@@ -328,6 +330,9 @@ async function api(request, env, url, context) {
 }
 
 export default {
+  async scheduled(_event, env, context) {
+    context.waitUntil(refreshListening(env));
+  },
   async fetch(request, env, context) {
     const url = new URL(request.url);
     const journalPath = url.pathname === '/journal' || url.pathname.startsWith('/journal/');
@@ -352,13 +357,17 @@ export default {
           url.pathname = url.pathname.slice('/journal'.length);
           request = new Request(url, request);
         }
-        if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
+        if (url.pathname === '/api/spotify/callback') response = await spotifyCallback(request, env, url);
+        else if (url.pathname === '/public/listening') response = await publicListening(request, env, context);
+        else if (url.pathname.startsWith('/public/')) response = await publicWriting(request, env, url);
         else if (url.pathname.startsWith('/api/')) response = await api(request, env, url, context);
+        else if (['GET', 'HEAD'].includes(request.method) && url.pathname === '/spotify.html') response = Response.redirect(new URL(journalPath ? '/journal/spotify' : '/spotify', url).href, 302);
+        else if (['GET', 'HEAD'].includes(request.method) && ['/spotify', '/spotify.js', '/spotify.css'].includes(url.pathname)) response = await env.ASSETS.fetch(request);
         else if (['GET', 'HEAD'].includes(request.method) && (['/', '/index.html', '/journal.css', '/journal.js', '/reading.js', '/commands.js', '/ideas.js', '/goals.js', '/study.js', '/vendor/pdf.min.mjs', '/vendor/pdf.worker.min.mjs', '/vendor/pdfjs-LICENSE.txt', '/dictation.js', '/photos.js', '/photo-links.js', '/tags.js', '/search-terms.js', '/markdown.js', '/thought-links.js', '/live-editor.js', '/vendor/live-editor-LICENSE.txt', '/vendor/marked.min.js', '/fonts/instrument-sans-latin.woff2', '/fonts/instrument-sans-latin-ext.woff2', '/fonts/fraunces-latin.woff2', '/fonts/fraunces-latin-ext.woff2'].includes(url.pathname) || /^\/vendor\/standard_fonts\/[A-Za-z-]+\.(?:pfb|ttf)$/.test(url.pathname))) response = await env.ASSETS.fetch(request);
         else fail(404, 'Not found.');
       }
     } catch (error) {
-      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof GoalError || error instanceof DocumentError || error instanceof TranscriptionError;
+      const expected = error instanceof HttpError || error instanceof PublicationError || error instanceof ReadingError || error instanceof PhotoError || error instanceof IdeaError || error instanceof GoalError || error instanceof DocumentError || error instanceof TranscriptionError || error instanceof SpotifyError;
       response = json({ error: expected ? error.message : 'The journal is unavailable. Try again later.' }, expected ? error.status : 500);
     }
     if(response.status===101)return response;

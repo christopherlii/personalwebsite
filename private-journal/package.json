@@ -24,6 +24,7 @@
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "esbuild": "0.28.2",
+    "miniflare": "5.20261012.1-beta",
     "wrangler": "4.151.1"
   },
   "dependencies": {

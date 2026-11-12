@@ -8,6 +8,11 @@ import os
 from urllib.parse import urlparse
 
 class MarkdownHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        # Local edits should show on the next reload, never a cached copy.
+        self.send_header('Cache-Control', 'no-store')
+        super().end_headers()
+
     def translate_path(self, path):
         # Content (posts, reading, favs) lives in the private repo checked
         # out at content/, mirroring the site's paths — fall back to it.

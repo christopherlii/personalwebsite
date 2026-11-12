@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+<title id="title">Mantle context graph illustration</title>
+<desc id="desc">An illustrative graph connecting people, projects, topics, content, and goals. Colors follow Mantle’s interface. This is a product illustration, not a screenshot of personal activity.</desc>
+<defs><radialGradient id="paper"><stop stop-color="#fffefb"/><stop offset="1" stop-color="#e8e9e3"/></radialGradient><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#424856" flood-opacity=".1"/></filter></defs>
+<rect width="1440" height="900" fill="url(#paper)"/>
+<g fill="none" stroke-linecap="round">
+<path d="M720 435 Q540.0 350 360 260" stroke="#6366f1" stroke-opacity=".38" stroke-width="5"/>
+<path d="M360 260 Q339.1138850919163 311.19700276806196 268.2 362.4" stroke="#6366f1" stroke-opacity=".35" stroke-width="3"/>
+<path d="M360 260 Q328.4314575050762 215.8058261758408 246.9 171.6" stroke="#6366f1" stroke-opacity=".35" stroke-width="3"/>
+<path d="M360 260 Q450.53216354311934 224.1514727280596 491.1 188.3" stroke="#6366f1" stroke-opacity=".35" stroke-width="3"/>
+<path d="M720 435 Q877.5 340 1035 250" stroke="#a855f7" stroke-opacity=".38" stroke-width="5"/>
+<path d="M1035 250 Q981.7481919412955 237.00551932389004 878.5 224.0" stroke="#a855f7" stroke-opacity=".35" stroke-width="3"/>
+<path d="M1035 250 Q1089.9685274732728 197.5 1094.9 145.0" stroke="#a855f7" stroke-opacity=".35" stroke-width="3"/>
+<path d="M1035 250 Q1127.843847692514 283.11995401457534 1170.7 316.2" stroke="#a855f7" stroke-opacity=".35" stroke-width="3"/>
+<path d="M720 435 Q935.0 670 1150 580" stroke="#22c55e" stroke-opacity=".38" stroke-width="5"/>
+<path d="M1150 580 Q1159.7352803698764 518.648301034521 1119.5 457.3" stroke="#22c55e" stroke-opacity=".35" stroke-width="3"/>
+<path d="M1150 580 Q1254.9878156125114 578.9092245976698 1310.0 577.8" stroke="#22c55e" stroke-opacity=".35" stroke-width="3"/>
+<path d="M1150 580 Q1162.4852427967817 641.7305212871961 1125.0 703.5" stroke="#22c55e" stroke-opacity=".35" stroke-width="3"/>
+<path d="M720 435 Q740.0 830 760 740" stroke="#f97316" stroke-opacity=".38" stroke-width="5"/>
+<path d="M760 740 Q851.3230058044034 705.0504435330784 892.6 670.1" stroke="#f97316" stroke-opacity=".35" stroke-width="3"/>
+<path d="M760 740 Q817.538931446064 780.0 825.1 820.0" stroke="#f97316" stroke-opacity=".35" stroke-width="3"/>
+<path d="M760 740 Q707.3763418979203 755.1201184749792 604.8 770.2" stroke="#f97316" stroke-opacity=".35" stroke-width="3"/>
+<path d="M720 435 Q515.0 760 310 670" stroke="#eab308" stroke-opacity=".38" stroke-width="5"/>
+<path d="M310 670 Q402.0936454356339 704.0399396884392 444.2 738.1" stroke="#eab308" stroke-opacity=".35" stroke-width="3"/>
+<path d="M310 670 Q280.44013119500016 715.7096063511981 200.9 761.4" stroke="#eab308" stroke-opacity=".35" stroke-width="3"/>
+<path d="M310 670 Q286.85479814783616 620.0852806220441 213.7 570.2" stroke="#eab308" stroke-opacity=".35" stroke-width="3"/>
+<path d="M360 260 Q610 135 1035 250" stroke="#afb8b1" stroke-width="2" stroke-dasharray="6 10"/>
+<path d="M310 670 Q510 810 760 740" stroke="#afb8b1" stroke-width="2" stroke-dasharray="6 10"/>
+<path d="M1035 250 Q1260 310 1150 580" stroke="#afb8b1" stroke-width="2" stroke-dasharray="6 10"/>
+</g>
+<g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+<circle cx="268.2" cy="362.4" r="18" fill="#6366f1" fill-opacity=".7"/><circle cx="268.2" cy="362.4" r="6" fill="#6366f1"/><text x="268.2" y="401.4" font-size="20" fill="#626570">collaborators</text>
+<circle cx="246.9" cy="171.6" r="18" fill="#6366f1" fill-opacity=".7"/><circle cx="246.9" cy="171.6" r="6" fill="#6366f1"/><text x="246.9" y="210.6" font-size="20" fill="#626570">conversations</text>
+<circle cx="491.1" cy="188.3" r="18" fill="#6366f1" fill-opacity=".7"/><circle cx="491.1" cy="188.3" r="6" fill="#6366f1"/><text x="491.1" y="227.3" font-size="20" fill="#626570">contacts</text>
+<circle cx="878.5" cy="224.0" r="18" fill="#a855f7" fill-opacity=".7"/><circle cx="878.5" cy="224.0" r="6" fill="#a855f7"/><text x="878.5" y="263.0" font-size="20" fill="#626570">Mantle</text>
+<circle cx="1094.9" cy="145.0" r="18" fill="#a855f7" fill-opacity=".7"/><circle cx="1094.9" cy="145.0" r="6" fill="#a855f7"/><text x="1094.9" y="184.0" font-size="20" fill="#626570">Buildathon</text>
+<circle cx="1170.7" cy="316.2" r="18" fill="#a855f7" fill-opacity=".7"/><circle cx="1170.7" cy="316.2" r="6" fill="#a855f7"/><text x="1170.7" y="355.2" font-size="20" fill="#626570">Nia</text>
+<circle cx="1119.5" cy="457.3" r="18" fill="#22c55e" fill-opacity=".7"/><circle cx="1119.5" cy="457.3" r="6" fill="#22c55e"/><text x="1119.5" y="496.3" font-size="20" fill="#626570">context graphs</text>
+<circle cx="1310.0" cy="577.8" r="18" fill="#22c55e" fill-opacity=".7"/><circle cx="1310.0" cy="577.8" r="6" fill="#22c55e"/><text x="1310.0" y="616.8" font-size="20" fill="#626570">retrieval</text>
+<circle cx="1125.0" cy="703.5" r="18" fill="#22c55e" fill-opacity=".7"/><circle cx="1125.0" cy="703.5" r="6" fill="#22c55e"/><text x="1125.0" y="742.5" font-size="20" fill="#626570">workflows</text>
+<circle cx="892.6" cy="670.1" r="18" fill="#f97316" fill-opacity=".7"/><circle cx="892.6" cy="670.1" r="6" fill="#f97316"/><text x="892.6" y="709.1" font-size="20" fill="#626570">documents</text>
+<circle cx="825.1" cy="820.0" r="18" fill="#f97316" fill-opacity=".7"/><circle cx="825.1" cy="820.0" r="6" fill="#f97316"/><text x="825.1" y="859.0" font-size="20" fill="#626570">browser tabs</text>
+<circle cx="604.8" cy="770.2" r="18" fill="#f97316" fill-opacity=".7"/><circle cx="604.8" cy="770.2" r="6" fill="#f97316"/><text x="604.8" y="809.2" font-size="20" fill="#626570">screen context</text>
+<circle cx="444.2" cy="738.1" r="18" fill="#eab308" fill-opacity=".7"/><circle cx="444.2" cy="738.1" r="6" fill="#eab308"/><text x="444.2" y="777.1" font-size="20" fill="#626570">next actions</text>
+<circle cx="200.9" cy="761.4" r="18" fill="#eab308" fill-opacity=".7"/><circle cx="200.9" cy="761.4" r="6" fill="#eab308"/><text x="200.9" y="800.4" font-size="20" fill="#626570">follow-ups</text>
+<circle cx="213.7" cy="570.2" r="18" fill="#eab308" fill-opacity=".7"/><circle cx="213.7" cy="570.2" r="6" fill="#eab308"/><text x="213.7" y="609.2" font-size="20" fill="#626570">tasks</text>
+<circle cx="360" cy="260" r="76" fill="#6366f1" fill-opacity=".12"/><circle cx="360" cy="260" r="60" fill="#6366f1" filter="url(#shadow)"/><text x="360" y="267" fill="#fff" font-size="24">people</text>
+<circle cx="1035" cy="250" r="76" fill="#a855f7" fill-opacity=".12"/><circle cx="1035" cy="250" r="60" fill="#a855f7" filter="url(#shadow)"/><text x="1035" y="257" fill="#fff" font-size="24">projects</text>
+<circle cx="1150" cy="580" r="76" fill="#22c55e" fill-opacity=".12"/><circle cx="1150" cy="580" r="60" fill="#22c55e" filter="url(#shadow)"/><text x="1150" y="587" fill="#fff" font-size="24">topics</text>
+<circle cx="760" cy="740" r="76" fill="#f97316" fill-opacity=".12"/><circle cx="760" cy="740" r="60" fill="#f97316" filter="url(#shadow)"/><text x="760" y="747" fill="#fff" font-size="24">content</text>
+<circle cx="310" cy="670" r="76" fill="#eab308" fill-opacity=".12"/><circle cx="310" cy="670" r="60" fill="#eab308" filter="url(#shadow)"/><text x="310" y="677" fill="#fff" font-size="24">goals</text>
+<circle cx="720" cy="435" r="121" fill="#6366f1" fill-opacity=".1"/>
+<circle cx="720" cy="435" r="103" fill="#373260" filter="url(#shadow)"/>
+<text x="720" y="430" fill="#fff" font-size="37" font-weight="600">Mantle</text>
+<text x="720" y="461" fill="#d4d1ec" font-size="20">context graph</text>
+</g></svg>

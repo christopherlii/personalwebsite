@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="704" viewBox="0 0 640 704" role="img" aria-labelledby="title desc">
+  <title id="title">from an idea to a playable game</title>
+  <desc id="desc">A request becomes a game brief. Archetypes supply genre-specific helpers and playable starters. Pixel writes real source files in a sandbox, alongside asset generation. Compiler, browser boot, and playability checks feed repairs back to Pixel. The playable result can be edited or published.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 6 3 0 6" fill="none" stroke="#8a8a82" stroke-width="1" /></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #242522; }
+      .label { font-size: 16px; dominant-baseline: central; }
+      .note { dominant-baseline: central; }
+      .note, .edge { font-size: 12px; fill: #73756d; }
+      .box { fill: #fff; stroke: #dedfd7; }
+      .line { fill: none; stroke: #8a8a82; stroke-width: 1.3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="640" height="704" fill="#f3f4ef" />
+  <g text-anchor="middle">
+    <rect class="box" x="76" y="28" width="488" height="64" rx="6" />
+    <text class="label" x="320" y="50">your idea</text>
+    <text class="note" x="320" y="72">a game described in text or voice</text>
+    <path class="line" d="M320 92 V120" />
+    <rect class="box" x="76" y="128" width="488" height="64" rx="6" />
+    <text class="label" x="320" y="150">a game brief</text>
+    <text class="note" x="320" y="172">mechanics · visual style · solo or multiplayer</text>
+    <path class="line" d="M320 192 V220" />
+    <rect class="box" x="76" y="228" width="488" height="64" rx="6" />
+    <text class="label" x="320" y="250">archetypes</text>
+    <text class="note" x="320" y="272">genre-specific helpers and playable starters</text>
+    <path class="line" d="M320 292 V320" />
+    <rect x="76" y="328" width="488" height="120" rx="6" fill="#e9ede4" stroke="#d4dacf" />
+    <rect class="box" x="92" y="356" width="268" height="64" rx="6" />
+    <text class="label" x="226" y="378">Pixel (coding agent)</text>
+    <text class="note" x="226" y="400">edits real source files in a sandbox</text>
+    <rect class="box" x="394" y="356" width="154" height="64" rx="6" />
+    <text class="label" x="471" y="378">asset generation</text>
+    <text class="note" x="471" y="400">images · audio · 3D</text>
+    <path class="line" d="M394 388 H367" />
+    <path class="line" d="M320 448 V484" />
+    <rect class="box" x="76" y="492" width="488" height="64" rx="6" />
+    <text class="label" x="320" y="514">build and check</text>
+    <text class="note" x="320" y="536">compiler · browser boot · playability checks</text>
+    <path class="line" d="M320 556 V604" />
+    <text class="edge" x="359" y="584">passes</text>
+    <rect fill="#e3eada" stroke="#c9d4bf" x="76" y="612" width="488" height="64" rx="6" />
+    <text class="label" x="320" y="634">a playable game</text>
+    <text class="note" x="320" y="656">play in the browser, iterate, or publish</text>
+    <path class="line" d="M76 524 H38 V388 H84" />
+    <text class="edge" x="23" y="456" transform="rotate(-90 23 456)">repair feedback</text>
+    <path class="line" d="M564 644 H604 V388 H572" />
+    <text class="edge" x="622" y="516" transform="rotate(-90 622 516)">your next edit</text>
+  </g>
+</svg>

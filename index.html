@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/styles/main.css">
   <script defer src="/static/vendor/marked.min.js"></script>
   <script defer src="/static/markdown-renderer.js"></script>
+  <script type="module" src="/static/spotify-listening.js"></script>
   <script>
     if (window.location.hash && window.location.hash !== '#') {
       document.documentElement.classList.add('route-pending');
@@ -46,6 +47,7 @@
         <div class="banner-media" data-layer="1"></div>
         <div class="banner-scrim"></div>
         <div class="banner-collage" id="banner-collage"></div>
+        <canvas class="banner-ascii" id="banner-ascii" aria-hidden="true"></canvas>
       </div>
       <!-- The page settles top to bottom: chrome drops in first, then the
            content below rises in sequence. -->
@@ -71,8 +73,8 @@
       <main class="page page-home">
         <section>
           <p class="home-title page-entrance entrance-delay-240">hi, i'm chris :)</p>
-          <p class="home-text page-entrance entrance-delay-360">i'm currently working on long-horizon environments at <a href="https://generalcontextlabs.com/" target="_blank" rel="noopener" class="inline-link">General Context Labs</a>, starting with <a href="https://www.instaplay.ai/" target="_blank" rel="noopener" class="inline-link">Instaplay</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
-          <p class="home-text page-entrance entrance-delay-480">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a> and <a href="#favorites" class="inline-link">favorites</a>.</p>
+          <p class="home-text page-entrance entrance-delay-360">i'm currently working on long-horizon environments at <a href="https://generalcontextlabs.com/" target="_blank" rel="noopener" class="inline-link">General Context Labs</a>. previously, i was <a href="https://www.tabs.com/" target="_blank" rel="noopener" class="inline-link">Tabs</a>' first new grad hire and studied computer science at nyu.</p>
+          <p class="home-text page-entrance entrance-delay-480">in my free time i like building things, playing sports (soccer, basketball, watching F1), and cafe hopping around the city. this is a little corner of the internet where i keep my <a href="#thoughts" class="inline-link">writing</a>, <a href="#projects" class="inline-link">projects</a>, and <a href="#favorites" class="inline-link">favorites</a>.</p>
         </section>
         <section class="contact">
           <p class="page-entrance entrance-delay-960"><button type="button" id="copy-email" class="contact-email" title="click to copy">christopherli [at] nyu [dot] edu</button><span class="copy-note" id="copy-note" role="status" aria-live="polite"></span></p>
@@ -99,6 +101,13 @@
       <div class="page page-stagger">
         <p class="page-blurb">writings by others that moved me — words i wish i'd found myself.</p>
         <div id="reading-list" class="reading-list stagger-children"></div>
+      </div>
+    </div>
+
+    <!-- Projects -->
+    <div id="projects-view" class="view hidden">
+      <div class="page page-stagger">
+        <div id="projects-list" class="thoughts-list stagger-children"></div>
       </div>
     </div>
 
@@ -129,8 +138,8 @@
             <tr><td>record soccer juggles</td><td>2412</td></tr>
             <tr><td>energy drinks today</td><td>hopefully 0</td></tr>
             <tr><td>favorite clothing brand</td><td>Lacoste / Ralph Lauren</td></tr>
-            <tr><td>favorite song</td><td>Malcolm in the Middle by Malcolm Todd</td></tr>
-            <tr><td>favorite artist</td><td>Tame Impala</td></tr>
+            <tr id="listening-track"><td data-listening-label>favorite song</td><td data-listening-value>Malcolm in the Middle by Malcolm Todd</td></tr>
+            <tr id="listening-artist"><td data-listening-label>favorite artist</td><td data-listening-value>Tame Impala</td></tr>
             <tr><td>favorite restaurant</td><td>Dubu Haus</td></tr>
             <tr><td>favorite city</td><td>New York City</td></tr>
           </tbody>

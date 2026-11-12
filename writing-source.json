@@ -1,4 +1,5 @@
 {
   "posts": "https://christopher-private-journal.christopherlii.workers.dev/public/posts",
-  "feed": "https://christopher-private-journal.christopherlii.workers.dev/public/feed.xml"
+  "feed": "https://christopher-private-journal.christopherlii.workers.dev/public/feed.xml",
+  "listening": "https://christopher-private-journal.christopherlii.workers.dev/public/listening"
 }

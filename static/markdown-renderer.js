@@ -6,6 +6,7 @@ class Site {
   constructor() {
     this.posts = [];
     this.reading = [];
+    this.projects = [];
     this.solaces = [];
     this.view = 'home';
     this.slug = null;
@@ -16,6 +17,7 @@ class Site {
     this.setupNavigation();
     this.setupScrollLock();
     this.setupBanner();
+    this.setupProjectAscii();
     this.setupCopyEmail();
   }
 
@@ -69,8 +71,9 @@ class Site {
 
       // Articles: the cover does not condense — the banner rides away at
       // full height with the scroll, like any other content, and long posts
-      // get the full column back.
-      if (this.view === 'thought') {
+      // get the full column back. Projects too: a condensed bar would set the
+      // ink chrome on the photograph.
+      if (this.view === 'thought' || this.view === 'projects' || this.view === 'project') {
         this.banner.style.height = `${target}px`;
         this.banner.classList.remove('condensed');
         if (this.bannerSpacer) this.bannerSpacer.style.height = '0px';
@@ -132,7 +135,7 @@ class Site {
     // The panel shadow dies on the click itself — navigation work (view
     // exit fade, image decode) runs 150ms+ later, and a shadow fading
     // around an emptying box reads as an outline.
-    const drawnHashes = new Set(['#thoughts', '#reading']);
+    const drawnHashes = new Set(['#thoughts', '#reading', '#projects']);
     const linkOf = e => e.target.closest && e.target.closest('a[href^="#"]');
     // Trial: the shadow leaves on hover (quick, not a slow fade), before the
     // click even happens; hover away and it returns.
@@ -173,7 +176,7 @@ class Site {
     this.syncScrollLock = () => {
       const root = document.documentElement;
       root.classList.remove('no-scroll');
-      if (this.view === 'thought') return;
+      if (this.view === 'thought' || this.view === 'project') return;
 
       // Measure the real content, not the page's trailing padding — that
       // padding only exists to give scrolling views room at the end, and
@@ -669,7 +672,9 @@ class Site {
 
     // Articles let the bar scroll away, so they don't need the top fade;
     // every other view keeps it floating and needs the strip above covered.
-    document.body.classList.toggle('no-top-fade', viewName === 'thought');
+    // The fade only veils content passing under a pinned banner; articles
+    // and projects let theirs scroll away, so there is nothing to veil.
+    document.body.classList.toggle('no-top-fade', viewName === 'thought' || viewName === 'projects' || viewName === 'project');
 
     document.documentElement.classList.remove('no-scroll');
     window.scrollTo(0, 0);
@@ -989,9 +994,10 @@ class Site {
   }
 
   // The chrome wears white-on-photo only where it actually sits on a photo.
-  // Drawn views put it on the page, and so does any lifted view.
+  // Drawn views put it on the page, and so does any lifted view — and so
+  // does projects, whose photo is retyped as dark type on the page colour.
   chromeIsInk(mode) {
-    return mode === 'drawn' || this.chromeIsLifted();
+    return mode === 'drawn' || this.chromeIsLifted() || this.view === 'projects' || this.view === 'project';
   }
 
   // 'photo' is the original full-bleed hero (home, article covers); 'drawn'
@@ -1048,6 +1054,14 @@ class Site {
     // panel shadow around an empty box, and no hero for the icons to run
     // down the side of.
     this.banner.classList.toggle('bare', this.view === 'stats');
+    // Projects and their writeups: home's photograph, full-bleed and
+    // unmoved, retyped as colour ASCII — the list from the photo itself, a
+    // writeup from its project's image. Also keyed to what the
+    // banner is showing — a view leaving them swaps the banner image before
+    // it claims the view.
+    const ascii = (this.view === 'projects' || this.view === 'project') &&
+      !!this.bannerPhoto && this.bannerPhoto.src === this.homePhoto().src;
+    if (this.setProjectAscii) this.setProjectAscii(ascii ? this.asciiSource : null);
     // Outside a text swap (cold loads, same-image mode syncs), the text
     // outfit just follows the mode.
     if (!this._chromeSwapping) {
@@ -1225,7 +1239,10 @@ class Site {
     // "next" walks backward in time, like flipping deeper into an archive.
     const older = this.posts[this.posts.indexOf(post) + 1];
 
-    document.getElementById('thought-content').innerHTML = `
+    const article = document.getElementById('thought-content');
+    article.classList.remove('project-writeup');
+    this.setupChapters(null);
+    article.innerHTML = `
       <header class="article-header">
         <h1 class="article-title">${post.title}</h1>
         <time class="article-date">${this.formatDate(post.date)} · ${this.readingTime(post)} min read</time>
@@ -1242,6 +1259,496 @@ class Site {
     this.updateBanner();
 
     this.syncUrl(`#thought/${postId}`);
+  }
+
+  // ========================================
+  // PROJECTS
+  // ========================================
+
+  async loadProjects() {
+    try {
+      const resp = await fetch('/projects/index.json');
+      if (resp.ok) this.projects = await resp.json();
+    } catch (e) {
+      console.error('Error loading projects:', e);
+    }
+  }
+
+  // Projects keep home's photograph at full size, exactly where it was, and
+  // retype it as colour ASCII — the same scene, seen the way a machine
+  // would. The projects themselves are a plain list, like the writing page.
+  async showProjectsList() {
+    if (this.data) await this.data.projects;
+    const photo = this.homePhoto();
+    this.asciiSource = { src: photo.src, position: photo.position, color: true };
+    // Coming from home the photograph is already up, full-bleed: start
+    // typing it at once instead of waiting out the view change.
+    if (this.view === 'home' && this.bannerMode === 'photo' && this.setProjectAscii &&
+        this.bannerPhoto && this.bannerPhoto.src === photo.src) {
+      this.setProjectAscii(this.asciiSource);
+    }
+    await this.fadeToView('projects-view', 'projects');
+    this.setBannerMode('photo');
+    this.setBannerPhoto(photo.src, photo.position, 'full');
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, null);
+
+    // the writing list's own row: name left, label and year right
+    document.getElementById('projects-list').innerHTML = this.projects.map(project => `
+      <a class="thought-row" href="#project/${project.slug}">
+        <span class="thought-title">${project.name}</span>
+        <span class="thought-date">${[project.role, project.when].filter(Boolean).join(' · ')}</span>
+      </a>`).join('') || '<p class="empty-note">nothing here yet.</p>';
+    // warm the images so the buzz on opening one doesn't wait on a download
+    this.preloadImages(this.projects.map(p => p.image));
+
+    this.syncUrl('#projects');
+  }
+
+  // A project's writeup reads like an article, under the same ASCII banner:
+  // the type retypes itself in place from the photo into the project's own
+  // image, in colour. The body is Markdown from projects/<slug>.md.
+  async loadProjectBody(project) {
+    if (project.content) return;
+    try {
+      const resp = await fetch(`/projects/${project.slug}.md`);
+      if (!resp.ok) throw new Error(resp.status);
+      const body = await resp.text();
+      project.content = typeof marked !== 'undefined' ? marked.parse(body) : body;
+    } catch (e) {
+      project.content = '<p>this writeup refused to load. try a refresh?</p>';
+    }
+  }
+
+  async showProject(slug) {
+    if (this.data) await this.data.projects;
+    const project = this.projects.find(p => p.slug === slug);
+    if (!project) return this.showProjectsList();
+
+    await Promise.all([
+      this.fadeToView('thought-view', 'project'),
+      this.loadProjectBody(project)
+    ]);
+
+    const photo = this.homePhoto();
+    this.asciiSource = project.image
+      ? { src: project.image, position: project.imagePosition || 'center', color: true }
+      : { src: photo.src, position: photo.position, color: true };
+    this.setBannerMode('photo');
+    this.setBannerPhoto(photo.src, photo.position, 'full');
+    this.renderBreadcrumb({ label: 'projects', hash: 'projects' }, project.name);
+
+    const next = this.projects[(this.projects.indexOf(project) + 1) % this.projects.length];
+    const meta = [project.role, project.when].filter(Boolean).join(' · ');
+    const article = document.getElementById('thought-content');
+    // as wide as the banner above it, with its chapters in the left margin
+    article.classList.add('project-writeup');
+    article.innerHTML = `
+      <nav class="chapters" aria-label="chapters"><ol></ol></nav>
+      <header class="article-header">
+        <h1 class="article-title">${project.name}</h1>
+        <p class="article-date project-meta"><span>${meta}</span>${project.url ? this.projectLink(project.url) : ''}</p>
+      </header>
+      <div class="article-body">${project.content}</div>
+      <footer class="article-footer">
+        <a href="#projects">← all projects</a>
+        ${next && next !== project ? `<a href="#project/${next.slug}">next: <span class="next-title">${next.name}</span> →</a>` : ''}
+      </footer>
+    `;
+
+    this.enhanceArticleImages(article);
+    this.setupChapters(article);
+    this.updateBanner();
+    this.syncUrl(`#project/${slug}`);
+  }
+
+  // A project's link: the GitHub mark and owner/repo for a repository, the
+  // bare domain and an arrow out for anything else.
+  projectLink(url) {
+    const u = new URL(url);
+    const github = u.hostname === 'github.com';
+    const icon = github
+      ? '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>'
+      : '';
+    const label = github ? u.pathname.replace(/^\/|\/$/g, '') : u.hostname.replace(/^www\./, '');
+    return `<a class="project-link" href="${url}" target="_blank" rel="noopener">${icon}<span>${label}</span>${github ? '' : '<span aria-hidden="true">↗</span>'}</a>`;
+  }
+
+  // A writeup's chapters: its h2s, listed in the left margin and following
+  // the reader down the page. The one being read is marked; pressing one
+  // scrolls to it. Passing null tears the last set down.
+  setupChapters(article) {
+    if (this._chapterScroll) window.removeEventListener('scroll', this._chapterScroll);
+    this._chapterScroll = null;
+    if (!article) return;
+    const nav = article.querySelector('.chapters');
+    const heads = [...article.querySelectorAll('.article-body h2')];
+    if (!nav || heads.length < 2) { if (nav) nav.remove(); return; }
+    nav.querySelector('ol').innerHTML = heads.map((h, i) => {
+      h.id = `chapter-${i + 1}`;
+      return `<li><button type="button" data-i="${i}">${h.textContent}</button></li>`;
+    }).join('');
+    const buttons = [...nav.querySelectorAll('button')];
+    buttons.forEach(b => b.addEventListener('click', () => {
+      const h = heads[+b.dataset.i];
+      window.scrollTo({ top: h.getBoundingClientRect().top + window.scrollY - 48, behavior: 'smooth' });
+    }));
+    this._chapterScroll = () => {
+      let on = 0;
+      heads.forEach((h, i) => { if (h.getBoundingClientRect().top < window.innerHeight * 0.35) on = i; });
+      buttons.forEach((b, i) => b.classList.toggle('on', i === on));
+    };
+    window.addEventListener('scroll', this._chapterScroll, { passive: true });
+    this._chapterScroll();
+  }
+
+  // ========================================
+  // PROJECT ASCII
+  // ========================================
+  //
+  // After Cognition's ASCII flag: a canvas laid exactly over the banner's
+  // image layer (same box, same cover math) retypes an image as characters.
+  // Tone rides two channels — denser glyphs and darker ink where the image
+  // is darker — and each character takes its image's own colour: the
+  // projects list types home's photograph, a writeup its project's image. Moving
+  // between them, the grid stays exactly where it is and each character
+  // retypes in place, in a wave. It holds perfectly still otherwise; only
+  // the pointer moves it, scattering the few characters right beneath it.
+
+  setupProjectAscii() {
+    const canvas = document.getElementById('banner-ascii');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const CW = 4, CH = 5, SUB = 3;
+    const RAMP = ' .,-~=+*x#%&@';
+    const INK = '#141414', BG = '#fafafa';
+    // the pointer's reach (px), how fast its wake heals, how hard it stirs
+    const REACH = 14, HEAL = 4, STIR = 0.6;
+    // A retype buzzes: every character, at its own random moment, flickers
+    // through random characters for BUZZ of the run — jittering a hair,
+    // its colour flipping between the two images — then lands on the new
+    // one. The whole banner fizzes over at once, like a signal tuning in.
+    const MORPH = 0.45, BUZZ = 0.35;
+    const NOISE = '.,:;-=+*x#%&@?!/<>';
+    const st = {
+      on: false, leaving: false, raf: 0, t: 0, last: 0, shown: 0, w: 0, h: 0, dpr: 1,
+      cols: 0, rows: 0, seeds: null, wake: null, prev: null,
+      source: null, cur: null, old: null, morph: 9,
+      images: new Map(), grids: new Map(), atlases: new Map()
+    };
+    // cheap repeatable noise in [0, 1)
+    const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    const mono = () => getComputedStyle(document.documentElement).getPropertyValue('--font-mono');
+    const keyOf = src => `${src.src}|${src.position}|${src.color ? 1 : 0}`;
+
+    const loadImage = src => {
+      if (!st.images.has(src)) {
+        st.images.set(src, new Promise(resolve => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = src;
+        }));
+      }
+      return st.images.get(src);
+    };
+
+    // The type fills the whole banner, as the photograph does on home.
+    const card = () => ({ x: 0, y: 0, w: st.w, h: st.h });
+
+    // One row of glyphs in one colour, drawn once, stamped per cell at
+    // whatever opacity the cell's tone asks for.
+    const atlas = colour => {
+      if (st.atlases.has(colour)) return st.atlases.get(colour);
+      const a = document.createElement('canvas');
+      a.width = RAMP.length * CW * st.dpr; a.height = CH * st.dpr;
+      const actx = a.getContext('2d');
+      actx.scale(st.dpr, st.dpr);
+      actx.fillStyle = colour;
+      // a touch larger than the cell, so the type crowds into one texture
+      actx.font = `500 ${CH + 1.5}px ${mono()}`;
+      actx.textAlign = 'center'; actx.textBaseline = 'middle';
+      [...RAMP].forEach((c, i) => actx.fillText(c, i * CW + CW / 2, CH / 2 + 0.5));
+      st.atlases.set(colour, a);
+      return a;
+    };
+
+    // Separable box blur over a w x h grid.
+    const boxBlur = (src, w, h, r) => {
+      const tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+      for (let y = 0; y < h; y++) {
+        let acc = 0;
+        for (let x = -r; x <= r; x++) acc += src[y * w + Math.max(0, Math.min(w - 1, x))];
+        for (let x = 0; x < w; x++) {
+          tmp[y * w + x] = acc / (2 * r + 1);
+          acc += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)];
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let acc = 0;
+        for (let y = -r; y <= r; y++) acc += tmp[Math.max(0, Math.min(h - 1, y)) * w + x];
+        for (let y = 0; y < h; y++) {
+          out[y * w + x] = acc / (2 * r + 1);
+          acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+        }
+      }
+      return out;
+    };
+
+    // An image as a grid: per character, its glyph, its opacity, and (in
+    // colour) its ink. Painted the way CSS paints the layer (cover +
+    // position), then sampled SUB times finer than the type so each
+    // character reads the middle of its own cell.
+    const gridFor = (source, img) => {
+      const key = keyOf(source);
+      if (st.grids.has(key)) return st.grids.get(key);
+      const { cols, rows } = st;
+      const scale = Math.max(st.w / img.width, st.h / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      const [px, py] = (source.position || 'center').split(' ');
+      const frac = v => v === 'top' || v === 'left' ? 0 : v === 'bottom' || v === 'right' ? 1
+        : v === 'center' || !v ? 0.5 : parseFloat(v) / 100;
+      const ox = (st.w - dw) * frac(px), oy = (st.h - dh) * frac(py || 'center');
+      const sample = (w, h) => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const cctx = c.getContext('2d'); cctx.imageSmoothingQuality = 'high';
+        // map the cell grid back into the image's own pixels
+        cctx.drawImage(img, -ox / scale, -oy / scale, cols * CW / scale, rows * CH / scale, 0, 0, w, h);
+        return cctx.getImageData(0, 0, w, h).data;
+      };
+      const gw = cols * SUB, gh = rows * SUB;
+      const d = sample(gw, gh);
+      const raw = new Float32Array(gw * gh);
+      for (let i = 0; i < raw.length; i++) raw[i] = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / 255;
+      // Gentle local contrast — enough to lift a figure off its ground
+      // without a halo — then stretch over the whole ramp.
+      const blur = boxBlur(raw, gw, gh, 12);
+      const lc = raw.map((v, i) => blur[i] + (v - blur[i]) * 1.7);
+      const sorted = Float32Array.from(lc).sort();
+      const lo = sorted[Math.floor(sorted.length * 0.01)], hi = sorted[Math.floor(sorted.length * 0.99)];
+      const n = cols * rows;
+      const glyph = new Uint8Array(n), alpha = new Float32Array(n), ink = new Array(n);
+      const cd = source.color ? sample(cols, rows) : null;
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = j * cols + i;
+          const l = Math.min(1, Math.max(0, (lc[(j * SUB + 1) * gw + i * SUB + 1] - lo) / (hi - lo)));
+          const dark = 1 - l;
+          glyph[k] = Math.round(dark * (RAMP.length - 1));
+          alpha[k] = 0.28 + 0.72 * Math.pow(dark, 1.15);
+          if (cd) {
+            // the cell's own colour, deepened and saturated so it holds on
+            // the light page, then rounded so a few dozen atlases cover it
+            let [r, g, b] = [cd[k * 4], cd[k * 4 + 1], cd[k * 4 + 2]];
+            const m = 0.299 * r + 0.587 * g + 0.114 * b;
+            [r, g, b] = [r, g, b].map(v => Math.max(0, Math.min(255, (m + (v - m) * 2.8) * 0.92)));
+            const q = v => Math.min(255, Math.round(v / 24) * 24);
+            ink[k] = `rgb(${q(r)},${q(g)},${q(b)})`;
+            // colour carries the tone, so even light cells stay fairly solid
+            glyph[k] = Math.max(glyph[k], 4);
+            alpha[k] = 0.72 + 0.28 * dark;
+          } else {
+            ink[k] = INK;
+          }
+        }
+      }
+      const grid = { glyph, alpha, ink };
+      st.grids.set(key, grid);
+      return grid;
+    };
+
+    // Size the canvas and the character grid to the banner; grids are per
+    // size, so a resize starts them over.
+    const measure = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width) return false;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (rect.width === st.w && rect.height === st.h && dpr === st.dpr) return true;
+      st.dpr = dpr; st.w = rect.width; st.h = rect.height;
+      canvas.width = Math.round(st.w * st.dpr);
+      canvas.height = Math.round(st.h * st.dpr);
+      st.cols = Math.floor(st.w / CW); st.rows = Math.floor(st.h / CH);
+      st.seeds = Float32Array.from({ length: st.cols * st.rows }, () => Math.random());
+      // each character's moment to land in a retype
+      st.turns = Float32Array.from({ length: st.cols * st.rows }, () => BUZZ + Math.random() * (1 - BUZZ));
+      st.wake = new Float32Array(st.cols * st.rows);
+      st.grids.clear(); st.atlases.clear();
+      return true;
+    };
+
+    // Bring the grid for a source up, retyping from whatever is showing.
+    const show = async (source, morph) => {
+      st.source = source;
+      const img = await loadImage(source.src);
+      if (!img || st.source !== source || !measure()) return;
+      const next = gridFor(source, img);
+      if (st.cur && st.cur !== next && morph && !reduced) { st.old = st.cur; st.morph = 0; }
+      else { st.old = null; st.morph = 9; }
+      st.cur = next;
+      draw();
+      wake();
+    };
+
+    const draw = () => {
+      if (!st.cur) return;
+      const { dpr, cols, rows, t } = st;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, st.w, st.h);
+
+      // Arrival from a photograph: cells turn from photo to type in a
+      // scattered wave running left to right. Leaving runs it backwards.
+      const reveal = reduced ? 2 : Math.min(2, st.shown / 0.9);
+      const full = reveal >= 2;
+      if (full) { ctx.fillStyle = BG; ctx.fillRect(0, 0, st.w, st.h); }
+      const aw = CW * dpr, ah = CH * dpr;
+      const roll = Math.floor(t * 14);
+      // where the run is, and a fresh roll of noise ~30 times a second
+      const p = st.old ? Math.min(1, st.morph / MORPH) : 1;
+      const buzz = Math.floor(t * 30);
+      for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < cols; i++) {
+          const k = j * cols + i;
+          const th = st.seeds[k] * 0.6 + (i / cols) * 0.8;
+          if (!full && th > reveal) continue;
+          const x = i * CW, y = j * CH;
+          if (!full) { ctx.globalAlpha = 1; ctx.fillStyle = BG; ctx.fillRect(x, y, CW, CH); }
+          // the type thins out under the chrome so the name and icons read
+          const chrome = Math.min(1, 0.12 + 0.88 * Math.max(0, (y - this.bannerBar * 0.55) / (this.bannerBar * 0.9)));
+          const turn = st.old ? st.turns[k] : 0;
+          if (p < turn && p > turn - BUZZ) {
+            // buzzing: a random character, either image's colour, a hair off
+            const n = hash(k * 2.3 + buzz);
+            const from = n < 0.5 ? st.old : st.cur;
+            const ink = from.ink[k];
+            ctx.globalAlpha = Math.max(from.alpha[k], 0.45) * chrome * (0.55 + 0.45 * hash(k * 7.1 + buzz));
+            ctx.fillStyle = ink;
+            ctx.font = `500 ${CH + 1.5}px ${mono()}`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(NOISE[Math.floor(hash(k * 5.7 + buzz) * NOISE.length)],
+              x + CW / 2 + (hash(k * 3.3 + buzz) - 0.5) * 2, y + CH / 2 + 0.5 + (hash(k * 4.9 + buzz) - 0.5) * 2);
+            continue;
+          }
+          const grid = p < turn ? st.old : st.cur, s = k;
+          const g = grid.glyph[s];
+          if (g === 0) continue;
+          let alpha = grid.alpha[s] * chrome;
+          let dx = 0, dy = 0;
+          // the pointer's wake: stirred cells drop out or jitter loose,
+          // re-rolling a few times a second until they settle
+          const e = st.wake[k];
+          if (e > 0.02) {
+            if (hash(k * 1.7 + roll) < e * 0.9) continue;
+            dx = (hash(k * 3.1 + roll) - 0.5) * e * CW * 6;
+            dy = (hash(k * 5.3 + roll) - 0.5) * e * CH * 4;
+            alpha *= 1 - e * 0.35;
+          }
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(atlas(grid.ink[s]), g * aw, 0, aw, ah, x + dx, y + dy, CW, CH);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    const frame = now => {
+      if (!st.on && !st.leaving) { st.raf = 0; return; }
+      st.raf = requestAnimationFrame(frame);
+      // ~30fps is plenty for type
+      if (st.last && now - st.last < 30) return;
+      const dt = Math.min(0.1, (now - (st.last || now)) / 1000);
+      st.last = now; st.t += dt;
+      if (!st.cur) return;   // the image is still loading
+      if (st.leaving) {
+        // Leaving: the arrival run backwards — type turns back into the
+        // photograph cell by cell, the wave retreating right to left.
+        st.shown -= dt * 1.6;
+        if (st.shown <= -0.05) {
+          st.leaving = false;
+          this.banner.classList.remove('ascii-on', 'ascii-leaving');
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          return;
+        }
+        if (canvas.getBoundingClientRect().bottom > 0) draw();
+        return;
+      }
+      // arrival runs at the same pace as leaving
+      st.shown += dt * 1.6;
+      const morphing = st.old && st.morph < MORPH;
+      if (st.old) { st.morph += dt; if (!morphing) st.old = null; }
+      let stirred = false;
+      const keep = Math.exp(-dt * HEAL);
+      for (let i = 0; i < st.wake.length; i++) { st.wake[i] *= keep; if (st.wake[i] > 0.01) stirred = true; }
+      // Still: nothing is drawn once the type has arrived or retyped and the
+      // pointer's wake has healed, or while the banner is out of sight.
+      if (!stirred && !morphing && st.shown > 2.2) return;
+      if (canvas.getBoundingClientRect().bottom > 0) draw();
+    };
+    const wake = () => { if (!reduced && !st.raf && (st.on || st.leaving)) { st.last = 0; st.raf = requestAnimationFrame(frame); } };
+
+    // source: { src, position, color } to show, or null to hand the banner
+    // back to the photograph.
+    this.setProjectAscii = source => {
+      const on = !!source;
+      if (!on) {
+        if (!st.on) return;
+        st.on = false;
+        st.prev = null;
+        if (reduced || !st.cur) { this.banner.classList.remove('ascii-on'); return; }
+        // hand the type back to the photograph in reverse, from wherever the
+        // arrival had got to (1.26 is where the last cell turned to type on
+        // the way in, so the reverse starts moving at once)
+        st.leaving = true;
+        st.shown = Math.min(st.shown, 1.26);
+        this.banner.classList.add('ascii-leaving');
+        wake();
+        return;
+      }
+      const arriving = !st.on;
+      st.on = true;
+      this.banner.classList.add('ascii-on');
+      this.banner.classList.remove('ascii-leaving');
+      if (arriving) {
+        // Back before the reverse finished: carry on forward from there.
+        // Otherwise the type starts resolving straight away.
+        if (st.leaving) st.leaving = false;
+        else st.shown = reduced ? 2 : -0.05;
+      }
+      // Already typed: retype in place. Arriving: just show it.
+      const same = st.source && keyOf(st.source) === keyOf(source);
+      if (!same || arriving) show(source, !arriving);
+      wake();
+    };
+
+    // Stir the cells along the pointer's path since the last event, so a
+    // fast sweep leaves an unbroken wake rather than a row of dots.
+    const stir = (x, y) => {
+      const ci = Math.round(x / CW), cj = Math.round(y / CH);
+      const ri = Math.ceil(REACH / CW), rj = Math.ceil(REACH / CH);
+      for (let j = Math.max(0, cj - rj); j <= Math.min(st.rows - 1, cj + rj); j++) {
+        for (let i = Math.max(0, ci - ri); i <= Math.min(st.cols - 1, ci + ri); i++) {
+          const d = Math.hypot((i - ci) * CW, (j - cj) * CH) / REACH;
+          if (d >= 1) continue;
+          const k = j * st.cols + i;
+          st.wake[k] = Math.min(1, st.wake[k] + (1 - d * d) * (0.55 + 0.45 * st.seeds[k]) * STIR);
+        }
+      }
+    };
+    canvas.addEventListener('pointermove', e => {
+      if (reduced || !st.wake || !st.on) return;
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const from = st.prev || { x, y };
+      const steps = Math.max(1, Math.ceil(Math.hypot(x - from.x, y - from.y) / 6));
+      for (let n = 1; n <= steps; n++) stir(from.x + (x - from.x) * n / steps, from.y + (y - from.y) * n / steps);
+      st.prev = { x, y };
+      wake();
+    });
+    canvas.addEventListener('pointerleave', () => { st.prev = null; });
+    new ResizeObserver(() => {
+      if (!st.on || !st.source) return;
+      st.w = 0;   // force a re-measure
+      show(st.source, false);
+    }).observe(canvas);
   }
 
   // ========================================
@@ -1417,6 +1924,16 @@ class Site {
       await this.showHome();
     } else if (hash === 'thoughts' || hash.startsWith('thoughts/')) {
       await this.showThoughtsList();
+    } else if (hash === 'projects') {
+      await this.showProjectsList();
+    } else if (hash.startsWith('project/')) {
+      const slug = hash.replace('project/', '');
+      // Like articles: a direct load puts the projects page behind it.
+      if (!this._routedOnce) {
+        history.replaceState(null, '', '#projects');
+        history.pushState(null, '', `#project/${slug}`);
+      }
+      await this.showProject(slug);
     } else if (hash === 'reading') {
       await this.showReadingList();
     } else if (hash === 'favorites' || hash === 'solaces') {
@@ -1451,6 +1968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   site.data = {
     posts: site.loadPosts(),
     reading: site.loadReading(),
+    projects: site.loadProjects(),
     solaces: site.loadSolaces()
   };
 
