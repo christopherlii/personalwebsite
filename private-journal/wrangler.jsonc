@@ -24,6 +24,9 @@
   "env": {
     "production": {
       "name": "christopher-private-journal",
+      "triggers": {
+        "crons": ["17 9 * * *"]
+      },
       "ai": {
         "binding": "AI"
       },

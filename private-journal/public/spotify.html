@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spotify · Christopher Li</title>
+  <link rel="stylesheet" href="spotify.css">
+  <script defer src="spotify.js"></script>
+</head>
+<body>
+  <main>
+    <a href="./" class="back">← journal</a>
+    <h1>Spotify</h1>
+    <p>show your top song and artist on your site's info page, using Spotify's rankings from roughly the past four weeks.</p>
+    <form id="login" hidden>
+      <label for="password">journal password</label>
+      <input id="password" type="password" autocomplete="new-password" required>
+      <button type="submit">unlock</button>
+    </form>
+    <section id="setup" hidden>
+      <p>in your <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer">Spotify developer app</a>, register this redirect address:</p>
+      <code id="redirect"></code>
+      <p class="muted">choose Web API when creating the app. Spotify currently requires the app owner to have Premium.</p>
+      <form id="connect">
+        <label for="client-id">Client ID</label>
+        <input id="client-id" autocomplete="off" spellcheck="false" pattern="[a-fA-F0-9]{32}" maxlength="32" required>
+        <button type="submit" id="connect-button">connect Spotify</button>
+      </form>
+      <p class="muted">only permission to read your top items is requested. your Client Secret is not needed. refreshes run daily; Spotify may ask you to reconnect when authorization expires.</p>
+      <div id="connected" hidden>
+        <p id="listening"></p>
+        <button type="button" id="disconnect">disconnect and remove listening stats</button>
+      </div>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

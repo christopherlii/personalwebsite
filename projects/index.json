@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Instaplay",
+    "url": "https://www.instaplay.ai/",
+    "role": "General Context Labs",
+    "when": "2026",
+    "image": "/static/images/projects/instaplay-race.jpg",
+    "imagePosition": "center 60%",
+    "slug": "instaplay"
+  },
+  {
+    "name": "Mantle",
+    "slug": "mantle",
+    "url": "https://devpost.com/software/mantle-7bp5ka",
+    "role": "Startup Week Buildathon",
+    "when": "2026",
+    "image": "/static/images/projects/mantle-context-graph.svg",
+    "imagePosition": "center"
+  },
+  {
+    "name": "this site",
+    "url": "https://github.com/christopherlii/personalwebsite",
+    "role": "Personal",
+    "when": "2026",
+    "image": "/static/images/hero/rock.jpg",
+    "imagePosition": "center 70%",
+    "slug": "this-site"
+  }
+]

@@ -1428,14 +1428,6 @@ body.no-top-fade .top-fade {
    PROJECTS
    ======================================== */
 
-/* The banner on projects is the photograph itself, cut clean: the same
-   travelling window as the painting, with a plain rectangle for a mask
-   instead of the torn edge. */
-.banner.squared .banner-media {
-  -webkit-mask-image: linear-gradient(#000, #000);
-  mask-image: linear-gradient(#000, #000);
-}
-
 /* Laid exactly over the image layer (same box), so the type samples the
    pixel beneath it. It paints nothing until the photo has settled into its
    card, then resolves cell by cell. */
@@ -1451,139 +1443,108 @@ body.no-top-fade .top-fade {
   transition: opacity 160ms ease;
 }
 
+/* Type on the page colour wants no panel shadow round it. */
+.banner.ascii-on {
+  box-shadow: none;
+}
+
+/* Leaving, the type stays up while it dissolves back into the photo, but
+   no longer takes the pointer. */
+.banner.ascii-leaving .banner-ascii {
+  pointer-events: none !important;
+}
+
 .banner.ascii-on .banner-ascii {
   opacity: 1;
   pointer-events: auto;
   transition: none;
 }
 
-/* Portfolio panels: a hairline and a meta row above each, then the image
-   with the name set large across its foot. The first one runs full width. */
-.projects-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 32px 16px;
-}
-
-.project-panel {
-  display: block;
-  color: inherit;
-  min-width: 0;
-}
-
-.project-panel.featured {
-  grid-column: 1 / -1;
-}
-
-.project-meta {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0 10px;
-  border-top: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-
-.project-arrow {
-  display: inline-block;
-  transition: transform 0.3s ease;
-}
-
-.project-face {
+/* A project writeup runs as wide as the banner above it (the full column,
+   past the page padding), with its chapters in the margin to the left. */
+.article.project-writeup {
   position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-  aspect-ratio: 1 / 1;
-  background: #111;
+  margin: 0 calc(var(--page-pad) * -1);
 }
 
-.project-panel.featured .project-face {
-  aspect-ratio: 16 / 9;
-}
-
-.project-image,
-.project-mark {
+.chapters {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+  top: 0;
+  bottom: 0;
+  right: calc(100% + 48px);
+  width: 150px;
 }
 
-.project-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-bottom: 22%;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.55);
+.chapters ol {
+  position: sticky;
+  top: 48px;
+  margin: 0;
+  /* the first chapter sits level with the title's first line */
+  padding: 23px 0 0;
+  list-style: none;
 }
 
-.project-face::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.45) 40%, transparent 68%);
-  pointer-events: none;
+.chapters li + li {
+  margin-top: 8px;
 }
 
-.project-caption {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: #fff;
+.chapters button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--fg-faint);
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
-.project-name {
-  font-family: var(--font-display);
-  font-size: 30px;
-  line-height: 1.05;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
-.project-panel.featured .project-name {
-  font-size: 40px;
-}
-
-.project-line {
-  font-size: 13px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.86);
-  max-width: 46ch;
+.chapters button.on {
+  color: var(--fg);
 }
 
 @media (hover: hover) {
-  .project-panel:hover .project-image,
-  .project-panel:hover .project-mark {
-    transform: scale(1.025);
+  .chapters button:hover {
+    color: var(--fg-muted);
   }
 
-  a.project-panel:hover .project-arrow {
-    transform: translate(2px, -2px);
+  .chapters button.on:hover {
+    color: var(--fg);
   }
 }
 
-@media (max-width: 640px) {
-  .projects-list {
-    grid-template-columns: 1fr;
-  }
+/* label and year on the left, the project's own link out at the far end */
+.article-date.project-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 
-  .project-face,
-  .project-panel.featured .project-face {
-    aspect-ratio: 4 / 3;
-  }
+.project-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
 
-  .project-panel.featured .project-name {
-    font-size: 30px;
+.project-link svg {
+  flex-shrink: 0;
+}
+
+@media (hover: hover) {
+  .project-link:hover {
+    color: var(--fg);
+  }
+}
+
+/* no margin to sit in: the chapters go */
+@media (max-width: 1080px) {
+  .chapters {
+    display: none;
   }
 }
 
