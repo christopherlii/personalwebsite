@@ -25,7 +25,7 @@ in a redesign of our harness, we aimed to give the model as much freedom as poss
   - ordinary HTML, CSS, and TypeScript replace the custom game SDK contract, so Pixel works with familiar web APIs and owns the game's structure; a small bridge added at build time connects it to the platform
   - direct control over the coding loop makes tool scheduling, build feedback, repair, and telemetry part of the harness rather than an external agent process
   - graphics and physics libraries, playable archetype starters, and single-call sprite sheets give the agent reusable building blocks
-  - median successful generation drops from **5m25s to 3m30s** in the September 2–5 rollout, while first-create pipeline completion is **92.9% versus Spark's 97.1%**
+  - median successful generation drops from **5m25s to 3m30s**
 - **collaborative editing:**
   - friends-only co-editing with invitations, collaborator management, and permissions
   - shared edit queue lets collaborators line up, revise, or cancel requests while a change runs, with persistent ordering and access checks before execution.
