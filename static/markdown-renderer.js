@@ -1860,6 +1860,8 @@ class Site {
     this.renderBreadcrumb(null, 'info');
     this.startAgeCounter();
     this.syncUrl('#stats');
+    // pushState does not fire hashchange/popstate for the Spotify loader.
+    window.dispatchEvent(new Event('site:stats'));
   }
 
   startAgeCounter() {
