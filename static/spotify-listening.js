@@ -40,5 +40,6 @@ if (typeof document !== 'undefined') {
   }
   addEventListener('hashchange', update);
   addEventListener('popstate', update);
+  addEventListener('site:stats', update);
   update();
 }
