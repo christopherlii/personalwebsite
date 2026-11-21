@@ -13,7 +13,7 @@ function text(value, maximum, name) {
   if (typeof value !== 'string' || value.length > maximum) fail(400, `Invalid ${name}.`);
   return value;
 }
-export function publicationData(value) {
+function publicationData(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(400, 'Invalid public draft.');
   const slug = text(value.slug, 100, 'address');
   if (!slugPattern.test(slug)) fail(400, 'Use lowercase words, hyphens, or underscores for the address.');
